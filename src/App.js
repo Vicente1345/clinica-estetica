@@ -1,3 +1,4 @@
+import { SelectorPlan, PLANES } from './PlanesArriendo';
 import { useState, useMemo, useEffect, useCallback } from 'react';
 import { sb } from './supabase';
 import Login from './Login';
