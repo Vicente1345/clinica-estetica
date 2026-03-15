@@ -579,29 +579,59 @@ export default function App() {
             </div>
           ):(
             <div style={S.card()}>
-              <h3 style={{margin:'0 0 4px',fontSize:15,fontWeight:500}}>Paso 1 — Solicitud de arriendo</h3>
+             <h3 style={{margin:'0 0 4px',fontSize:15,fontWeight:500}}>Paso 1 — Selecciona box y plan</h3>
               <p style={{margin:'0 0 14px',fontSize:13,color:'#666'}}>El horario se agenda solo tras confirmar el pago.</p>
-              <div style={S.g2}>
-                <div><label style={S.label}>Box *</label>
-                  <select style={S.input} value={arrForm.boxId} onChange={e=>setArrForm(a=>({...a,boxId:e.target.value}))}>
-                    <option value="">— Seleccionar —</option>
-                    {boxes.filter(b=>b.activo).map(b=><option key={b.id} value={b.id}>{b.nombre} · {b.tipo} · {fmt(b.tarifa_hora)}/hr</option>)}
-                  </select>
-                </div>
-                <div><label style={S.label}>Profesional *</label>
-                  <select style={S.input} value={arrForm.profId} onChange={e=>setArrForm(a=>({...a,profId:e.target.value}))}>
-                    <option value="">— Seleccionar —</option>
-                    {profesionales.map(p=><option key={p.id} value={p.id}>{p.nombre}</option>)}
-                  </select>
+
+              {/* Selector de profesional */}
+              <div style={{marginBottom:14}}>
+                <label style={S.label}>Profesional *</label>
+                <select style={S.input} value={arrForm.profId} onChange={e=>setArrForm(a=>({...a,profId:e.target.value}))}>
+                  <option value="">— Seleccionar profesional —</option>
+                  {profesionales.map(p=><option key={p.id} value={p.id}>{p.nombre}</option>)}
+                </select>
+              </div>
+
+              {/* Selector de tipo de box */}
+              <div style={{marginBottom:16}}>
+                <label style={S.label}>Tipo de box *</label>
+                <div style={{display:'flex',gap:10}}>
+                  {[['estetico','✨ Box Estético'],['dental','🦷 Box Dental']].map(([tipo,label])=>(
+                    <div
+                      key={tipo}
+                      onClick={()=>setArrForm(a=>({...a,tipoBox:tipo,planSel:null}))}
+                      style={{flex:1,padding:'12px',borderRadius:10,border:`2px solid ${arrForm.tipoBox===tipo?(tipo==='dental'?'#1D9E75':'#378ADD'):'#ddd'}`,background:arrForm.tipoBox===tipo?(tipo==='dental'?'#E1F5EE':'#E6F1FB'):'#fff',cursor:'pointer',textAlign:'center'}}
+                    >
+                      <div style={{fontSize:14,fontWeight:600}}>{label}</div>
+                      <div style={{fontSize:11,color:'#888',marginTop:3}}>{tipo==='dental'?'Con/sin asistente':'Por hora o plan fijo'}</div>
+                    </div>
+                  ))}
                 </div>
               </div>
-              <div style={S.g3}>
-                <div><label style={S.label}>Fecha *</label><input type="date" style={S.input} value={arrForm.fecha} onChange={e=>setArrForm(a=>({...a,fecha:e.target.value}))}/></div>
-                <div><label style={S.label}>Hora inicio</label><input type="time" style={S.input} value={arrForm.horaInicio} onChange={e=>setArrForm(a=>({...a,horaInicio:e.target.value}))}/></div>
-                <div><label style={S.label}>Hora fin</label><input type="time" style={S.input} value={arrForm.horaFin} onChange={e=>setArrForm(a=>({...a,horaFin:e.target.value}))}/></div>
-              </div>
-              {boxArr&&horasArr>0&&<div style={{background:'#EAF3DE',border:'1px solid #C0DD97',borderRadius:8,padding:10,fontSize:13,marginTop:10,color:'#173404'}}>{horasArr}h · {fmt(boxArr.tarifa_hora)}/hr · <strong>Total: {fmt(montoArr)}</strong></div>}
-              <div style={{marginTop:20}}><button style={S.btn('primary')} onClick={handleArrNext}>Continuar al pago →</button></div>
+
+              {/* Selector de plan — aparece al elegir el tipo de box */}
+              {arrForm.tipoBox && (
+                <SelectorPlan
+                  tipoBox={arrForm.tipoBox}
+                  onSeleccionar={(seleccion)=>{
+                    setArrForm(a=>({
+                      ...a,
+                      planSel:      seleccion,
+                      boxId:        boxes.find(b=>b.tipo===(arrForm.tipoBox==='dental'?'Dental':'Estético') && b.activo)?.id || '',
+                      planId:       seleccion.plan.id,
+                      planLabel:    seleccion.plan.label,
+                      planMeses:    seleccion.plan.meses,
+                      planAsistente:seleccion.plan.asistente,
+                      diasJornada:  seleccion.dias,
+                      horaInicio:   seleccion.horario.inicio,
+                      horaFin:      seleccion.horario.fin,
+                      fecha:        seleccion.fechaInicio || arrForm.fecha,
+                      monto:        seleccion.monto,
+                      esPlan:       seleccion.esPlan,
+                    }));
+                    setArrStep(1);
+                  }}
+                />
+              )}
             </div>
           )}
           <h3 style={{fontSize:14,fontWeight:500,margin:'24px 0 10px'}}>Arriendos registrados</h3>
