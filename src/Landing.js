@@ -1,0 +1,384 @@
+import { useState, useEffect } from "react";
+import { sb } from "./supabase";
+
+// ── PALETA inspirada en Barcelona Clinic Instagram ─────────────
+const C = {
+  lila:        "#9B8EC4",
+  lilaClaro:   "#C4B8E3",
+  lilaPale:    "#EDE8F7",
+  rosa:        "#E8B4C0",
+  rosaPale:    "#FAEEF1",
+  beige:       "#F5EFE6",
+  beigeOscuro: "#E8DDD0",
+  cafe:        "#3D2B1F",
+  cafeClaro:   "#6B4C3B",
+  blanco:      "#FFFFFF",
+  gris:        "#888888",
+  dorado:      "#C9A96E",
+};
+
+const PLANES_ESTETICO = [
+  { titulo:"Por hora",            precio:10000,  detalle:"Tarifa flexible por hora" },
+  { titulo:"2 horas",             precio:18000,  detalle:"Bloque de 2 horas continuas" },
+  { titulo:"Jornada suelta (5h)", precio:45000,  detalle:"Jornada completa sin compromiso" },
+  { titulo:"1 jornada/semana",    precio:170000, detalle:"Plan mensual · horario fijo" },
+  { titulo:"2 jornadas/semana",   precio:330000, detalle:"Plan mensual · horario fijo" },
+  { titulo:"3 jornadas/semana",   precio:480000, detalle:"Plan mensual · horario fijo" },
+  { titulo:"Plan Exclusivo ⭐",   precio:1350000,detalle:"5 jornadas semanales" },
+];
+
+const PLANES_DENTAL = [
+  { titulo:"Jornada suelta",           precio:45000,  detalle:"Sin asistente · sin compromiso" },
+  { titulo:"1 jornada/semana",         precio:170000, detalle:"Sin asistente · plan mensual" },
+  { titulo:"2 jornadas/semana",        precio:340000, detalle:"Sin asistente · plan mensual" },
+  { titulo:"Jornada suelta Pro",       precio:65000,  detalle:"Con asistente incluido" },
+  { titulo:"1 jornada/semana Pro",     precio:250000, detalle:"Con asistente · plan mensual" },
+  { titulo:"2 jornadas/semana Pro",    precio:500000, detalle:"Con asistente · plan mensual" },
+  { titulo:"Plan Exclusivo ⭐",        precio:1350000,detalle:"5 jornadas semanales" },
+];
+
+const fmt = n => n.toLocaleString("es-CL", { style:"currency", currency:"CLP", maximumFractionDigits:0 });
+
+export default function Landing({ onLogin }) {
+  const [modalLogin, setModalLogin] = useState(false);
+  const [email, setEmail]           = useState("");
+  const [pass, setPass]             = useState("");
+  const [error, setError]           = useState("");
+  const [loading, setLoading]       = useState(false);
+  const [boxActivo, setBoxActivo]   = useState("estetico");
+  const [dispBoxes, setDispBoxes]         = useState([]);
+  const [dispArriendos, setDispArriendos] = useState([]);
+  const [dispBoxSel, setDispBoxSel]       = useState(null);
+  const [dispSemana, setDispSemana]       = useState(0);
+
+  useEffect(() => {
+    sb.from("boxes").select("id,nombre,tipo").eq("activo",true).order("nombre")
+      .then(({data})=>{ if(data){ setDispBoxes(data); setDispBoxSel(data[0]); }});
+    sb.from("arriendos").select("box_id,fecha,hora_inicio,hora_fin,estado")
+      .in("estado",["confirmado","pendiente"]).order("fecha")
+      .then(({data})=>{ if(data) setDispArriendos(data); });
+  }, []);
+
+  const handleLogin = async e => {
+    e.preventDefault();
+    setLoading(true); setError("");
+    const { data } = await sb.from("usuarios")
+      .select("*").eq("email", email.trim().toLowerCase())
+      .eq("password_hash", pass).eq("activo", true).single();
+    setLoading(false);
+    if (data) { onLogin(data); setModalLogin(false); }
+    else setError("Email o contraseña incorrectos");
+  };
+
+  return (
+    <div style={{ fontFamily:"'Georgia',serif", background:C.beige, color:C.cafe, minHeight:"100vh" }}>
+
+      {/* ── TOPBAR ── */}
+      <div style={{ background:C.lila, color:C.blanco, padding:"8px 40px", display:"flex", justifyContent:"space-between", alignItems:"center", fontSize:12, letterSpacing:".1em" }}>
+        <span>+56 9 8628 4965 · San Ignacio 1263, Puerto Varas</span>
+        <button onClick={()=>setModalLogin(true)} style={{ background:"none", border:`1px solid rgba(255,255,255,0.6)`, color:C.blanco, padding:"4px 16px", borderRadius:20, cursor:"pointer", fontSize:11, letterSpacing:".1em" }}>
+          ACCESO EQUIPO
+        </button>
+      </div>
+
+      {/* ── NAVBAR ── */}
+      <nav style={{ background:C.blanco, borderBottom:`1px solid ${C.beigeOscuro}`, padding:"14px 40px", display:"flex", justifyContent:"space-between", alignItems:"center", position:"sticky", top:0, zIndex:100, boxShadow:"0 2px 12px rgba(155,142,196,0.08)" }}>
+        <img src="/logo.png" alt="Cowork Salud" style={{ height:90, objectFit:"contain", display:"block" }}/>
+        <div style={{ display:"flex", gap:28, fontSize:12, letterSpacing:".1em", textTransform:"uppercase" }}>
+          {[["#como-funciona","Cómo funciona"],["#boxes","Boxes"],["#planes","Planes"],["#disponibilidad","Disponibilidad"],["#contacto","Contacto"]].map(([href,label])=>(
+            <a key={href} href={href} style={{ textDecoration:"none", color:C.cafeClaro, transition:"color .2s" }}>{label}</a>
+          ))}
+        </div>
+      </nav>
+
+      {/* ── HERO ── */}
+      <section style={{ background:`linear-gradient(135deg, ${C.lilaPale} 0%, ${C.rosaPale} 50%, ${C.beige} 100%)`, padding:"90px 40px", textAlign:"center", position:"relative", overflow:"hidden" }}>
+        {/* Círculos decorativos */}
+        <div style={{ position:"absolute", top:-80, right:-80, width:300, height:300, borderRadius:"50%", background:`radial-gradient(circle, ${C.lilaClaro}33, transparent 70%)`, pointerEvents:"none" }}/>
+        <div style={{ position:"absolute", bottom:-60, left:-60, width:250, height:250, borderRadius:"50%", background:`radial-gradient(circle, ${C.rosa}33, transparent 70%)`, pointerEvents:"none" }}/>
+        <div style={{ position:"relative", maxWidth:680, margin:"0 auto" }}>
+          <div style={{ fontSize:11, letterSpacing:".3em", color:C.lila, textTransform:"uppercase", marginBottom:16 }}>Espacio odontológico y estético compartido</div>
+          <h1 style={{ fontSize:46, fontWeight:400, lineHeight:1.2, margin:"0 0 20px", color:C.cafe, fontStyle:"italic" }}>
+            Llega solo con tu paciente<br/>y tu talento
+          </h1>
+          <p style={{ fontSize:15, color:C.cafeClaro, lineHeight:1.8, marginBottom:36, fontFamily:"system-ui" }}>
+            Infraestructura lista · Documentación al día · Sin inversión inicial · Flexibilidad real
+          </p>
+          <div style={{ display:"flex", gap:14, justifyContent:"center", flexWrap:"wrap" }}>
+            <a href="#planes" style={{ background:C.lila, color:C.blanco, padding:"13px 32px", textDecoration:"none", fontSize:12, fontWeight:600, letterSpacing:".12em", textTransform:"uppercase", borderRadius:30, boxShadow:"0 4px 16px rgba(155,142,196,0.4)" }}>
+              VER PLANES Y PRECIOS
+            </a>
+            <a href="#contacto" style={{ border:`1px solid ${C.lila}`, color:C.lila, padding:"13px 32px", textDecoration:"none", fontSize:12, letterSpacing:".12em", textTransform:"uppercase", borderRadius:30 }}>
+              CONSULTAR DISPONIBILIDAD
+            </a>
+          </div>
+        </div>
+      </section>
+
+      {/* ── STATS ── */}
+      <section style={{ background:C.lila, padding:"28px 40px" }}>
+        <div style={{ maxWidth:800, margin:"0 auto", display:"grid", gridTemplateColumns:"repeat(3,1fr)", gap:20, textAlign:"center" }}>
+          {[["2","Boxes equipados"],["100%","Documentación al día"],["Flex","Horarios a tu medida"]].map(([n,t])=>(
+            <div key={t}>
+              <div style={{ fontSize:30, fontWeight:700, color:C.blanco }}>{n}</div>
+              <div style={{ fontSize:11, letterSpacing:".15em", textTransform:"uppercase", color:C.lilaPale, marginTop:4 }}>{t}</div>
+            </div>
+          ))}
+        </div>
+      </section>
+
+      {/* ── CÓMO FUNCIONA ── */}
+      <section id="como-funciona" style={{ padding:"80px 40px", background:C.blanco }}>
+        <div style={{ maxWidth:860, margin:"0 auto" }}>
+          <div style={{ textAlign:"center", marginBottom:52 }}>
+            <div style={{ fontSize:10, letterSpacing:".3em", textTransform:"uppercase", color:C.lila, marginBottom:12 }}>Simple y sin complicaciones</div>
+            <h2 style={{ fontSize:32, fontWeight:400, margin:0, color:C.cafe }}>¿Cómo funciona el arriendo?</h2>
+          </div>
+          <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fit,minmax(200px,1fr))", gap:32 }}>
+            {[
+              ["01","Elige tu plan","Selecciona el box y el bloque de horas o plan mensual que más te acomoda."],
+              ["02","Transfiere","Realiza la transferencia y adjunta el comprobante en la plataforma."],
+              ["03","Confirmación","La administración verifica el pago y confirma tu reserva."],
+              ["04","¡A trabajar!","El box estará listo. Solo trae a tu paciente."],
+            ].map(([n,t,d])=>(
+              <div key={n} style={{ borderTop:`3px solid ${C.lilaClaro}`, paddingTop:20 }}>
+                <div style={{ fontSize:36, fontWeight:700, color:C.lilaPale, lineHeight:1 }}>{n}</div>
+                <div style={{ fontSize:15, fontWeight:600, margin:"10px 0 8px", color:C.cafe }}>{t}</div>
+                <div style={{ fontSize:13, color:C.cafeClaro, lineHeight:1.7, fontFamily:"system-ui" }}>{d}</div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* ── BOXES ── */}
+      <section id="boxes" style={{ padding:"80px 40px", background:C.lilaPale }}>
+        <div style={{ maxWidth:860, margin:"0 auto" }}>
+          <div style={{ textAlign:"center", marginBottom:52 }}>
+            <div style={{ fontSize:10, letterSpacing:".3em", textTransform:"uppercase", color:C.lila, marginBottom:12 }}>Instalaciones</div>
+            <h2 style={{ fontSize:32, fontWeight:400, margin:0, color:C.cafe }}>Nuestros boxes</h2>
+          </div>
+          <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fit,minmax(260px,1fr))", gap:24 }}>
+            {[
+              { icon:"✨", color:C.lila, bg:C.lilaPale, nombre:"Box 1 · Estético", desc:"Equipado para medicina estética, cosmetología y tratamientos faciales y corporales.", items:["Camilla profesional","Iluminación especializada","WiFi y climatización","Insumos básicos disponibles"] },
+              { icon:"🦷", color:C.rosa, bg:C.rosaPale, nombre:"Box 2 · Dental", desc:"Unidad dental completa con todos los equipos necesarios, con o sin asistente.", items:["Sillón dental completo","Equipamiento diagnóstico","Opción con asistente","Esterilización disponible"] },
+              { icon:"🏠", color:C.dorado, bg:C.beige, nombre:"Box 3 · Multipropósito", desc:"Espacio versátil ideal para distintas especialidades de salud y bienestar.", items:["Equipamiento flexible","Iluminación regulable","WiFi y climatización","Adaptable a tu especialidad"] },
+            ].map(b=>(
+              <div key={b.nombre} style={{ background:C.blanco, borderRadius:16, overflow:"hidden", boxShadow:"0 4px 24px rgba(155,142,196,0.12)" }}>
+                <div style={{ background:`linear-gradient(135deg, ${b.color}, ${b.color}bb)`, padding:"36px 28px", textAlign:"center" }}>
+                  <div style={{ fontSize:48 }}>{b.icon}</div>
+                  <div style={{ fontSize:18, fontWeight:600, color:C.blanco, marginTop:10, letterSpacing:".05em" }}>{b.nombre}</div>
+                </div>
+                <div style={{ padding:"24px 28px" }}>
+                  <p style={{ fontSize:13, lineHeight:1.8, color:C.cafeClaro, fontFamily:"system-ui", marginBottom:16 }}>{b.desc}</p>
+                  <ul style={{ listStyle:"none", padding:0, margin:0 }}>
+                    {b.items.map(item=>(
+                      <li key={item} style={{ fontSize:12, color:C.cafe, padding:"5px 0", borderBottom:`1px solid ${C.beigeOscuro}`, fontFamily:"system-ui", display:"flex", gap:8, alignItems:"center" }}>
+                        <span style={{ color:b.color, fontWeight:700 }}>—</span> {item}
+                      </li>
+                    ))}
+                  </ul>
+                  <a href="#planes" style={{ display:"block", marginTop:20, background:b.color, color:C.blanco, textAlign:"center", padding:"11px", textDecoration:"none", fontSize:11, letterSpacing:".12em", textTransform:"uppercase", borderRadius:8, fontWeight:600 }}>
+                    VER PLANES
+                  </a>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* ── PLANES ── */}
+      <section id="planes" style={{ padding:"80px 40px", background:C.blanco }}>
+        <div style={{ maxWidth:860, margin:"0 auto" }}>
+          <div style={{ textAlign:"center", marginBottom:40 }}>
+            <div style={{ fontSize:10, letterSpacing:".3em", textTransform:"uppercase", color:C.lila, marginBottom:12 }}>Transparencia total</div>
+            <h2 style={{ fontSize:32, fontWeight:400, margin:0, color:C.cafe }}>Planes y precios</h2>
+            <p style={{ fontSize:13, color:C.gris, marginTop:10, fontFamily:"system-ui" }}>Todos los planes incluyen el espacio listo para trabajar.</p>
+          </div>
+          <div style={{ display:"flex", gap:0, marginBottom:32, borderRadius:30, overflow:"hidden", border:`2px solid ${C.lila}`, width:"fit-content", margin:"0 auto 32px" }}>
+            {[["estetico","✨ Box Estético"],["dental","🦷 Box Dental"]].map(([k,l])=>(
+              <button key={k} onClick={()=>setBoxActivo(k)} style={{ padding:"11px 28px", border:"none", cursor:"pointer", fontSize:13, fontWeight:600, background:boxActivo===k?C.lila:C.blanco, color:boxActivo===k?C.blanco:C.lila, letterSpacing:".05em", transition:"all .2s" }}>
+                {l}
+              </button>
+            ))}
+          </div>
+          <div style={{ display:"grid", gap:8 }}>
+            {(boxActivo==="estetico"?PLANES_ESTETICO:PLANES_DENTAL).map((p,i)=>(
+              <div key={i} style={{ display:"flex", justifyContent:"space-between", alignItems:"center", padding:"14px 20px", background:p.titulo.includes("⭐")?C.lila:i%2===0?C.lilaPale:C.blanco, borderRadius:10, border:`1px solid ${p.titulo.includes("⭐")?C.lila:C.beigeOscuro}` }}>
+                <div>
+                  <div style={{ fontSize:14, fontWeight:600, color:p.titulo.includes("⭐")?C.blanco:C.cafe }}>{p.titulo}</div>
+                  <div style={{ fontSize:12, color:p.titulo.includes("⭐")?C.lilaPale:C.gris, marginTop:2, fontFamily:"system-ui" }}>{p.detalle}</div>
+                </div>
+                <div style={{ textAlign:"right" }}>
+                  <div style={{ fontSize:19, fontWeight:700, color:p.titulo.includes("⭐")?C.blanco:C.lila }}>{fmt(p.precio)}</div>
+                  <div style={{ fontSize:10, color:p.titulo.includes("⭐")?C.lilaPale:C.gris, fontFamily:"system-ui" }}>{p.precio>=100000?"/ mes":"/ vez"}</div>
+                </div>
+              </div>
+            ))}
+          </div>
+          <div style={{ marginTop:20, padding:"14px 18px", background:C.lilaPale, borderRadius:10, fontSize:12, color:C.cafeClaro, fontFamily:"system-ui", lineHeight:1.8 }}>
+            💳 <strong>Forma de pago:</strong> Transferencia bancaria únicamente. Adjunta el comprobante en la plataforma para confirmar tu reserva.
+          </div>
+        </div>
+      </section>
+
+      {/* ── DISPONIBILIDAD PÚBLICA ── */}
+      <section id="disponibilidad" style={{ padding:"80px 40px", background:C.lilaPale }}>
+        <div style={{ maxWidth:860, margin:"0 auto" }}>
+          <div style={{ textAlign:"center", marginBottom:40 }}>
+            <div style={{ fontSize:10, letterSpacing:".3em", textTransform:"uppercase", color:C.lila, marginBottom:12 }}>Agenda en tiempo real</div>
+            <h2 style={{ fontSize:32, fontWeight:400, margin:0, color:C.cafe }}>Disponibilidad de boxes</h2>
+            <p style={{ fontSize:13, color:C.gris, marginTop:10, fontFamily:"system-ui" }}>Vista general — para reservar, accede con tu cuenta.</p>
+          </div>
+          <div style={{ display:"flex", gap:8, marginBottom:16, justifyContent:"center", flexWrap:"wrap" }}>
+            {dispBoxes.map(b=>(
+              <button key={b.id} onClick={()=>setDispBoxSel(b)}
+                style={{ padding:"7px 18px", borderRadius:20, border:`1px solid ${dispBoxSel?.id===b.id?C.lila:C.beigeOscuro}`, background:dispBoxSel?.id===b.id?C.lila:C.blanco, color:dispBoxSel?.id===b.id?C.blanco:C.cafeClaro, cursor:"pointer", fontSize:13, fontWeight:600 }}>
+                {b.nombre}
+              </button>
+            ))}
+          </div>
+          {(() => {
+            const getLunesP = (off=0) => {
+              const d=new Date(); const day=d.getDay();
+              const diff=d.getDate()-day+(day===0?-6:1)+off*7;
+              return new Date(new Date().setDate(diff));
+            };
+            const lunes = getLunesP(dispSemana);
+            const dias = ["Lun","Mar","Mié","Jue","Vie","Sáb"].map((l,i)=>{
+              const f=new Date(lunes); f.setDate(lunes.getDate()+i);
+              return { label:l, fecha:f.toISOString().split("T")[0] };
+            });
+            const horas = ["08:00","09:00","10:00","11:00","12:00","13:00","14:00","15:00","16:00","17:00","18:00","19:00"];
+            const ocupado = (fecha,hora) => dispArriendos.some(a=>a.box_id===dispBoxSel?.id&&a.fecha===fecha&&hora>=a.hora_inicio&&hora<a.hora_fin);
+            const pasado  = (fecha,hora) => new Date(`${fecha}T${hora}:00`) < new Date();
+            return (
+              <div style={{ background:C.blanco, borderRadius:16, padding:20, boxShadow:"0 4px 24px rgba(155,142,196,0.1)" }}>
+                <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:12 }}>
+                  <button onClick={()=>setDispSemana(s=>s-1)} disabled={dispSemana===0}
+                    style={{ padding:"6px 14px", borderRadius:20, border:`1px solid ${C.beigeOscuro}`, background:dispSemana===0?"#f5f5f5":C.blanco, cursor:dispSemana===0?"default":"pointer", fontSize:12, color:C.cafeClaro }}>
+                    ← Anterior
+                  </button>
+                  <span style={{ fontSize:13, fontWeight:600, color:C.cafe }}>{dias[0].fecha.slice(5)} — {dias[5].fecha.slice(5)}</span>
+                  <button onClick={()=>setDispSemana(s=>s+1)}
+                    style={{ padding:"6px 14px", borderRadius:20, border:`1px solid ${C.beigeOscuro}`, background:C.blanco, cursor:"pointer", fontSize:12, color:C.cafeClaro }}>
+                    Siguiente →
+                  </button>
+                </div>
+                <div style={{ display:"flex", gap:12, fontSize:11, marginBottom:10 }}>
+                  {[["#D4EDDA","#155724","Disponible"],["#F8D7DA","#721C24","Ocupado"]].map(([bg,c,l])=>(
+                    <span key={l} style={{ display:"flex", alignItems:"center", gap:5 }}>
+                      <span style={{ width:12, height:12, background:bg, border:`1px solid ${c}`, borderRadius:3, display:"inline-block" }}/>
+                      <span style={{ color:C.gris, fontFamily:"system-ui" }}>{l}</span>
+                    </span>
+                  ))}
+                </div>
+                <div style={{ overflowX:"auto" }}>
+                  <table style={{ borderCollapse:"collapse", width:"100%", fontSize:11 }}>
+                    <thead>
+                      <tr>
+                        <th style={{ padding:"5px 8px", textAlign:"left", color:C.gris, fontWeight:400, width:45 }}>Hora</th>
+                        {dias.map(d=>(
+                          <th key={d.fecha} style={{ padding:"5px 4px", textAlign:"center", fontWeight:400, color:C.cafeClaro, minWidth:70 }}>
+                            {d.label}<br/><span style={{ fontSize:10 }}>{d.fecha.slice(5)}</span>
+                          </th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {horas.map(hora=>(
+                        <tr key={hora}>
+                          <td style={{ padding:"2px 8px", color:C.gris, fontSize:10 }}>{hora}</td>
+                          {dias.map(d=>{
+                            const ocp=ocupado(d.fecha,hora); const pas=pasado(d.fecha,hora);
+                            let bg="#D4EDDA",color="#155724",label="✓";
+                            if(pas){bg="#f5f5f5";color="#bbb";label="–";}
+                            if(ocp){bg="#F8D7DA";color="#721C24";label="✗";}
+                            return (
+                              <td key={d.fecha} style={{ padding:"2px 3px", textAlign:"center" }}>
+                                <div style={{ background:bg, color, borderRadius:4, padding:"3px 2px", fontSize:11, fontWeight:600 }}>{label}</div>
+                              </td>
+                            );
+                          })}
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+                <div style={{ textAlign:"center", marginTop:20 }}>
+                  <p style={{ fontSize:12, color:C.gris, fontFamily:"system-ui", marginBottom:12 }}>¿Quieres reservar? Accede con tu cuenta.</p>
+                  <button onClick={()=>setModalLogin(true)}
+                    style={{ background:C.lila, color:C.blanco, border:"none", padding:"12px 28px", cursor:"pointer", fontSize:12, fontWeight:700, letterSpacing:".1em", borderRadius:30, boxShadow:"0 4px 16px rgba(155,142,196,0.4)" }}>
+                    INGRESAR A MI CUENTA
+                  </button>
+                </div>
+              </div>
+            );
+          })()}
+        </div>
+      </section>
+
+      {/* ── CONTACTO ── */}
+      <section id="contacto" style={{ padding:"80px 40px", background:C.blanco }}>
+        <div style={{ maxWidth:600, margin:"0 auto", textAlign:"center" }}>
+          <div style={{ fontSize:10, letterSpacing:".3em", textTransform:"uppercase", color:C.lila, marginBottom:12 }}>¿Lista para empezar?</div>
+          <h2 style={{ fontSize:32, fontWeight:400, margin:"0 0 14px", color:C.cafe }}>Consulta disponibilidad</h2>
+          <p style={{ fontSize:13, color:C.cafeClaro, lineHeight:1.8, marginBottom:32, fontFamily:"system-ui" }}>
+            Escríbenos por WhatsApp y te respondemos a la brevedad.
+          </p>
+          <a href="https://wa.me/56986284965?text=Hola! Me interesa arrendar un box en Cowork Salud. ¿Podrían darme más información?" target="_blank" rel="noreferrer"
+            style={{ display:"inline-block", background:"#25D366", color:C.blanco, padding:"15px 36px", textDecoration:"none", fontSize:13, fontWeight:700, letterSpacing:".1em", textTransform:"uppercase", borderRadius:30, marginBottom:32, boxShadow:"0 4px 16px rgba(37,211,102,0.3)" }}>
+            💬 ESCRIBIR POR WHATSAPP
+          </a>
+          <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:14 }}>
+            {[["📍","Dirección","San Ignacio 1263, Puerto Varas"],["📞","Teléfono","+56 9 8628 4965"],["📱","Instagram","@barcelonaclinic.pv"],["🕐","Horario","Lun–Vie 9:00–19:00"]].map(([icon,t,v])=>(
+              <div key={t} style={{ background:C.lilaPale, padding:"16px 18px", borderRadius:12, textAlign:"left" }}>
+                <div style={{ fontSize:20, marginBottom:6 }}>{icon}</div>
+                <div style={{ fontSize:10, letterSpacing:".15em", textTransform:"uppercase", color:C.lila, marginBottom:4 }}>{t}</div>
+                <div style={{ fontSize:13, color:C.cafe, fontFamily:"system-ui" }}>{v}</div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* ── FOOTER ── */}
+      <footer style={{ background:C.lila, color:C.blanco, padding:"32px 40px", textAlign:"center" }}>
+        <img src="/logo.png" alt="Cowork Salud" style={{ height:55, objectFit:"contain", display:"block", margin:"0 auto 12px", filter:"brightness(0) invert(1)" }}/>
+        <div style={{ fontSize:11, color:"rgba(255,255,255,0.7)", marginBottom:12, fontFamily:"system-ui" }}>San Ignacio 1263, Puerto Varas · @barcelonaclinic.pv</div>
+        <button onClick={()=>setModalLogin(true)} style={{ background:"none", border:"1px solid rgba(255,255,255,0.5)", color:C.blanco, padding:"7px 22px", cursor:"pointer", fontSize:11, letterSpacing:".1em", borderRadius:20 }}>
+          ACCESO EQUIPO
+        </button>
+      </footer>
+
+      {/* ── MODAL LOGIN ── */}
+      {modalLogin && (
+        <div style={{ position:"fixed", inset:0, background:"rgba(61,43,31,.5)", zIndex:300, display:"flex", alignItems:"center", justifyContent:"center", backdropFilter:"blur(4px)" }}>
+          <div style={{ background:C.blanco, borderRadius:20, padding:"40px 36px", width:"min(400px,94vw)", position:"relative", boxShadow:"0 20px 60px rgba(155,142,196,0.3)" }}>
+            <button onClick={()=>{setModalLogin(false);setError("");}} style={{ position:"absolute", top:16, right:16, background:"none", border:"none", fontSize:22, cursor:"pointer", color:C.gris }}>×</button>
+            <div style={{ textAlign:"center", marginBottom:28 }}>
+              <img src="/logo.png" alt="Cowork Salud" style={{ height:70, objectFit:"contain", marginBottom:12 }}/>
+              <div style={{ width:40, height:2, background:C.lilaClaro, margin:"0 auto 12px" }}/>
+              <div style={{ fontSize:12, color:C.gris, fontFamily:"system-ui" }}>Acceso al sistema de gestión</div>
+            </div>
+            <form onSubmit={handleLogin}>
+              <label style={{ display:"block", fontSize:10, letterSpacing:".15em", textTransform:"uppercase", color:C.cafe, marginBottom:6 }}>Email</label>
+              <input type="email" value={email} onChange={e=>setEmail(e.target.value)} required
+                style={{ width:"100%", padding:"10px 12px", border:`1px solid ${C.beigeOscuro}`, borderRadius:10, fontSize:14, background:C.beige, color:C.cafe, boxSizing:"border-box", marginBottom:14, fontFamily:"system-ui" }}/>
+              <label style={{ display:"block", fontSize:10, letterSpacing:".15em", textTransform:"uppercase", color:C.cafe, marginBottom:6 }}>Contraseña</label>
+              <input type="password" value={pass} onChange={e=>setPass(e.target.value)} required
+                style={{ width:"100%", padding:"10px 12px", border:`1px solid ${C.beigeOscuro}`, borderRadius:10, fontSize:14, background:C.beige, color:C.cafe, boxSizing:"border-box", marginBottom:18, fontFamily:"system-ui" }}/>
+              {error && <div style={{ background:"#FCEBEB", color:"#A32D2D", padding:"8px 12px", borderRadius:8, fontSize:12, marginBottom:14, fontFamily:"system-ui" }}>{error}</div>}
+              <button type="submit" disabled={loading}
+                style={{ width:"100%", padding:"13px", background:C.lila, color:C.blanco, border:"none", cursor:"pointer", fontSize:12, fontWeight:700, letterSpacing:".15em", textTransform:"uppercase", borderRadius:10, boxShadow:"0 4px 16px rgba(155,142,196,0.4)" }}>
+                {loading?"Verificando…":"INGRESAR"}
+              </button>
+            </form>
+            <div style={{ textAlign:"center", marginTop:14, fontSize:11, color:C.gris, fontFamily:"system-ui" }}>Acceso exclusivo · Equipo Cowork Salud</div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}

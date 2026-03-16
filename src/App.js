@@ -1,8 +1,11 @@
+import TabPlanes from './TabPlanes';
 import { SelectorPlan, PLANES } from './PlanesArriendo';
 import { useState, useMemo, useEffect, useCallback } from 'react';
 import { sb } from './supabase';
 import Login from './Login';
 import { SubirComprobante, BadgeVerificado, VerComprobante, PanelVerificacion } from './Comprobante';
+import Calendario from './Calendario';
+import ModificarReserva from './ModificarReserva';
 
 // ─── CONSTANTES ───────────────────────────────────────────────────
 const CATEGORIAS = ['Inyectables','Materiales descartables','Productos tópicos','Equipos/accesorios','Otros'];
@@ -21,10 +24,13 @@ const CAN = {
 };
 
 const TABS_DEF = [
+  { key:'modificar', label:'Modificar reservas', perm: r => r==='admin' },
   { key:'dashboard',   label:'Dashboard' },
   { key:'insumos',     label:'Inventario',     perm: r => r==='admin'||r==='recep' },
   { key:'retiro',      label:'Retirar insumo' },
   { key:'arriendos',   label:'Arriendos',      perm: r => r==='admin'||r==='recep' },
+  { key:'disponibilidad', label:'Disponibilidad' },
+  { key:'planes', label:'Planes' },
   { key:'agenda',      label:'Agenda' },
   { key:'movimientos', label:'Movimientos' },
   { key:'verificacion', label:'Verificar pagos', perm: r => r==='admin'||r==='recep' },
@@ -120,7 +126,7 @@ export default function App() {
   }, [arriendos, user]);
 
   // ── RETIRO STATE ──
-  const emptyRet = { insumoId:'', cantidad:1, profId:'', paciente:'', obs:'', origen:'clinica', insumoPropio:'' };
+  const emptyRet = { insumoId:'', cantidad:1, profId:'', paciente:today(), obs:'', origen:'clinica', insumoPropio:'' };
   const [ret, setRet]       = useState(emptyRet);
   const [retStep, setRetStep] = useState(0);
   const [retMetodo, setRetMetodo] = useState('Efectivo');
@@ -224,7 +230,8 @@ export default function App() {
   const totalInv = insumos.filter(i=>i.origen==='clinica').reduce((s,i)=>s+i.stock*i.precio,0);
   const recArr   = arriendos.filter(a=>a.pagado).reduce((s,a)=>s+a.monto,0);
   const recIns   = movimientos.filter(m=>m.pago_pagado).reduce((s,m)=>s+(m.pago_monto||0),0);
-
+  const pendVerif = [...arriendos, ...movimientos].filter(x => x.verificado === 'pendiente').length;
+  const planes    = [];
   // ─── GUARD ───────────────────────────────────────────────────────
   if (!user) return <Login onLogin={handleLogin}/>;
 
@@ -365,40 +372,74 @@ export default function App() {
       {!loading && <>
 
       {/* ── DASHBOARD ── */}
-      {tab==='dashboard' && (
+       {tab==='dashboard' && (
         <div>
-          <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(150px,1fr))',gap:12,marginBottom:20}}>
-            {[['Valor inventario',fmt(totalInv),'#185FA5'],['Total arriendos',fmt(recArr),'#0F6E56'],['Insumos cobrados',fmt(recIns),'#533AB7'],['Alertas stock',alertas.length,alertas.length?'#A32D2D':'#0F6E56'],['Boxes activos',boxes.filter(b=>b.activo).length,'#3B6D11'],['Profesionales',profesionales.length,'#0F6E56']].map(([t,v,c])=>(
-              <div key={t} style={{background:'#f8f8f8',borderRadius:12,padding:16,textAlign:'center'}}>
-                <div style={{fontSize:11,color:'#666',marginBottom:6}}>{t}</div>
-                <div style={{fontSize:22,fontWeight:500,color:c}}>{v}</div>
+          {user.rol === 'prof' ? (
+            // ── DASHBOARD PROFESIONAL ──
+            <div>
+              <div style={{fontSize:14,fontWeight:600,marginBottom:14}}>
+                Bienvenida, {user.nombre} 👋
               </div>
-            ))}
-          </div>
-          <div style={S.g2}>
-            <div>
-              <h3 style={{fontSize:14,fontWeight:500,marginBottom:10}}>Últimos arriendos</h3>
-              {arriendosVisibles.slice(0,4).map(a=>(
-                <div key={a.id} style={S.card('#1D9E75')}>
-                  <div style={{fontWeight:500}}>{a.box_nombre}</div>
-                  <div style={{fontSize:13,color:'#666'}}>{a.profesional_nombre}</div>
-                  <div style={{fontSize:12,marginTop:4}}>{a.fecha} · {a.hora_inicio}–{a.hora_fin} · {fmt(a.monto)}</div>
+              <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:10,marginBottom:18}}>
+                <div style={{background:'#fff',borderRadius:12,padding:16,border:'1px solid #eee',textAlign:'center'}}>
+                  <div style={{fontSize:11,color:'#888',marginBottom:4}}>Mis arriendos</div>
+                  <div style={{fontSize:22,fontWeight:700,color:'#185FA5'}}>{arriendosVisibles.length}</div>
+                </div>
+                <div style={{background:'#fff',borderRadius:12,padding:16,border:'1px solid #eee',textAlign:'center'}}>
+                  <div style={{fontSize:11,color:'#888',marginBottom:4}}>Mis retiros</div>
+                  <div style={{fontSize:22,fontWeight:700,color:'#533AB7'}}>{movsVisibles.filter(m=>m.tipo==='retiro').length}</div>
+                </div>
+              </div>
+              <h3 style={{fontSize:13,fontWeight:600,marginBottom:10}}>Mis últimos arriendos</h3>
+              {arriendosVisibles.slice(0,5).map(a=>(
+                <div key={a.id} style={{background:'#fff',borderRadius:10,padding:'10px 14px',marginBottom:8,border:'1px solid #eee',borderLeft:'3px solid #1D9E75'}}>
+                  <div style={{fontWeight:600,fontSize:13}}>{a.box_nombre}</div>
+                  <div style={{fontSize:12,color:'#666'}}>{a.fecha} · {a.hora_inicio}–{a.hora_fin}</div>
+                  <div style={{fontSize:11,marginTop:3}}>
+                    <span style={{background:a.verificado==='aprobado'?'#EAF3DE':'#FAEEDA',color:a.verificado==='aprobado'?'#3B6D11':'#854F0B',padding:'1px 8px',borderRadius:6,fontWeight:600}}>
+                      {a.verificado==='aprobado'?'✓ Confirmado':'⏳ Pendiente'}
+                    </span>
+                  </div>
                 </div>
               ))}
-              {arriendosVisibles.length===0&&<div style={{fontSize:13,color:'#888'}}>Sin arriendos aún</div>}
+              {arriendosVisibles.length===0 && <div style={{fontSize:13,color:'#888'}}>Sin arriendos registrados aún</div>}
             </div>
+          ) : (
+            // ── DASHBOARD ADMIN / RECEP ──
             <div>
-              <h3 style={{fontSize:14,fontWeight:500,marginBottom:10}}>Últimos retiros</h3>
-              {movsVisibles.filter(m=>m.tipo==='retiro').slice(0,4).map(m=>(
-                <div key={m.id} style={S.card('#185FA5')}>
-                  <div style={{fontWeight:500}}>{m.insumo_nombre}</div>
-                  <div style={{fontSize:13,color:'#666'}}>{m.profesional_nombre} → {m.paciente}</div>
-                  <div style={{fontSize:12,marginTop:4}}>{m.fecha} · {m.pago_requerido?(m.pago_pagado?'✓ '+fmt(m.pago_monto):'⚠ Pendiente'):'Sin cobro'}</div>
+              <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(150px,1fr))',gap:10,marginBottom:18}}>
+                {[['💰','Ingresos mes',fmt(totalInv),'#185FA5'],['🏠','Arriendos',fmt(recArr),'#1D9E75'],['💊','Insumos cobrados',fmt(recIns),'#533AB7'],['📅','Planes activos',planes?.length||0,'#854F0B'],['🔔','Por verificar',pendVerif,pendVerif>0?'#A32D2D':'#0F6E56'],['📦','Alertas stock',alertas.length,alertas.length>0?'#A32D2D':'#0F6E56']].map(([icon,t,v,c])=>(
+                  <div key={t} style={{background:'#fff',borderRadius:12,padding:'14px 16px',border:'1px solid #eee',textAlign:'center'}}>
+                    <div style={{fontSize:18}}>{icon}</div>
+                    <div style={{fontSize:10,color:'#888',margin:'4px 0'}}>{t}</div>
+                    <div style={{fontSize:18,fontWeight:700,color:c}}>{v}</div>
+                  </div>
+                ))}
+              </div>
+              <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:14}}>
+                <div>
+                  <h3 style={{fontSize:13,fontWeight:600,marginBottom:10}}>Últimos arriendos</h3>
+                  {arriendos.slice(0,4).map(a=>(
+                    <div key={a.id} style={{background:'#fff',borderRadius:10,padding:'10px 14px',marginBottom:8,border:'1px solid #eee',borderLeft:'3px solid #1D9E75'}}>
+                      <div style={{fontWeight:600,fontSize:13}}>{a.profesional_nombre}</div>
+                      <div style={{fontSize:12,color:'#666'}}>{a.box_nombre} · {a.fecha}</div>
+                      <div style={{fontSize:12,color:'#185FA5',fontWeight:600}}>{fmt(a.monto)}</div>
+                    </div>
+                  ))}
                 </div>
-              ))}
-              {movsVisibles.filter(m=>m.tipo==='retiro').length===0&&<div style={{fontSize:13,color:'#888'}}>Sin retiros aún</div>}
+                <div>
+                  <h3 style={{fontSize:13,fontWeight:600,marginBottom:10}}>Últimos retiros</h3>
+                  {movimientos.filter(m=>m.tipo==='retiro').slice(0,4).map(m=>(
+                    <div key={m.id} style={{background:'#fff',borderRadius:10,padding:'10px 14px',marginBottom:8,border:'1px solid #eee',borderLeft:'3px solid #185FA5'}}>
+                      <div style={{fontWeight:600,fontSize:13}}>{m.insumo_nombre}</div>
+                      <div style={{fontSize:12,color:'#666'}}>{m.profesional_nombre}</div>
+                      <div style={{fontSize:12,color:m.pago_pagado?'#1D9E75':'#854F0B',fontWeight:600}}>{m.pago_requerido?(m.pago_pagado?'✓ Pagado':'⚠ Pendiente'):'Sin cobro'}</div>
+                    </div>
+                  ))}
+                </div>
+              </div>
             </div>
-          </div>
+          )}
         </div>
       )}
 
@@ -473,10 +514,13 @@ export default function App() {
                 Insumo: <strong>{insRet?.nombre}</strong><br/>
                 Total: <strong>{fmt((insRet?.precio||0)*+ret.cantidad)}</strong> ({ret.cantidad} × {fmt(insRet?.precio)})
               </div>
-              <label style={S.label}>Método de pago</label>
-              <select style={S.input} value={retMetodo} onChange={e=>setRetMetodo(e.target.value)}>
-                {METODOS.map(m=><option key={m}>{m}</option>)}
-              </select>
+              <div style={{background:'#E6F1FB',border:'1px solid #B5D4F4',borderRadius:8,padding:12,marginBottom:16,fontSize:13,color:'#042C53',display:'flex',gap:10,alignItems:'flex-start'}}>
+  <span style={{fontSize:20}}>💳</span>
+  <div>
+    <strong>Pago solo por transferencia bancaria</strong>
+    <div style={{marginTop:4,fontFamily:'system-ui'}}>Adjunta el comprobante de transferencia en el siguiente paso para validar el pago.</div>
+  </div>
+</div>
               <div style={{display:'flex',gap:10,marginTop:20,flexWrap:'wrap'}}>
                 <button style={S.btn('success')} onClick={()=>confirmarRetiro(true)}>✓ Confirmar pago y entregar</button>
                 <button style={{...S.btn('secondary'),background:'#FAEEDA',color:'#854F0B'}} onClick={()=>confirmarRetiro(false)}>Entregar con pago pendiente</button>
@@ -522,12 +566,12 @@ export default function App() {
                 <>
                   <label style={S.label}>Nombre del insumo propio *</label>
                   <input style={S.input} placeholder="Describe el insumo" value={ret.insumoPropio} onChange={e=>setRet(r=>({...r,insumoPropio:e.target.value}))}/>
-                  <div style={{background:'#EAF3DE',border:'1px solid #C0DD97',borderRadius:8,padding:10,fontSize:13,marginTop:8,color:'#173404'}}>✓ Solo registro — sin cobro</div>
+                  <div style={{background:'#EAF3DE',border:'1px solid #C0DD97',borderRadius:8,padding:10,fontSize:13,marginTop:8,color:'#1738404'}}>✓ Solo registro — sin cobro</div>
                 </>
               )}
               <div style={S.g2}>
                 <div><label style={S.label}>Cantidad *</label><input type="number" min="1" style={S.input} value={ret.cantidad} onChange={e=>setRet(r=>({...r,cantidad:+e.target.value}))}/></div>
-                <div><label style={S.label}>Paciente / Destino *</label><input style={S.input} value={ret.paciente} onChange={e=>setRet(r=>({...r,paciente:e.target.value}))}/></div>
+                <div><label style={S.label}>Fecha de uso *</label><input type="date" style={S.input} value={ret.paciente} onChange={e=>setRet(r=>({...r,paciente:e.target.value}))} defaultValue={today()}/></div>
               </div>
               <label style={S.label}>Observaciones</label>
               <input style={S.input} value={ret.obs} onChange={e=>setRet(r=>({...r,obs:e.target.value}))}/>
@@ -568,10 +612,13 @@ export default function App() {
                 <div style={{marginTop:6,fontSize:16}}>Total: <strong>{fmt(montoArr)}</strong></div>
                 <div style={{fontSize:12,color:'#185FA5',marginTop:4}}>⚠ El horario se agenda solo al confirmar el pago</div>
               </div>
-              <label style={S.label}>Método de pago</label>
-              <select style={S.input} value={arrForm.metodo} onChange={e=>setArrForm(a=>({...a,metodo:e.target.value}))}>
-                {METODOS.map(m=><option key={m}>{m}</option>)}
-              </select>
+              <div style={{background:'#E6F1FB',border:'1px solid #B5D4F4',borderRadius:8,padding:12,marginBottom:16,fontSize:13,color:'#042C53',display:'flex',gap:10,alignItems:'flex-start'}}>
+  <span style={{fontSize:20}}>💳</span>
+  <div>
+    <strong>Pago solo por transferencia bancaria</strong>
+    <div style={{marginTop:4,fontFamily:'system-ui'}}>Una vez confirmada la reserva, adjunta el comprobante de transferencia en el siguiente paso para validar tu pago.</div>
+  </div>
+</div>
               <div style={{display:'flex',gap:10,marginTop:20}}>
                 <button style={S.btn('success')} onClick={confirmarArriendo}>✓ Confirmar pago y agendar</button>
                 <button style={S.btn('secondary')} onClick={()=>setArrStep(0)}>← Volver</button>
@@ -587,7 +634,7 @@ export default function App() {
                 <label style={S.label}>Profesional *</label>
                 <select style={S.input} value={arrForm.profId} onChange={e=>setArrForm(a=>({...a,profId:e.target.value}))}>
                   <option value="">— Seleccionar profesional —</option>
-                  {profesionales.map(p=><option key={p.id} value={p.id}>{p.nombre}</option>)}
+                 {profesionales.map(p=><option key={p.id} value={p.id}>{p.nombre}</option>)}
                 </select>
               </div>
 
@@ -647,7 +694,33 @@ export default function App() {
           ))}
         </div>
       )}
-
+{tab==='disponibilidad' && (
+        <div>
+          <h3 style={{fontSize:15,fontWeight:600,marginBottom:4}}>Disponibilidad de boxes</h3>
+          <p style={{fontSize:13,color:'#888',marginBottom:16}}>
+            Haz clic en cualquier horario verde para reservar.
+          </p>
+          <Calendario
+            user={user}
+            boxes={boxes}
+            arriendos={arriendos}
+            profesionales={profesionales}
+            onNuevoArriendo={async()=>{ await fetchAll(); setTab('arriendos'); }}
+          />
+        </div>
+      )}
+     {tab==='planes' && (
+        <TabPlanes
+          user={user}
+          profesionales={profesionales}
+          boxes={boxes}
+          onReservar={(plan) => {
+            // Al hacer clic en "Reservar jornada", va al tab disponibilidad
+            // con el box del plan preseleccionado
+            setTab('disponibilidad');
+          }}
+        />
+      )}
       {/* ── AGENDA ── */}
       {tab==='agenda' && (
         <div>
@@ -746,7 +819,15 @@ export default function App() {
           }
         </div>
       )}
-
+{tab==='modificar' && (
+  <ModificarReserva
+    arriendos={arriendos}
+    boxes={boxes}
+    profesionales={profesionales}
+    userRol={user.rol}
+    onActualizar={fetchAll}
+  />
+)}
       {/* ── CONFIGURACIÓN (solo admin) ── */}
       {tab==='config' && user.rol==='admin' && (
         <div>
