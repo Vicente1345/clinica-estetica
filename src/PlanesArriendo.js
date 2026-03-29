@@ -109,9 +109,9 @@ export const PLANES = {
             id: "est_2j_mes",
             label: "Mensual",
             detalle: "Renueva cada mes",
-            precio: 340000,
+            precio: 330000,
             jornadas: 2, meses: 1, asistente: false,
-            tag: "Ahorra $20.000",
+            tag: "Ahorra $30.000",
             tagColor: "#1D9E75",
           },
           {
@@ -221,17 +221,26 @@ export const PLANES = {
     borde:  "#1D9E75",
     texto:  "#04342C",
     secciones: [
-      // ── SIN ASISTENTE ──────────────────────────
+      // ── PLAN FLEX (sin asistente) ──────────────
       {
         id: "den_suelta",
-        titulo: "Jornada suelta — sin asistente",
+        titulo: "Plan Flex — Por hora o jornada suelta",
         icono: "⏱",
         tipo: "suelta",
         opciones: [
           {
+            id: "den_hora_flex",
+            label: "Por hora (Plan Flex)",
+            detalle: "Mínimo 2 horas consecutivas · sin asistente",
+            precio: 15000,
+            jornadas: null, meses: null, asistente: false,
+            tag: "Mín. 2h",
+            tagColor: "#1D9E75",
+          },
+          {
             id: "den_js",
             label: "Jornada suelta (5 horas)",
-            detalle: "Sin compromiso · sin asistente",
+            detalle: "Sin compromiso · Plan Flex",
             precio: 45000,
             jornadas: null, meses: null, asistente: false,
             ref: "4 jornadas sueltas al mes = $180.000",
@@ -241,10 +250,10 @@ export const PLANES = {
       },
       {
         id: "den_1j_sin",
-        titulo: "Plan 1 jornada semanal — sin asistente",
+        titulo: "Plan Flex — 1 jornada semanal",
         icono: "📅",
         tipo: "plan",
-        descripcion: "4 jornadas al mes · día y horario fijo",
+        descripcion: "4 jornadas al mes · día y horario fijo · Plan Flex",
         ref: "Suelto: 4 × $45.000 = $180.000/mes",
         opciones: [
           {
@@ -278,10 +287,10 @@ export const PLANES = {
       },
       {
         id: "den_2j_sin",
-        titulo: "Plan 2 jornadas semanales — sin asistente",
+        titulo: "Plan Flex — 2 jornadas semanales",
         icono: "📅",
         tipo: "plan",
-        descripcion: "8 jornadas al mes · días y horario fijo",
+        descripcion: "8 jornadas al mes · días y horario fijo · Plan Flex",
         ref: "Suelto: 8 × $45.000 = $360.000/mes",
         opciones: [
           {
@@ -316,11 +325,20 @@ export const PLANES = {
       // ── CON ASISTENTE (PLAN PRO) ───────────────
       {
         id: "den_pro_suelta",
-        titulo: "🦷 Plan Pro — Jornada suelta con asistente",
+        titulo: "Plan Pro — Por hora o jornada suelta con asistente",
         icono: "🦷",
         tipo: "suelta",
         descripcion: "Incluye asistente durante toda la jornada",
         opciones: [
+          {
+            id: "den_hora_pro",
+            label: "Por hora Pro",
+            detalle: "Mínimo 2 horas consecutivas · con asistente",
+            precio: 18000,
+            jornadas: null, meses: null, asistente: true,
+            tag: "Con asistente",
+            tagColor: "#533AB7",
+          },
           {
             id: "den_pro_js",
             label: "Jornada suelta Pro",
