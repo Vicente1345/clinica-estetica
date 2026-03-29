@@ -18,23 +18,39 @@ const C = {
 };
 
 const PLANES_ESTETICO = [
-  { titulo:"Por hora",            precio:10000,  detalle:"Tarifa flexible por hora" },
-  { titulo:"2 horas",             precio:18000,  detalle:"Bloque de 2 horas continuas" },
-  { titulo:"Jornada suelta (5h)", precio:45000,  detalle:"Jornada completa sin compromiso" },
-  { titulo:"1 jornada/semana",    precio:170000, detalle:"Plan mensual · horario fijo" },
-  { titulo:"2 jornadas/semana",   precio:330000, detalle:"Plan mensual · horario fijo" },
-  { titulo:"3 jornadas/semana",   precio:480000, detalle:"Plan mensual · horario fijo" },
-  { titulo:"Plan Exclusivo ⭐",   precio:1350000,detalle:"5 jornadas semanales" },
+  { titulo:"Jornada suelta (5h)",               precio:45000,  detalle:"Sin compromiso · horario flexible", suelta:true },
+  { titulo:"2 jornadas/semana · Mensual",        precio:340000, detalle:"Compromiso mensual · horario fijo" },
+  { titulo:"2 jornadas/semana · Semestral",      precio:320000, detalle:"Compromiso 6 meses · cobro mensual" },
+  { titulo:"2 jornadas/semana · Anual ⭐",       precio:300000, detalle:"Compromiso 12 meses · mejor precio" },
 ];
 
-const PLANES_DENTAL = [
-  { titulo:"Jornada suelta",           precio:45000,  detalle:"Sin asistente · sin compromiso" },
-  { titulo:"1 jornada/semana",         precio:170000, detalle:"Sin asistente · plan mensual" },
-  { titulo:"2 jornadas/semana",        precio:340000, detalle:"Sin asistente · plan mensual" },
-  { titulo:"Jornada suelta Pro",       precio:65000,  detalle:"Con asistente incluido" },
-  { titulo:"1 jornada/semana Pro",     precio:250000, detalle:"Con asistente · plan mensual" },
-  { titulo:"2 jornadas/semana Pro",    precio:500000, detalle:"Con asistente · plan mensual" },
-  { titulo:"Plan Exclusivo ⭐",        precio:1350000,detalle:"5 jornadas semanales" },
+const PLANES_DENTAL_SIN = [
+  { titulo:"Jornada suelta",              precio:45000,  detalle:"Sin compromiso",         suelta:true },
+  { titulo:"1 jornada/sem · Mensual",     precio:170000, detalle:"Plan mensual" },
+  { titulo:"1 jornada/sem · Semestral",   precio:160000, detalle:"6 meses" },
+  { titulo:"1 jornada/sem · Anual ⭐",    precio:150000, detalle:"12 meses · mejor precio" },
+  { titulo:"2 jornadas/sem · Mensual",    precio:340000, detalle:"Plan mensual" },
+  { titulo:"2 jornadas/sem · Semestral",  precio:320000, detalle:"6 meses" },
+  { titulo:"2 jornadas/sem · Anual ⭐",   precio:300000, detalle:"12 meses · mejor precio" },
+];
+const PLANES_DENTAL_PRO = [
+  { titulo:"Jornada suelta Pro",           precio:65000,  detalle:"Con asistente incluido",  suelta:true },
+  { titulo:"1 jornada/sem · Mensual",      precio:250000, detalle:"Con asistente" },
+  { titulo:"1 jornada/sem · Semestral",    precio:240000, detalle:"6 meses · con asistente" },
+  { titulo:"1 jornada/sem · Anual ⭐",     precio:230000, detalle:"12 meses · con asistente" },
+  { titulo:"2 jornadas/sem · Mensual",     precio:500000, detalle:"Con asistente" },
+  { titulo:"2 jornadas/sem · Semestral",   precio:480000, detalle:"6 meses · con asistente" },
+  { titulo:"2 jornadas/sem · Anual ⭐",    precio:450000, detalle:"12 meses · con asistente" },
+  { titulo:"Plan Exclusivo ⭐",            precio:1350000,detalle:"5 jornadas semanales fijas" },
+];
+
+const PLANES_MEDICO = [
+  { titulo:"Hora suelta",            precio:12000,  detalle:"Mínimo 2 horas consecutivas", suelta:true },
+  { titulo:"Jornada (5 horas)",      precio:55000,  detalle:"Sin compromiso",               suelta:true },
+  { titulo:"1 jornada/semana",       precio:215000, detalle:"Plan mensual · horario fijo" },
+  { titulo:"2 jornadas/semana",      precio:420000, detalle:"Plan mensual · horario fijo" },
+  { titulo:"3 jornadas/semana",      precio:645000, detalle:"Plan mensual · horario fijo" },
+  { titulo:"5 jornadas/semana ⭐",   precio:1050000,detalle:"Plan mensual · lunes a viernes" },
 ];
 
 const fmt = n => n.toLocaleString("es-CL", { style:"currency", currency:"CLP", maximumFractionDigits:0 });
@@ -46,6 +62,7 @@ export default function Landing({ onLogin }) {
   const [error, setError]           = useState("");
   const [loading, setLoading]       = useState(false);
   const [boxActivo, setBoxActivo]   = useState("estetico");
+  const [dentalCat, setDentalCat]   = useState("sin");
   const [dispBoxes, setDispBoxes]         = useState([]);
   const [dispArriendos, setDispArriendos] = useState([]);
   const [dispBoxSel, setDispBoxSel]       = useState(null);
@@ -85,7 +102,7 @@ export default function Landing({ onLogin }) {
       <nav style={{ background:C.blanco, borderBottom:`1px solid ${C.beigeOscuro}`, padding:"14px 40px", display:"flex", justifyContent:"space-between", alignItems:"center", position:"sticky", top:0, zIndex:100, boxShadow:"0 2px 12px rgba(155,142,196,0.08)" }}>
         <img src="/logo.png" alt="Cowork Salud" style={{ height:90, objectFit:"contain", display:"block" }}/>
         <div style={{ display:"flex", gap:28, fontSize:12, letterSpacing:".1em", textTransform:"uppercase" }}>
-          {[["#como-funciona","Cómo funciona"],["#boxes","Boxes"],["#planes","Planes"],["#disponibilidad","Disponibilidad"],["#contacto","Contacto"]].map(([href,label])=>(
+          {[["#como-funciona","Cómo funciona"],["#boxes","Boxes"],["#planes","Planes"],["#terminos","Términos"],["#disponibilidad","Disponibilidad"],["#contacto","Contacto"]].map(([href,label])=>(
             <a key={href} href={href} style={{ textDecoration:"none", color:C.cafeClaro, transition:"color .2s" }}>{label}</a>
           ))}
         </div>
@@ -118,7 +135,7 @@ export default function Landing({ onLogin }) {
       {/* ── STATS ── */}
       <section style={{ background:C.lila, padding:"28px 40px" }}>
         <div style={{ maxWidth:800, margin:"0 auto", display:"grid", gridTemplateColumns:"repeat(3,1fr)", gap:20, textAlign:"center" }}>
-          {[["2","Boxes equipados"],["100%","Documentación al día"],["Flex","Horarios a tu medida"]].map(([n,t])=>(
+          {[["3","Boxes equipados"],["100%","Documentación al día"],["Flex","Horarios a tu medida"]].map(([n,t])=>(
             <div key={t}>
               <div style={{ fontSize:30, fontWeight:700, color:C.blanco }}>{n}</div>
               <div style={{ fontSize:11, letterSpacing:".15em", textTransform:"uppercase", color:C.lilaPale, marginTop:4 }}>{t}</div>
@@ -162,7 +179,7 @@ export default function Landing({ onLogin }) {
             {[
               { icon:"✨", color:C.lila, bg:C.lilaPale, nombre:"Box 1 · Estético", desc:"Equipado para medicina estética, cosmetología y tratamientos faciales y corporales.", items:["Camilla profesional","Iluminación especializada","WiFi y climatización","Insumos básicos disponibles"] },
               { icon:"🦷", color:C.rosa, bg:C.rosaPale, nombre:"Box 2 · Dental", desc:"Unidad dental completa con todos los equipos necesarios, con o sin asistente.", items:["Sillón dental completo","Equipamiento diagnóstico","Opción con asistente","Esterilización disponible"] },
-              { icon:"🏠", color:C.dorado, bg:C.beige, nombre:"Box 3 · Multipropósito", desc:"Espacio versátil ideal para distintas especialidades de salud y bienestar.", items:["Equipamiento flexible","Iluminación regulable","WiFi y climatización","Adaptable a tu especialidad"] },
+              { icon:"🏥", color:C.dorado, bg:C.beige, nombre:"Box 3 · Médico", desc:"Espacio clínico para médicos y profesionales de la salud. Ideal para consultas, procedimientos y atención ambulatoria.", items:["Camilla","Escritorio y lavamanos","EPP incluido","Esterilización de instrumental simple","Eliminación de residuos básicos y cortopunzantes"] },
             ].map(b=>(
               <div key={b.nombre} style={{ background:C.blanco, borderRadius:16, overflow:"hidden", boxShadow:"0 4px 24px rgba(155,142,196,0.12)" }}>
                 <div style={{ background:`linear-gradient(135deg, ${b.color}, ${b.color}bb)`, padding:"36px 28px", textAlign:"center" }}>
@@ -196,35 +213,236 @@ export default function Landing({ onLogin }) {
             <h2 style={{ fontSize:32, fontWeight:400, margin:0, color:C.cafe }}>Planes y precios</h2>
             <p style={{ fontSize:13, color:C.gris, marginTop:10, fontFamily:"system-ui" }}>Todos los planes incluyen el espacio listo para trabajar.</p>
           </div>
+          {/* Tab selector boxes */}
           <div style={{ display:"flex", gap:0, marginBottom:32, borderRadius:30, overflow:"hidden", border:`2px solid ${C.lila}`, width:"fit-content", margin:"0 auto 32px" }}>
-            {[["estetico","✨ Box Estético"],["dental","🦷 Box Dental"]].map(([k,l])=>(
-              <button key={k} onClick={()=>setBoxActivo(k)} style={{ padding:"11px 28px", border:"none", cursor:"pointer", fontSize:13, fontWeight:600, background:boxActivo===k?C.lila:C.blanco, color:boxActivo===k?C.blanco:C.lila, letterSpacing:".05em", transition:"all .2s" }}>
+            {[["estetico","✨ Estético"],["dental","🦷 Dental"],["medico","🏥 Médico"]].map(([k,l])=>(
+              <button key={k} onClick={()=>setBoxActivo(k)} style={{ padding:"11px 24px", border:"none", cursor:"pointer", fontSize:13, fontWeight:600, background:boxActivo===k?C.lila:C.blanco, color:boxActivo===k?C.blanco:C.lila, letterSpacing:".05em", transition:"all .2s" }}>
                 {l}
               </button>
             ))}
           </div>
-          <div style={{ display:"grid", gap:8 }}>
-            {(boxActivo==="estetico"?PLANES_ESTETICO:PLANES_DENTAL).map((p,i)=>(
-              <div key={i} style={{ display:"flex", justifyContent:"space-between", alignItems:"center", padding:"14px 20px", background:p.titulo.includes("⭐")?C.lila:i%2===0?C.lilaPale:C.blanco, borderRadius:10, border:`1px solid ${p.titulo.includes("⭐")?C.lila:C.beigeOscuro}` }}>
+
+          {/* ─── BOX ESTÉTICO ─── */}
+          {boxActivo==="estetico" && (
+            <div>
+              <div style={{ marginBottom:14, padding:"12px 16px", background:C.lilaPale, borderRadius:10, fontSize:12, color:C.cafeClaro, fontFamily:"system-ui", lineHeight:1.8, borderLeft:`3px solid ${C.lila}` }}>
+                ℹ️ <strong>Plan 2 jornadas semanales</strong> · El precio varía según el tiempo de compromiso de arriendo.
+              </div>
+              <div style={{ display:"grid", gap:8 }}>
+                {PLANES_ESTETICO.map((p,i)=>{
+                  const star=p.titulo.includes("⭐");
+                  const unit=p.suelta?"/ vez":"/mes";
+                  return (
+                    <div key={i} style={{ display:"flex", justifyContent:"space-between", alignItems:"center", padding:"14px 20px", background:star?C.lila:p.suelta?C.beige:i%2===0?C.lilaPale:C.blanco, borderRadius:10, border:`1px solid ${star?C.lila:C.beigeOscuro}` }}>
+                      <div>
+                        <div style={{ fontSize:14, fontWeight:600, color:star?C.blanco:C.cafe }}>{p.titulo}</div>
+                        <div style={{ fontSize:12, color:star?C.lilaPale:C.gris, marginTop:2, fontFamily:"system-ui" }}>{p.detalle}</div>
+                      </div>
+                      <div style={{ textAlign:"right" }}>
+                        <div style={{ fontSize:19, fontWeight:700, color:star?C.blanco:C.lila }}>{fmt(p.precio)}</div>
+                        <div style={{ fontSize:10, color:star?C.lilaPale:C.gris, fontFamily:"system-ui" }}>{unit}</div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+          {/* ─── BOX DENTAL ─── */}
+          {boxActivo==="dental" && (
+            <div>
+              {/* Subtabs dental */}
+              <div style={{ display:"flex", gap:8, marginBottom:20, flexWrap:"wrap", justifyContent:"center" }}>
+                {[["sin","Sin Asistente"],["pro","Plan PRO (con Asistente)"]].map(([k,l])=>(
+                  <button key={k} onClick={()=>setDentalCat(k)}
+                    style={{ padding:"8px 20px", borderRadius:20, border:`2px solid ${dentalCat===k?C.rosa:C.beigeOscuro}`, background:dentalCat===k?C.rosa:C.blanco, color:dentalCat===k?C.blanco:C.cafeClaro, fontSize:12, fontWeight:600, cursor:"pointer", transition:"all .2s" }}>
+                    {l}
+                  </button>
+                ))}
+              </div>
+
+              {dentalCat==="sin" && (
                 <div>
-                  <div style={{ fontSize:14, fontWeight:600, color:p.titulo.includes("⭐")?C.blanco:C.cafe }}>{p.titulo}</div>
-                  <div style={{ fontSize:12, color:p.titulo.includes("⭐")?C.lilaPale:C.gris, marginTop:2, fontFamily:"system-ui" }}>{p.detalle}</div>
+                  <div style={{ marginBottom:14, padding:"12px 16px", background:C.rosaPale, borderRadius:10, fontSize:12, color:C.cafeClaro, fontFamily:"system-ui", lineHeight:1.8, borderLeft:`3px solid ${C.rosa}` }}>
+                    ℹ️ Planes con <strong>compromiso de arriendo</strong> — el precio baja a 6 o 12 meses.
+                  </div>
+                  <div style={{ display:"grid", gap:8 }}>
+                    {PLANES_DENTAL_SIN.map((p,i)=>{
+                      const star=p.titulo.includes("⭐");
+                      return (
+                        <div key={i} style={{ display:"flex", justifyContent:"space-between", alignItems:"center", padding:"14px 20px", background:p.suelta?C.beige:i%2===0?C.rosaPale:C.blanco, borderRadius:10, border:`1px solid ${C.beigeOscuro}` }}>
+                          <div>
+                            <div style={{ fontSize:14, fontWeight:600, color:C.cafe }}>{p.titulo}</div>
+                            <div style={{ fontSize:12, color:C.gris, marginTop:2, fontFamily:"system-ui" }}>{p.detalle}</div>
+                          </div>
+                          <div style={{ textAlign:"right" }}>
+                            <div style={{ fontSize:19, fontWeight:700, color:C.rosa }}>{fmt(p.precio)}</div>
+                            <div style={{ fontSize:10, color:C.gris, fontFamily:"system-ui" }}>{p.suelta?"/ vez":"/mes"}</div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
                 </div>
-                <div style={{ textAlign:"right" }}>
-                  <div style={{ fontSize:19, fontWeight:700, color:p.titulo.includes("⭐")?C.blanco:C.lila }}>{fmt(p.precio)}</div>
-                  <div style={{ fontSize:10, color:p.titulo.includes("⭐")?C.lilaPale:C.gris, fontFamily:"system-ui" }}>{p.precio>=100000?"/ mes":"/ vez"}</div>
+              )}
+
+              {dentalCat==="pro" && (
+                <div>
+                  <div style={{ marginBottom:14, padding:"12px 16px", background:C.lilaPale, borderRadius:10, fontSize:12, color:C.cafeClaro, fontFamily:"system-ui", lineHeight:1.8, borderLeft:`3px solid ${C.lila}` }}>
+                    ⭐ <strong>Plan PRO incluye:</strong> Kit de destartraje y profilaxis · Kit de operatoria · Kit de anestesia · Carga de esterilización
+                  </div>
+                  <div style={{ display:"grid", gap:8 }}>
+                    {PLANES_DENTAL_PRO.map((p,i)=>{
+                      const star=p.titulo.includes("⭐")&&p.precio===1350000;
+                      return (
+                        <div key={i} style={{ display:"flex", justifyContent:"space-between", alignItems:"center", padding:"14px 20px", background:star?C.lila:p.suelta?C.beige:i%2===0?C.lilaPale:C.blanco, borderRadius:10, border:`1px solid ${star?C.lila:C.beigeOscuro}` }}>
+                          <div>
+                            <div style={{ fontSize:14, fontWeight:600, color:star?C.blanco:C.cafe }}>{p.titulo}</div>
+                            <div style={{ fontSize:12, color:star?C.lilaPale:C.gris, marginTop:2, fontFamily:"system-ui" }}>{p.detalle}</div>
+                          </div>
+                          <div style={{ textAlign:"right" }}>
+                            <div style={{ fontSize:19, fontWeight:700, color:star?C.blanco:C.lila }}>{fmt(p.precio)}</div>
+                            <div style={{ fontSize:10, color:star?C.lilaPale:C.gris, fontFamily:"system-ui" }}>{p.suelta?"/ vez":"/mes"}</div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* ─── BOX MÉDICO ─── */}
+          {boxActivo==="medico" && (
+            <div>
+              <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fit,minmax(280px,1fr))", gap:16, marginBottom:20 }}>
+                {/* Columna sin compromiso */}
+                <div style={{ background:C.beige, borderRadius:12, padding:"18px 20px", border:`1px solid ${C.beigeOscuro}` }}>
+                  <div style={{ fontSize:11, letterSpacing:".2em", textTransform:"uppercase", color:C.dorado, fontWeight:700, marginBottom:12 }}>Sin compromiso</div>
+                  {PLANES_MEDICO.filter(p=>p.suelta).map((p,i)=>(
+                    <div key={i} style={{ display:"flex", justifyContent:"space-between", alignItems:"center", padding:"10px 0", borderBottom:`1px solid ${C.beigeOscuro}` }}>
+                      <div>
+                        <div style={{ fontSize:13, fontWeight:600, color:C.cafe }}>{p.titulo}</div>
+                        <div style={{ fontSize:11, color:C.gris, fontFamily:"system-ui" }}>{p.detalle}</div>
+                      </div>
+                      <div style={{ textAlign:"right" }}>
+                        <div style={{ fontSize:17, fontWeight:700, color:C.dorado }}>{fmt(p.precio)}</div>
+                        <div style={{ fontSize:10, color:C.gris, fontFamily:"system-ui" }}>/ vez</div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+                {/* Columna planes mensuales */}
+                <div style={{ background:C.lilaPale, borderRadius:12, padding:"18px 20px", border:`1px solid ${C.lilaClaro}` }}>
+                  <div style={{ fontSize:11, letterSpacing:".2em", textTransform:"uppercase", color:C.lila, fontWeight:700, marginBottom:12 }}>Planes mensuales</div>
+                  {PLANES_MEDICO.filter(p=>!p.suelta).map((p,i)=>{
+                    const star=p.titulo.includes("⭐");
+                    return (
+                      <div key={i} style={{ display:"flex", justifyContent:"space-between", alignItems:"center", padding:"10px 0", borderBottom:`1px solid ${C.lilaClaro}` }}>
+                        <div>
+                          <div style={{ fontSize:13, fontWeight:600, color:C.cafe }}>{p.titulo}</div>
+                          <div style={{ fontSize:11, color:C.gris, fontFamily:"system-ui" }}>{p.detalle}</div>
+                        </div>
+                        <div style={{ textAlign:"right" }}>
+                          <div style={{ fontSize:17, fontWeight:700, color:star?C.lila:C.lila }}>{fmt(p.precio)}</div>
+                          <div style={{ fontSize:10, color:C.gris, fontFamily:"system-ui" }}>/mes</div>
+                        </div>
+                      </div>
+                    );
+                  })}
                 </div>
               </div>
-            ))}
-          </div>
+              {/* Incluye + condiciones */}
+              <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fit,minmax(240px,1fr))", gap:12 }}>
+                <div style={{ padding:"14px 18px", background:C.blanco, borderRadius:10, border:`1px solid ${C.beigeOscuro}`, fontSize:12, color:C.cafeClaro, fontFamily:"system-ui", lineHeight:1.9 }}>
+                  <strong style={{ display:"block", marginBottom:6, color:C.cafe }}>✅ Incluye</strong>
+                  Camilla · Escritorio · Lavamanos · EPP · Esterilización de instrumental simple · Eliminación de residuos básicos y cortopunzantes
+                </div>
+                <div style={{ padding:"14px 18px", background:C.blanco, borderRadius:10, border:`1px solid ${C.beigeOscuro}`, fontSize:12, color:C.cafeClaro, fontFamily:"system-ui", lineHeight:1.9 }}>
+                  <strong style={{ display:"block", marginBottom:6, color:C.cafe }}>📋 Condiciones</strong>
+                  Arriendo por hora: mínimo 2 horas consecutivas
+                </div>
+              </div>
+            </div>
+          )}
           <div style={{ marginTop:20, padding:"14px 18px", background:C.lilaPale, borderRadius:10, fontSize:12, color:C.cafeClaro, fontFamily:"system-ui", lineHeight:1.8 }}>
             💳 <strong>Forma de pago:</strong> Transferencia bancaria únicamente. Adjunta el comprobante en la plataforma para confirmar tu reserva.
           </div>
         </div>
       </section>
 
+      {/* ── TÉRMINOS Y CONDICIONES ── */}
+      <section id="terminos" style={{ padding:"80px 40px", background:C.lilaPale }}>
+        <div style={{ maxWidth:860, margin:"0 auto" }}>
+          <div style={{ textAlign:"center", marginBottom:52 }}>
+            <div style={{ fontSize:10, letterSpacing:".3em", textTransform:"uppercase", color:C.lila, marginBottom:12 }}>Todo lo que necesitas saber</div>
+            <h2 style={{ fontSize:32, fontWeight:400, margin:0, color:C.cafe }}>Términos y condiciones de arriendo</h2>
+            <p style={{ fontSize:13, color:C.gris, marginTop:10, fontFamily:"system-ui" }}>Condiciones generales para el arriendo de boxes en Cowork Salud.</p>
+          </div>
+          <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fit,minmax(360px,1fr))", gap:16 }}>
+            {[
+              {
+                icon:"💳", titulo:"Forma de pago", acento:C.lila,
+                items:[
+                  "El arriendo debe pagarse por adelantado para confirmar la reserva.",
+                  "En caso de profesionales con varias jornadas mensuales, el pago puede realizarse a fin de mes, previo acuerdo."
+                ]
+              },
+              {
+                icon:"🕐", titulo:"Horario de funcionamiento", acento:C.rosa,
+                items:[
+                  "Las jornadas y reservas se realizan entre las 09:00 y 19:00 hrs.",
+                  "Este horario debe respetarse estrictamente.",
+                  "Las reservas son por hora completa.",
+                  "NO se permiten reservas de 30 o 45 minutos."
+                ]
+              },
+              {
+                icon:"📋", titulo:"Política de cancelación", acento:C.dorado,
+                items:[
+                  "Las reservas pueden cancelarse con un mínimo de 48 horas hábiles de anticipación.",
+                  "En ese caso, se devolverá el abono realizado.",
+                  "Cancelaciones fuera de este plazo implican el cobro completo de la reserva."
+                ]
+              },
+              {
+                icon:"⏱", titulo:"Extensión de horario", acento:C.lila,
+                items:[
+                  "Se permite una tolerancia máxima de 15 minutos sobre la hora o jornada reservada.",
+                  "Si se supera este tiempo, se cobrará una hora adicional o extensión de jornada, según corresponda."
+                ]
+              },
+              {
+                icon:"🏥", titulo:"Arriendo por hora", acento:C.rosa,
+                items:[
+                  "El valor por hora aplica hasta un máximo de 2 horas.",
+                  "A partir de ese tiempo, el arriendo se considera como jornada completa."
+                ]
+              },
+            ].map(t => (
+              <div key={t.titulo} style={{ background:C.blanco, borderRadius:14, padding:"24px 26px", border:`1px solid ${C.beigeOscuro}`, borderTop:`4px solid ${t.acento}`, boxShadow:"0 2px 12px rgba(155,142,196,0.07)" }}>
+                <div style={{ display:"flex", alignItems:"center", gap:10, marginBottom:16 }}>
+                  <span style={{ fontSize:22 }}>{t.icon}</span>
+                  <span style={{ fontSize:15, fontWeight:700, color:C.cafe, letterSpacing:".02em" }}>{t.titulo}</span>
+                </div>
+                <ul style={{ listStyle:"none", padding:0, margin:0 }}>
+                  {t.items.map((item,i) => (
+                    <li key={i} style={{ fontSize:13, color:C.cafeClaro, padding:"7px 0", borderBottom:i<t.items.length-1?`1px solid ${C.beigeOscuro}`:"none", fontFamily:"system-ui", lineHeight:1.7, display:"flex", gap:10, alignItems:"flex-start" }}>
+                      <span style={{ color:t.acento, fontWeight:700, flexShrink:0, marginTop:1 }}>✔</span>
+                      <span>{item}</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
       {/* ── DISPONIBILIDAD PÚBLICA ── */}
-      <section id="disponibilidad" style={{ padding:"80px 40px", background:C.lilaPale }}>
+      <section id="disponibilidad" style={{ padding:"80px 40px", background:C.blanco }}>
         <div style={{ maxWidth:860, margin:"0 auto" }}>
           <div style={{ textAlign:"center", marginBottom:40 }}>
             <div style={{ fontSize:10, letterSpacing:".3em", textTransform:"uppercase", color:C.lila, marginBottom:12 }}>Agenda en tiempo real</div>

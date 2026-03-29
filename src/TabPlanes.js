@@ -6,7 +6,7 @@ const fmt = n => (n||0).toLocaleString("es-CL",{style:"currency",currency:"CLP",
 const PLANES_DEF = {
   estetico: [
     { id:"est_1j", label:"1 jornada/semana",   precio:170000, jornadas:4,  asistente:false, detalle:"4 jornadas al mes · horario fijo" },
-    { id:"est_2j", label:"2 jornadas/semana",  precio:330000, jornadas:8,  asistente:false, detalle:"8 jornadas al mes · horario fijo" },
+    { id:"est_2j", label:"2 jornadas/semana",  precio:340000, jornadas:8,  asistente:false, detalle:"8 jornadas al mes · horario fijo" },
     { id:"est_3j", label:"3 jornadas/semana",  precio:480000, jornadas:12, asistente:false, detalle:"12 jornadas al mes · horario fijo" },
     { id:"est_exc",label:"Plan Exclusivo ⭐",  precio:1350000,jornadas:20, asistente:false, detalle:"5 jornadas semanales" },
   ],
@@ -16,6 +16,12 @@ const PLANES_DEF = {
     { id:"den_1jp", label:"1 jornada/semana Pro",     precio:250000, jornadas:4,  asistente:true,  detalle:"Con asistente · 4 jornadas/mes" },
     { id:"den_2jp", label:"2 jornadas/semana Pro",    precio:500000, jornadas:8,  asistente:true,  detalle:"Con asistente · 8 jornadas/mes" },
     { id:"den_exc", label:"Plan Exclusivo ⭐",        precio:1350000,jornadas:20, asistente:false, detalle:"5 jornadas semanales" },
+  ],
+  medico: [
+    { id:"med_1j",  label:"1 jornada/semana",        precio:215000, jornadas:4,  asistente:false, detalle:"4 jornadas al mes · horario fijo" },
+    { id:"med_2j",  label:"2 jornadas/semana",        precio:420000, jornadas:8,  asistente:false, detalle:"8 jornadas al mes · horario fijo" },
+    { id:"med_3j",  label:"3 jornadas/semana",        precio:645000, jornadas:12, asistente:false, detalle:"12 jornadas al mes · horario fijo" },
+    { id:"med_5j",  label:"5 jornadas/semana ⭐",     precio:1050000,jornadas:20, asistente:false, detalle:"Lunes a viernes · horario fijo" },
   ],
 };
 

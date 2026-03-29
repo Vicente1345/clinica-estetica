@@ -109,27 +109,27 @@ export const PLANES = {
             id: "est_2j_mes",
             label: "Mensual",
             detalle: "Renueva cada mes",
-            precio: 330000,
+            precio: 340000,
             jornadas: 2, meses: 1, asistente: false,
-            tag: "Ahorra $30.000",
+            tag: "Ahorra $20.000",
             tagColor: "#1D9E75",
           },
           {
             id: "est_2j_3m",
             label: "Trimestral",
             detalle: "3 meses · cobro mensual",
-            precio: 320000,
+            precio: 330000,
             jornadas: 2, meses: 3, asistente: false,
-            tag: "Ahorra $40.000/mes",
+            tag: "Ahorra $30.000/mes",
             tagColor: "#1D9E75",
           },
           {
             id: "est_2j_6m",
             label: "Semestral",
             detalle: "6 meses · cobro mensual",
-            precio: 310000,
+            precio: 320000,
             jornadas: 2, meses: 6, asistente: false,
-            tag: "Ahorra $50.000/mes",
+            tag: "Ahorra $40.000/mes",
             tagColor: "#185FA5",
           },
           {
@@ -420,6 +420,120 @@ export const PLANES = {
             label: "Mensual",
             detalle: "Acceso exclusivo de lunes a viernes",
             precio: 1350000,
+            jornadas: 5, meses: 1, asistente: false,
+            tag: "Plan exclusivo",
+            tagColor: "#2C2C2A",
+          },
+        ]
+      },
+    ]
+  },
+
+  // ══════════════════════════════════════════════
+  // BOX MÉDICO
+  // ══════════════════════════════════════════════
+  medico: {
+    nombre: "Box Médico",
+    emoji: "🏥",
+    color:  "#FEF3E2",
+    borde:  "#C9A96E",
+    texto:  "#3D2B1F",
+    secciones: [
+      {
+        id: "med_suelta",
+        titulo: "Sin compromiso — hora o jornada",
+        icono: "⏱",
+        tipo: "suelta",
+        opciones: [
+          {
+            id: "med_hora",
+            label: "Hora suelta",
+            detalle: "Mínimo 2 horas consecutivas",
+            precio: 12000,
+            jornadas: null, meses: null, asistente: false,
+            tag: null,
+          },
+          {
+            id: "med_jornada",
+            label: "Jornada (5 horas)",
+            detalle: "5 horas corridas · sin compromiso",
+            precio: 55000,
+            jornadas: null, meses: null, asistente: false,
+            tag: "Más conveniente",
+            tagColor: "#C9A96E",
+          },
+        ]
+      },
+      {
+        id: "med_plan_1j",
+        titulo: "Plan 1 jornada semanal",
+        icono: "📅",
+        tipo: "plan",
+        descripcion: "4 jornadas al mes · día y horario fijo",
+        ref: "Suelto: 4 × $55.000 = $220.000/mes",
+        opciones: [
+          {
+            id: "med_1j_mes",
+            label: "Mensual",
+            detalle: "Renueva cada mes",
+            precio: 215000,
+            jornadas: 1, meses: 1, asistente: false,
+            tag: "Ahorra $5.000",
+            tagColor: "#1D9E75",
+          },
+        ]
+      },
+      {
+        id: "med_plan_2j",
+        titulo: "Plan 2 jornadas semanales",
+        icono: "📅",
+        tipo: "plan",
+        descripcion: "8 jornadas al mes · días y horario fijo",
+        ref: "Suelto: 8 × $55.000 = $440.000/mes",
+        opciones: [
+          {
+            id: "med_2j_mes",
+            label: "Mensual",
+            detalle: "Renueva cada mes",
+            precio: 420000,
+            jornadas: 2, meses: 1, asistente: false,
+            tag: "Ahorra $20.000",
+            tagColor: "#1D9E75",
+          },
+        ]
+      },
+      {
+        id: "med_plan_3j",
+        titulo: "Plan 3 jornadas semanales",
+        icono: "📅",
+        tipo: "plan",
+        descripcion: "12 jornadas al mes · días y horario fijo",
+        ref: "Suelto: 12 × $55.000 = $660.000/mes",
+        opciones: [
+          {
+            id: "med_3j_mes",
+            label: "Mensual",
+            detalle: "Renueva cada mes",
+            precio: 645000,
+            jornadas: 3, meses: 1, asistente: false,
+            tag: "Ahorra $15.000",
+            tagColor: "#1D9E75",
+          },
+        ]
+      },
+      {
+        id: "med_exclusivo",
+        titulo: "Plan Exclusivo ⭐ — 5 jornadas semanales",
+        icono: "⭐",
+        tipo: "plan",
+        descripcion: "Uso prioritario · lunes a viernes · horario fijo",
+        ref: null,
+        opciones: [
+          {
+            id: "med_excl",
+            label: "Mensual",
+            detalle: "Acceso exclusivo de lunes a viernes",
+            precio: 1050000,
             jornadas: 5, meses: 1, asistente: false,
             tag: "Plan exclusivo",
             tagColor: "#2C2C2A",
