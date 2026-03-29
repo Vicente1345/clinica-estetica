@@ -17,31 +17,45 @@ const C = {
   dorado:      "#C9A96E",
 };
 
-const PLANES_ESTETICO = [
-  { titulo:"Jornada suelta (5h)",               precio:45000,  detalle:"Sin compromiso · horario flexible", suelta:true },
-  { titulo:"2 jornadas/semana · Mensual",        precio:340000, detalle:"Compromiso mensual · horario fijo" },
-  { titulo:"2 jornadas/semana · Semestral",      precio:320000, detalle:"Compromiso 6 meses · cobro mensual" },
-  { titulo:"2 jornadas/semana · Anual ⭐",       precio:300000, detalle:"Compromiso 12 meses · mejor precio" },
+// ── BOX ESTÉTICO ────────────────────────────────────────────────
+const EST_BASE = [
+  { titulo:"1 hora",                precio:10000, detalle:"Tarifa base · mínimo 1 hora" },
+  { titulo:"2 horas consecutivas",  precio:18000, detalle:"Bloque continuo de 2 horas", popular:true },
+  { titulo:"Jornada completa (5h)", precio:45000, detalle:"Sin compromiso · horario flexible" },
+];
+const EST_MENSUAL = [
+  { titulo:"1 jornada/semana",  precio:170000, detalle:"Mismo horario reservado cada semana" },
+  { titulo:"2 jornadas/semana", precio:330000, detalle:"Mismo horario reservado cada semana" },
+  { titulo:"3 jornadas/semana", precio:480000, detalle:"Mismo horario reservado cada semana" },
 ];
 
-const PLANES_DENTAL_SIN = [
-  { titulo:"Jornada suelta",              precio:45000,  detalle:"Sin compromiso",         suelta:true },
-  { titulo:"1 jornada/sem · Mensual",     precio:170000, detalle:"Plan mensual" },
-  { titulo:"1 jornada/sem · Semestral",   precio:160000, detalle:"6 meses" },
-  { titulo:"1 jornada/sem · Anual ⭐",    precio:150000, detalle:"12 meses · mejor precio" },
-  { titulo:"2 jornadas/sem · Mensual",    precio:340000, detalle:"Plan mensual" },
-  { titulo:"2 jornadas/sem · Semestral",  precio:320000, detalle:"6 meses" },
-  { titulo:"2 jornadas/sem · Anual ⭐",   precio:300000, detalle:"12 meses · mejor precio" },
+// ── BOX DENTAL – PLAN FLEX (sin asistente) ───────────────────────
+const FLEX_BASE = [
+  { titulo:"Por hora",              precio:15000, detalle:"Mínimo 2 horas consecutivas" },
+  { titulo:"Jornada suelta (5h)",   precio:45000, detalle:"Sin compromiso · sin asistente" },
 ];
-const PLANES_DENTAL_PRO = [
-  { titulo:"Jornada suelta Pro",           precio:65000,  detalle:"Con asistente incluido",  suelta:true },
-  { titulo:"1 jornada/sem · Mensual",      precio:250000, detalle:"Con asistente" },
-  { titulo:"1 jornada/sem · Semestral",    precio:240000, detalle:"6 meses · con asistente" },
-  { titulo:"1 jornada/sem · Anual ⭐",     precio:230000, detalle:"12 meses · con asistente" },
-  { titulo:"2 jornadas/sem · Mensual",     precio:500000, detalle:"Con asistente" },
-  { titulo:"2 jornadas/sem · Semestral",   precio:480000, detalle:"6 meses · con asistente" },
-  { titulo:"2 jornadas/sem · Anual ⭐",    precio:450000, detalle:"12 meses · con asistente" },
-  { titulo:"Plan Exclusivo ⭐",            precio:1350000,detalle:"5 jornadas semanales fijas" },
+const FLEX_MENSUAL = [
+  { titulo:"1 jornada/sem · Mensual",    precio:170000, detalle:"Mismo horario cada semana" },
+  { titulo:"1 jornada/sem · Semestral",  precio:160000, detalle:"6 meses · horario fijo" },
+  { titulo:"1 jornada/sem · Anual ⭐",   precio:150000, detalle:"12 meses · mejor precio" },
+  { titulo:"2 jornadas/sem · Mensual",   precio:340000, detalle:"Mismo horario cada semana" },
+  { titulo:"2 jornadas/sem · Semestral", precio:320000, detalle:"6 meses · horario fijo" },
+  { titulo:"2 jornadas/sem · Anual ⭐",  precio:300000, detalle:"12 meses · mejor precio" },
+];
+
+// ── BOX DENTAL – PLAN PRO (con asistente) ───────────────────────
+const PRO_BASE = [
+  { titulo:"Por hora Pro",          precio:18000, detalle:"Mínimo 2 horas · con asistente" },
+  { titulo:"Jornada suelta Pro",    precio:65000, detalle:"Con asistente incluido" },
+];
+const PRO_MENSUAL = [
+  { titulo:"1 jornada/sem · Mensual",    precio:250000, detalle:"Con asistente · horario fijo" },
+  { titulo:"1 jornada/sem · Semestral",  precio:240000, detalle:"6 meses · con asistente" },
+  { titulo:"1 jornada/sem · Anual ⭐",   precio:230000, detalle:"12 meses · con asistente" },
+  { titulo:"2 jornadas/sem · Mensual",   precio:500000, detalle:"Con asistente · horario fijo" },
+  { titulo:"2 jornadas/sem · Semestral", precio:480000, detalle:"6 meses · con asistente" },
+  { titulo:"2 jornadas/sem · Anual ⭐",  precio:450000, detalle:"12 meses · con asistente" },
+  { titulo:"Plan Exclusivo ⭐",          precio:1350000,detalle:"5 jornadas semanales fijas" },
 ];
 
 const PLANES_MEDICO = [
@@ -62,7 +76,9 @@ export default function Landing({ onLogin }) {
   const [error, setError]           = useState("");
   const [loading, setLoading]       = useState(false);
   const [boxActivo, setBoxActivo]   = useState("estetico");
-  const [dentalCat, setDentalCat]   = useState("sin");
+  const [dentalCat, setDentalCat]   = useState("flex");
+  const [estOpen,   setEstOpen]     = useState(false);
+  const [denOpen,   setDenOpen]     = useState(false);
   const [dispBoxes, setDispBoxes]         = useState([]);
   const [dispArriendos, setDispArriendos] = useState([]);
   const [dispBoxSel, setDispBoxSel]       = useState(null);
@@ -225,90 +241,160 @@ export default function Landing({ onLogin }) {
           {/* ─── BOX ESTÉTICO ─── */}
           {boxActivo==="estetico" && (
             <div>
-              <div style={{ marginBottom:14, padding:"12px 16px", background:C.lilaPale, borderRadius:10, fontSize:12, color:C.cafeClaro, fontFamily:"system-ui", lineHeight:1.8, borderLeft:`3px solid ${C.lila}` }}>
-                ℹ️ <strong>Plan 2 jornadas semanales</strong> · El precio varía según el tiempo de compromiso de arriendo.
+              {/* Precios base — tarjetas */}
+              <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fit,minmax(200px,1fr))", gap:12, marginBottom:16 }}>
+                {EST_BASE.map((p,i)=>(
+                  <div key={i} style={{ position:"relative", background:p.popular?C.lila:C.lilaPale, borderRadius:14, padding:"22px 18px", border:`2px solid ${p.popular?C.lila:C.lilaClaro}`, boxShadow:p.popular?"0 4px 18px rgba(155,142,196,0.3)":"none" }}>
+                    {p.popular && <div style={{ position:"absolute", top:-10, right:12, background:C.dorado, color:C.blanco, fontSize:10, fontWeight:700, padding:"3px 10px", borderRadius:20, letterSpacing:".08em" }}>MÁS ELEGIDO</div>}
+                    <div style={{ fontSize:24, fontWeight:700, color:p.popular?C.blanco:C.lila, marginBottom:4 }}>{fmt(p.precio)}</div>
+                    <div style={{ fontSize:13, fontWeight:600, color:p.popular?C.blanco:C.cafe, marginBottom:4 }}>{p.titulo}</div>
+                    <div style={{ fontSize:11, color:p.popular?C.lilaPale:C.gris, fontFamily:"system-ui", lineHeight:1.5 }}>{p.detalle}</div>
+                  </div>
+                ))}
               </div>
-              <div style={{ display:"grid", gap:8 }}>
-                {PLANES_ESTETICO.map((p,i)=>{
-                  const star=p.titulo.includes("⭐");
-                  const unit=p.suelta?"/ vez":"/mes";
-                  return (
-                    <div key={i} style={{ display:"flex", justifyContent:"space-between", alignItems:"center", padding:"14px 20px", background:star?C.lila:p.suelta?C.beige:i%2===0?C.lilaPale:C.blanco, borderRadius:10, border:`1px solid ${star?C.lila:C.beigeOscuro}` }}>
+
+              {/* Condiciones + Incluye */}
+              <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fit,minmax(260px,1fr))", gap:10, marginBottom:14 }}>
+                <div style={{ padding:"11px 14px", background:C.beige, borderRadius:10, fontSize:12, color:C.cafeClaro, fontFamily:"system-ui", lineHeight:1.8, borderLeft:`3px solid ${C.dorado}` }}>
+                  <strong style={{ color:C.cafe }}>📋 Condiciones</strong><br/>
+                  Mínimo 1 hora · Horario 09:00–19:00 · No se arriendan bloques de 30 o 45 min
+                </div>
+                <div style={{ padding:"11px 14px", background:C.lilaPale, borderRadius:10, fontSize:12, color:C.cafeClaro, fontFamily:"system-ui", lineHeight:1.8, borderLeft:`3px solid ${C.lila}` }}>
+                  <strong style={{ color:C.cafe }}>✅ Incluye</strong><br/>
+                  Sabanilla desechable · <span style={{ color:C.cafeClaro }}>Carpule disponible (+{fmt(2000)} adicional)</span>
+                </div>
+              </div>
+
+              {/* Tip conversión */}
+              <div style={{ marginBottom:16, padding:"11px 14px", background:C.rosaPale, borderRadius:10, fontSize:12, color:C.cafeClaro, fontFamily:"system-ui", lineHeight:1.8, borderLeft:`3px solid ${C.rosa}` }}>
+                💡 Muchos profesionales prefieren reservar <strong>2 horas consecutivas o jornadas completas</strong> — permite una mejor organización de la agenda y resulta más conveniente.
+              </div>
+
+              {/* Acordeón: planes mensuales */}
+              <button onClick={()=>setEstOpen(o=>!o)}
+                style={{ width:"100%", padding:"13px 18px", background:estOpen?C.lila:C.blanco, color:estOpen?C.blanco:C.lila, border:`2px solid ${C.lila}`, borderRadius:10, cursor:"pointer", fontSize:13, fontWeight:700, letterSpacing:".05em", display:"flex", justifyContent:"space-between", alignItems:"center", transition:"all .2s" }}>
+                <span>📅 Planes mensuales con horario fijo</span>
+                <span style={{ fontSize:11 }}>{estOpen?"▲ Cerrar":"▼ Ver planes"}</span>
+              </button>
+              {estOpen && (
+                <div style={{ marginTop:2, border:`1px solid ${C.lilaClaro}`, borderRadius:"0 0 10px 10px", overflow:"hidden" }}>
+                  <div style={{ padding:"12px 16px", background:C.lilaPale, fontSize:12, color:C.cafeClaro, fontFamily:"system-ui", lineHeight:1.7, borderBottom:`1px solid ${C.lilaClaro}` }}>
+                    ✔ Estos planes <strong>aseguran el mismo horario reservado cada semana</strong> — más conveniente que el arriendo por jornada suelta.
+                  </div>
+                  {EST_MENSUAL.map((p,i)=>(
+                    <div key={i} style={{ display:"flex", justifyContent:"space-between", alignItems:"center", padding:"13px 18px", background:i%2===0?C.blanco:C.lilaPale, borderBottom:`1px solid ${C.lilaClaro}` }}>
                       <div>
-                        <div style={{ fontSize:14, fontWeight:600, color:star?C.blanco:C.cafe }}>{p.titulo}</div>
-                        <div style={{ fontSize:12, color:star?C.lilaPale:C.gris, marginTop:2, fontFamily:"system-ui" }}>{p.detalle}</div>
+                        <div style={{ fontSize:14, fontWeight:600, color:C.cafe }}>{p.titulo}</div>
+                        <div style={{ fontSize:12, color:C.gris, marginTop:2, fontFamily:"system-ui" }}>{p.detalle}</div>
                       </div>
                       <div style={{ textAlign:"right" }}>
-                        <div style={{ fontSize:19, fontWeight:700, color:star?C.blanco:C.lila }}>{fmt(p.precio)}</div>
-                        <div style={{ fontSize:10, color:star?C.lilaPale:C.gris, fontFamily:"system-ui" }}>{unit}</div>
+                        <div style={{ fontSize:19, fontWeight:700, color:C.lila }}>{fmt(p.precio)}</div>
+                        <div style={{ fontSize:10, color:C.gris, fontFamily:"system-ui" }}>/mes</div>
                       </div>
                     </div>
-                  );
-                })}
-              </div>
+                  ))}
+                </div>
+              )}
             </div>
           )}
 
           {/* ─── BOX DENTAL ─── */}
           {boxActivo==="dental" && (
             <div>
-              {/* Subtabs dental */}
+              {/* Subtabs */}
               <div style={{ display:"flex", gap:8, marginBottom:20, flexWrap:"wrap", justifyContent:"center" }}>
-                {[["sin","Sin Asistente"],["pro","Plan PRO (con Asistente)"]].map(([k,l])=>(
-                  <button key={k} onClick={()=>setDentalCat(k)}
-                    style={{ padding:"8px 20px", borderRadius:20, border:`2px solid ${dentalCat===k?C.rosa:C.beigeOscuro}`, background:dentalCat===k?C.rosa:C.blanco, color:dentalCat===k?C.blanco:C.cafeClaro, fontSize:12, fontWeight:600, cursor:"pointer", transition:"all .2s" }}>
+                {[["flex","Plan Flex (sin asistente)"],["pro","Plan PRO (con asistente)"]].map(([k,l])=>(
+                  <button key={k} onClick={()=>{ setDentalCat(k); setDenOpen(false); }}
+                    style={{ padding:"8px 22px", borderRadius:20, border:`2px solid ${dentalCat===k?C.rosa:C.beigeOscuro}`, background:dentalCat===k?C.rosa:C.blanco, color:dentalCat===k?C.blanco:C.cafeClaro, fontSize:12, fontWeight:600, cursor:"pointer", transition:"all .2s" }}>
                     {l}
                   </button>
                 ))}
               </div>
 
-              {dentalCat==="sin" && (
+              {/* Plan Flex */}
+              {dentalCat==="flex" && (
                 <div>
-                  <div style={{ marginBottom:14, padding:"12px 16px", background:C.rosaPale, borderRadius:10, fontSize:12, color:C.cafeClaro, fontFamily:"system-ui", lineHeight:1.8, borderLeft:`3px solid ${C.rosa}` }}>
-                    ℹ️ Planes con <strong>compromiso de arriendo</strong> — el precio baja a 6 o 12 meses.
+                  <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fit,minmax(200px,1fr))", gap:12, marginBottom:14 }}>
+                    {FLEX_BASE.map((p,i)=>(
+                      <div key={i} style={{ background:C.rosaPale, borderRadius:14, padding:"22px 18px", border:`2px solid ${C.rosa}44` }}>
+                        <div style={{ fontSize:24, fontWeight:700, color:C.rosa, marginBottom:4 }}>{fmt(p.precio)}</div>
+                        <div style={{ fontSize:13, fontWeight:600, color:C.cafe, marginBottom:4 }}>{p.titulo}</div>
+                        <div style={{ fontSize:11, color:C.gris, fontFamily:"system-ui", lineHeight:1.5 }}>{p.detalle}</div>
+                      </div>
+                    ))}
                   </div>
-                  <div style={{ display:"grid", gap:8 }}>
-                    {PLANES_DENTAL_SIN.map((p,i)=>{
-                      const star=p.titulo.includes("⭐");
-                      return (
-                        <div key={i} style={{ display:"flex", justifyContent:"space-between", alignItems:"center", padding:"14px 20px", background:p.suelta?C.beige:i%2===0?C.rosaPale:C.blanco, borderRadius:10, border:`1px solid ${C.beigeOscuro}` }}>
-                          <div>
-                            <div style={{ fontSize:14, fontWeight:600, color:C.cafe }}>{p.titulo}</div>
-                            <div style={{ fontSize:12, color:C.gris, marginTop:2, fontFamily:"system-ui" }}>{p.detalle}</div>
-                          </div>
-                          <div style={{ textAlign:"right" }}>
-                            <div style={{ fontSize:19, fontWeight:700, color:C.rosa }}>{fmt(p.precio)}</div>
-                            <div style={{ fontSize:10, color:C.gris, fontFamily:"system-ui" }}>{p.suelta?"/ vez":"/mes"}</div>
-                          </div>
-                        </div>
-                      );
-                    })}
+                  <div style={{ marginBottom:14, padding:"11px 14px", background:C.lilaPale, borderRadius:10, fontSize:12, color:C.cafeClaro, fontFamily:"system-ui", lineHeight:1.8, borderLeft:`3px solid ${C.lila}` }}>
+                    💡 Los <strong>planes mensuales aseguran el mismo horario</strong> reservado cada semana y son más convenientes que el arriendo por jornada suelta.
                   </div>
+                  <button onClick={()=>setDenOpen(o=>!o)}
+                    style={{ width:"100%", padding:"13px 18px", background:denOpen?C.rosa:C.blanco, color:denOpen?C.blanco:C.rosa, border:`2px solid ${C.rosa}`, borderRadius:10, cursor:"pointer", fontSize:13, fontWeight:700, letterSpacing:".05em", display:"flex", justifyContent:"space-between", alignItems:"center", transition:"all .2s" }}>
+                    <span>📅 Planes mensuales Plan Flex</span>
+                    <span style={{ fontSize:11 }}>{denOpen?"▲ Cerrar":"▼ Ver planes"}</span>
+                  </button>
+                  {denOpen && (
+                    <div style={{ marginTop:2, border:`1px solid ${C.rosa}44`, borderRadius:"0 0 10px 10px", overflow:"hidden" }}>
+                      {FLEX_MENSUAL.map((p,i)=>{
+                        const star=p.titulo.includes("⭐")&&!p.titulo.includes("sem");
+                        return (
+                          <div key={i} style={{ display:"flex", justifyContent:"space-between", alignItems:"center", padding:"13px 18px", background:i%2===0?C.blanco:C.rosaPale, borderBottom:`1px solid ${C.rosa}22` }}>
+                            <div>
+                              <div style={{ fontSize:14, fontWeight:600, color:C.cafe }}>{p.titulo}</div>
+                              <div style={{ fontSize:12, color:C.gris, marginTop:2, fontFamily:"system-ui" }}>{p.detalle}</div>
+                            </div>
+                            <div style={{ textAlign:"right" }}>
+                              <div style={{ fontSize:19, fontWeight:700, color:C.rosa }}>{fmt(p.precio)}</div>
+                              <div style={{ fontSize:10, color:C.gris, fontFamily:"system-ui" }}>/mes</div>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
                 </div>
               )}
 
+              {/* Plan PRO */}
               {dentalCat==="pro" && (
                 <div>
-                  <div style={{ marginBottom:14, padding:"12px 16px", background:C.lilaPale, borderRadius:10, fontSize:12, color:C.cafeClaro, fontFamily:"system-ui", lineHeight:1.8, borderLeft:`3px solid ${C.lila}` }}>
+                  <div style={{ marginBottom:14, padding:"11px 14px", background:C.lilaPale, borderRadius:10, fontSize:12, color:C.cafeClaro, fontFamily:"system-ui", lineHeight:1.8, borderLeft:`3px solid ${C.lila}` }}>
                     ⭐ <strong>Plan PRO incluye:</strong> Kit de destartraje y profilaxis · Kit de operatoria · Kit de anestesia · Carga de esterilización
                   </div>
-                  <div style={{ display:"grid", gap:8 }}>
-                    {PLANES_DENTAL_PRO.map((p,i)=>{
-                      const star=p.titulo.includes("⭐")&&p.precio===1350000;
-                      return (
-                        <div key={i} style={{ display:"flex", justifyContent:"space-between", alignItems:"center", padding:"14px 20px", background:star?C.lila:p.suelta?C.beige:i%2===0?C.lilaPale:C.blanco, borderRadius:10, border:`1px solid ${star?C.lila:C.beigeOscuro}` }}>
-                          <div>
-                            <div style={{ fontSize:14, fontWeight:600, color:star?C.blanco:C.cafe }}>{p.titulo}</div>
-                            <div style={{ fontSize:12, color:star?C.lilaPale:C.gris, marginTop:2, fontFamily:"system-ui" }}>{p.detalle}</div>
-                          </div>
-                          <div style={{ textAlign:"right" }}>
-                            <div style={{ fontSize:19, fontWeight:700, color:star?C.blanco:C.lila }}>{fmt(p.precio)}</div>
-                            <div style={{ fontSize:10, color:star?C.lilaPale:C.gris, fontFamily:"system-ui" }}>{p.suelta?"/ vez":"/mes"}</div>
-                          </div>
-                        </div>
-                      );
-                    })}
+                  <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fit,minmax(200px,1fr))", gap:12, marginBottom:14 }}>
+                    {PRO_BASE.map((p,i)=>(
+                      <div key={i} style={{ background:C.lilaPale, borderRadius:14, padding:"22px 18px", border:`2px solid ${C.lila}44` }}>
+                        <div style={{ fontSize:24, fontWeight:700, color:C.lila, marginBottom:4 }}>{fmt(p.precio)}</div>
+                        <div style={{ fontSize:13, fontWeight:600, color:C.cafe, marginBottom:4 }}>{p.titulo}</div>
+                        <div style={{ fontSize:11, color:C.gris, fontFamily:"system-ui", lineHeight:1.5 }}>{p.detalle}</div>
+                      </div>
+                    ))}
                   </div>
+                  <div style={{ marginBottom:14, padding:"11px 14px", background:C.rosaPale, borderRadius:10, fontSize:12, color:C.cafeClaro, fontFamily:"system-ui", lineHeight:1.8, borderLeft:`3px solid ${C.rosa}` }}>
+                    💡 Los <strong>planes mensuales aseguran el mismo horario</strong> reservado cada semana y son más convenientes que el arriendo por jornada suelta.
+                  </div>
+                  <button onClick={()=>setDenOpen(o=>!o)}
+                    style={{ width:"100%", padding:"13px 18px", background:denOpen?C.lila:C.blanco, color:denOpen?C.blanco:C.lila, border:`2px solid ${C.lila}`, borderRadius:10, cursor:"pointer", fontSize:13, fontWeight:700, letterSpacing:".05em", display:"flex", justifyContent:"space-between", alignItems:"center", transition:"all .2s" }}>
+                    <span>📅 Planes mensuales Plan PRO</span>
+                    <span style={{ fontSize:11 }}>{denOpen?"▲ Cerrar":"▼ Ver planes"}</span>
+                  </button>
+                  {denOpen && (
+                    <div style={{ marginTop:2, border:`1px solid ${C.lilaClaro}`, borderRadius:"0 0 10px 10px", overflow:"hidden" }}>
+                      {PRO_MENSUAL.map((p,i)=>{
+                        const star=p.precio===1350000;
+                        return (
+                          <div key={i} style={{ display:"flex", justifyContent:"space-between", alignItems:"center", padding:"13px 18px", background:star?C.lila:i%2===0?C.blanco:C.lilaPale, borderBottom:`1px solid ${C.lilaClaro}` }}>
+                            <div>
+                              <div style={{ fontSize:14, fontWeight:600, color:star?C.blanco:C.cafe }}>{p.titulo}</div>
+                              <div style={{ fontSize:12, color:star?C.lilaPale:C.gris, marginTop:2, fontFamily:"system-ui" }}>{p.detalle}</div>
+                            </div>
+                            <div style={{ textAlign:"right" }}>
+                              <div style={{ fontSize:19, fontWeight:700, color:star?C.blanco:C.lila }}>{fmt(p.precio)}</div>
+                              <div style={{ fontSize:10, color:star?C.lilaPale:C.gris, fontFamily:"system-ui" }}>/mes</div>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
                 </div>
               )}
             </div>
