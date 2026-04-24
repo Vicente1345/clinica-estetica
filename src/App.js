@@ -6,6 +6,7 @@ import Login from './Login';
 import { SubirComprobante, BadgeVerificado, VerComprobante, PanelVerificacion } from './Comprobante';
 import Calendario from './Calendario';
 import ModificarReserva from './ModificarReserva';
+import ChatBot from './ChatBot';
 
 // ─── CONSTANTES ───────────────────────────────────────────────────
 const CATEGORIAS = ['Inyectables','Materiales descartables','Productos tópicos','Equipos/accesorios','Otros'];
@@ -16,16 +17,18 @@ const stockSt = i => i.stock===0 ? 'critico' : i.stock<=i.stock_min ? 'bajo' : '
 
 // Permisos por rol
 const CAN = {
-  config:   r => r==='admin',
-  insumos:  r => r==='admin' || r==='recep',
-  retiro:   r => true,
-  arriendos:r => r==='admin' || r==='recep' || r==='prof',
-  reportes: r => r==='admin',
+  config:      r => r==='admin',
+  insumos:     r => r==='admin' || r==='recep',
+  retiro:      r => true,
+  arriendos:   r => r==='admin' || r==='recep' || r==='prof',
+  solicitudes: r => r==='admin' || r==='recep',
+  reportes:    r => r==='admin',
 };
 
 const TABS_DEF = [
   { key:'modificar', label:'Modificar reservas', perm: r => r==='admin' },
   { key:'dashboard',   label:'Dashboard' },
+  { key:'solicitudes', label:'Solicitudes pacientes', perm: r => r==='admin'||r==='recep' },
   { key:'insumos',     label:'Inventario',     perm: r => r==='admin'||r==='recep' },
   { key:'retiro',      label:'Retirar insumo' },
   { key:'arriendos',   label:'Arriendos',      perm: r => r==='admin'||r==='recep'||r==='prof' },
@@ -85,6 +88,7 @@ export default function App() {
   const [profesionales, setProfesionales] = useState([]);
   const [boxes, setBoxes]               = useState([]);
   const [usuarios, setUsuarios]         = useState([]);
+  const [solicitudes, setSolicitudes]   = useState([]);
 
   const showToast = (msg, tipo='ok') => { setToast({msg,tipo}); setTimeout(()=>setToast(null),3200); };
 
@@ -95,13 +99,14 @@ export default function App() {
   // ── FETCH DATA ──
   const fetchAll = useCallback(async () => {
     setLoading(true);
-    const [ins, mov, arr, prof, bx, usr] = await Promise.all([
+    const [ins, mov, arr, prof, bx, usr, sol] = await Promise.all([
       sb.from('insumos').select('*').eq('activo',true).order('nombre'),
       sb.from('movimientos').select('*').order('created_at',{ascending:false}).limit(200),
       sb.from('arriendos').select('*').order('fecha',{ascending:false}).limit(200),
       sb.from('profesionales').select('*').eq('activo',true).order('nombre'),
       sb.from('boxes').select('*').order('nombre'),
       sb.from('usuarios').select('id,nombre,email,rol,activo').order('nombre'),
+      sb.from('solicitudes_paciente').select('*').order('created_at',{ascending:false}).limit(200),
     ]);
     if (ins.data)  setInsumos(ins.data);
     if (mov.data)  setMovimientos(mov.data);
@@ -109,6 +114,7 @@ export default function App() {
     if (prof.data) setProfesionales(prof.data);
     if (bx.data)   setBoxes(bx.data);
     if (usr.data)  setUsuarios(usr.data);
+    if (sol.data)  setSolicitudes(sol.data);
     setLoading(false);
   }, []);
 
@@ -231,6 +237,7 @@ export default function App() {
   const recArr   = arriendos.filter(a=>a.pagado).reduce((s,a)=>s+a.monto,0);
   const recIns   = movimientos.filter(m=>m.pago_pagado).reduce((s,m)=>s+(m.pago_monto||0),0);
   const pendVerif = [...arriendos, ...movimientos].filter(x => x.verificado === 'pendiente').length;
+  const pendSolic = solicitudes.filter(s => s.estado === 'pendiente').length;
   const planes    = [];
   // ─── GUARD ───────────────────────────────────────────────────────
   if (!user) return <Login onLogin={handleLogin}/>;
@@ -371,9 +378,15 @@ export default function App() {
 
       {/* TABS */}
       <div style={{display:'flex',gap:4,flexWrap:'wrap',marginBottom:20}}>
-        {tabs.map(t=>(
-          <button key={t.key} style={{padding:'6px 14px',borderRadius:20,border:'1px solid #ccc',background:tab===t.key?'#111':'transparent',color:tab===t.key?'#fff':'#666',cursor:'pointer',fontSize:13,fontWeight:tab===t.key?500:400}} onClick={()=>setTab(t.key)}>{t.label}</button>
-        ))}
+        {tabs.map(t=>{
+          const badge = t.key==='solicitudes' && pendSolic>0 ? pendSolic : (t.key==='verificacion' && pendVerif>0 ? pendVerif : null);
+          return (
+            <button key={t.key} style={{padding:'6px 14px',borderRadius:20,border:'1px solid #ccc',background:tab===t.key?'#111':'transparent',color:tab===t.key?'#fff':'#666',cursor:'pointer',fontSize:13,fontWeight:tab===t.key?500:400,position:'relative',display:'inline-flex',alignItems:'center',gap:6}} onClick={()=>setTab(t.key)}>
+              {t.label}
+              {badge && <span style={{background:'#E24B4A',color:'#fff',borderRadius:10,padding:'1px 7px',fontSize:10,fontWeight:700}}>{badge}</span>}
+            </button>
+          );
+        })}
       </div>
 
       {loading && <Spin/>}
@@ -787,6 +800,114 @@ export default function App() {
         </div>
       )}
 
+      {/* ── SOLICITUDES DE PACIENTES ── */}
+      {tab==='solicitudes' && (
+        <div>
+          <h3 style={{fontSize:15,fontWeight:500,margin:'0 0 6px'}}>Solicitudes de pacientes</h3>
+          <p style={{margin:'0 0 16px',color:'#666',fontSize:13}}>Pacientes que pidieron hora desde el chatbot. Contáctalos por WhatsApp para confirmar.</p>
+
+          {/* Filtros por estado */}
+          <div style={{display:'flex',gap:6,marginBottom:14,flexWrap:'wrap'}}>
+            {['pendiente','contactado','agendado','descartado'].map(est => {
+              const cnt = solicitudes.filter(s => s.estado===est).length;
+              const colors = { pendiente:'#FAEEDA', contactado:'#E6F1FB', agendado:'#EAF3DE', descartado:'#f0f0ec' };
+              return (
+                <span key={est} style={{padding:'4px 10px',borderRadius:14,background:colors[est],fontSize:12,color:'#444',fontWeight:500}}>
+                  {est}: <strong>{cnt}</strong>
+                </span>
+              );
+            })}
+          </div>
+
+          {solicitudes.length === 0 && (
+            <div style={{padding:30,textAlign:'center',background:'#fafafa',borderRadius:10,color:'#888',fontSize:13}}>
+              No hay solicitudes registradas todavía.
+            </div>
+          )}
+
+          {solicitudes.map(s => {
+            const wsBody = encodeURIComponent(`Hola ${s.nombre}, te contactamos desde Cowork Salud (Barcelona Clinic) por tu solicitud de hora. ¿Podemos coordinar?`);
+            const wsTel = (s.telefono || '').replace(/[^0-9]/g,'');
+            const wsLink = wsTel ? `https://wa.me/${wsTel.startsWith('56')?wsTel:'56'+wsTel}?text=${wsBody}` : null;
+            const estadoColors = { pendiente:['#FAEEDA','#854F0B'], contactado:['#E6F1FB','#0C447C'], agendado:['#EAF3DE','#3B6D11'], descartado:['#f0f0ec','#666'] };
+            const [bgEst, colorEst] = estadoColors[s.estado] || estadoColors.pendiente;
+
+            return (
+              <div key={s.id} style={{background:'#fff',borderRadius:12,border:'1px solid #eee',padding:16,marginBottom:12,borderLeft:`4px solid ${colorEst}`}}>
+                <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',gap:10,marginBottom:8,flexWrap:'wrap'}}>
+                  <div>
+                    <div style={{fontSize:14,fontWeight:600,color:'#111'}}>#{s.id} · {s.nombre}</div>
+                    <div style={{fontSize:11,color:'#888',marginTop:2}}>📞 {s.telefono} {s.email && `· ✉ ${s.email}`} {s.rut && `· 🪪 ${s.rut}`}</div>
+                    <div style={{fontSize:11,color:'#888',marginTop:2}}>Recibido: {new Date(s.created_at).toLocaleString('es-CL')}</div>
+                  </div>
+                  <span style={{padding:'3px 10px',borderRadius:12,fontSize:11,fontWeight:600,background:bgEst,color:colorEst}}>
+                    {s.estado}
+                  </span>
+                </div>
+
+                <div style={{fontSize:13,color:'#333',marginBottom:6,lineHeight:1.5}}>
+                  <strong>Motivo:</strong> {s.motivo_consulta}
+                </div>
+                {(s.especialidad_preferida || s.profesional_preferido) && (
+                  <div style={{fontSize:12,color:'#666',marginBottom:4}}>
+                    {s.especialidad_preferida && <>🩺 Especialidad: <strong>{s.especialidad_preferida}</strong> </>}
+                    {s.profesional_preferido && <>· 👨‍⚕ Prefiere: <strong>{s.profesional_preferido}</strong></>}
+                  </div>
+                )}
+                {s.fecha_preferida && (
+                  <div style={{fontSize:12,color:'#666',marginBottom:4}}>
+                    📅 Disponibilidad: <strong>{s.fecha_preferida}</strong>
+                  </div>
+                )}
+                {s.notas_adicionales && (
+                  <div style={{fontSize:12,color:'#666',marginBottom:4,fontStyle:'italic'}}>
+                    💭 {s.notas_adicionales}
+                  </div>
+                )}
+                {s.admin_obs && (
+                  <div style={{fontSize:12,background:'#FFF9E6',padding:'6px 10px',borderRadius:6,marginTop:8,color:'#664500'}}>
+                    📝 Obs admin: {s.admin_obs}
+                  </div>
+                )}
+
+                <div style={{display:'flex',gap:6,flexWrap:'wrap',marginTop:12}}>
+                  {wsLink && (
+                    <a href={wsLink} target="_blank" rel="noreferrer" style={{...S.btn('success',true),textDecoration:'none',background:'#25D366'}}>
+                      💬 WhatsApp
+                    </a>
+                  )}
+                  {s.estado === 'pendiente' && (
+                    <button style={S.btn('primary',true)} onClick={async()=>{
+                      await sb.from('solicitudes_paciente').update({estado:'contactado', contactado_por:user.nombre, contactado_at:new Date().toISOString()}).eq('id',s.id);
+                      await fetchAll(); showToast('Marcado como contactado');
+                    }}>Marcar contactado</button>
+                  )}
+                  {(s.estado === 'pendiente' || s.estado === 'contactado') && (
+                    <button style={S.btn('success',true)} onClick={async()=>{
+                      await sb.from('solicitudes_paciente').update({estado:'agendado'}).eq('id',s.id);
+                      await fetchAll(); showToast('Marcado como agendado');
+                    }}>Marcar agendado</button>
+                  )}
+                  {s.estado !== 'descartado' && (
+                    <button style={S.btn('danger',true)} onClick={async()=>{
+                      const obs = prompt('Razón del descarte (opcional):') || '';
+                      await sb.from('solicitudes_paciente').update({estado:'descartado', admin_obs: obs || s.admin_obs}).eq('id',s.id);
+                      await fetchAll(); showToast('Descartada');
+                    }}>Descartar</button>
+                  )}
+                  <button style={S.btn('secondary',true)} onClick={()=>{
+                    const nuevaObs = prompt('Notas internas:', s.admin_obs || '');
+                    if (nuevaObs !== null) {
+                      sb.from('solicitudes_paciente').update({admin_obs: nuevaObs}).eq('id',s.id).then(fetchAll).then(()=>showToast('Notas guardadas'));
+                    }
+                  }}>📝 Notas</button>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+
       {/* ── VERIFICACIÓN DE PAGOS ── */}
       {tab==='verificacion' && (
         <div>
@@ -907,6 +1028,9 @@ export default function App() {
         </div>
       )}
       </>}
+
+      {/* ── CHATBOT ── */}
+      <ChatBot variante="interno" usuario={user} />
     </div>
   );
 }

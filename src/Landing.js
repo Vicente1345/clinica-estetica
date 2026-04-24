@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { sb } from "./supabase";
+import ChatBot from "./ChatBot";
 
 // ── PALETA inspirada en Barcelona Clinic Instagram ─────────────
 const C = {
@@ -716,6 +717,9 @@ export default function Landing({ onLogin }) {
           </div>
         </div>
       )}
+
+      {/* ── CHATBOT ── */}
+      <ChatBot variante="publico" />
     </div>
   );
 }
