@@ -19,7 +19,7 @@ const CAN = {
   config:   r => r==='admin',
   insumos:  r => r==='admin' || r==='recep',
   retiro:   r => true,
-  arriendos:r => r==='admin' || r==='recep',
+  arriendos:r => r==='admin' || r==='recep' || r==='prof',
   reportes: r => r==='admin',
 };
 
@@ -28,7 +28,7 @@ const TABS_DEF = [
   { key:'dashboard',   label:'Dashboard' },
   { key:'insumos',     label:'Inventario',     perm: r => r==='admin'||r==='recep' },
   { key:'retiro',      label:'Retirar insumo' },
-  { key:'arriendos',   label:'Arriendos',      perm: r => r==='admin'||r==='recep' },
+  { key:'arriendos',   label:'Arriendos',      perm: r => r==='admin'||r==='recep'||r==='prof' },
   { key:'disponibilidad', label:'Disponibilidad' },
   { key:'planes', label:'Planes' },
   { key:'agenda',      label:'Agenda' },
@@ -222,7 +222,7 @@ export default function App() {
   const [ingObs, setIngObs]   = useState('');
 
   // ── USUARIO FORM ──
-  const emptyUsr = { nombre:'', email:'', password_hash:'', rol:'recep' };
+  const emptyUsr = { nombre:'', email:'', password_hash:'', rol:'recep', activo:true };
   const [usrForm, setUsrForm] = useState(emptyUsr);
 
   // ── STATS ──
@@ -331,13 +331,21 @@ export default function App() {
           <div style={{display:'flex',gap:10,marginTop:20}}>
             <button style={S.btn('primary')} onClick={async()=>{
               if(!usrForm.nombre.trim()||!usrForm.email.trim()) return showToast('Nombre y email requeridos','err');
+              const emailNorm = usrForm.email.trim().toLowerCase();
+              const passNorm  = (usrForm.password_hash||'').trim();
               if(modal.id){
-                const upd = {nombre:usrForm.nombre,email:usrForm.email,rol:usrForm.rol};
-                if(usrForm.password_hash) upd.password_hash=usrForm.password_hash;
+                const upd = {nombre:usrForm.nombre.trim(), email:emailNorm, rol:usrForm.rol};
+                if(passNorm) upd.password_hash = passNorm;
                 await sb.from('usuarios').update(upd).eq('id',modal.id);
               } else {
-                if(!usrForm.password_hash) return showToast('Contraseña requerida','err');
-                await sb.from('usuarios').insert({...usrForm});
+                if(!passNorm) return showToast('Contraseña requerida','err');
+                await sb.from('usuarios').insert({
+                  ...usrForm,
+                  nombre: usrForm.nombre.trim(),
+                  email: emailNorm,
+                  password_hash: passNorm,
+                  activo: true,
+                });
               }
               await fetchAll(); showToast(modal.id?'Usuario actualizado':'Usuario creado'); setModal(null);
             }}>Guardar</button>

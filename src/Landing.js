@@ -332,19 +332,29 @@ export default function Landing({ onLogin }) {
                     <span style={{ fontSize:11 }}>{denOpen?"▲ Cerrar":"▼ Ver planes"}</span>
                   </button>
                   {denOpen && (
-                    <div style={{ marginTop:2, border:`1px solid ${C.rosa}44`, borderRadius:"0 0 10px 10px", overflow:"hidden" }}>
-                      {FLEX_MENSUAL.map((p,i)=>{
-                        const star=p.titulo.includes("⭐")&&!p.titulo.includes("sem");
+                    <div style={{ marginTop:2, border:`1px solid ${C.rosa}44`, borderRadius:"0 0 10px 10px", overflow:"hidden", background:C.blanco }}>
+                      {[
+                        { key:"Mensual",   icono:"📅", desc:"Renueva mes a mes" },
+                        { key:"Semestral", icono:"📆", desc:"Compromiso 6 meses · cobro mensual" },
+                        { key:"Anual",     icono:"🗓️", desc:"Compromiso 12 meses · mejor precio" },
+                      ].map(periodo => {
+                        const planes = FLEX_MENSUAL.filter(p => p.titulo.includes(periodo.key));
+                        if(planes.length===0) return null;
                         return (
-                          <div key={i} style={{ display:"flex", justifyContent:"space-between", alignItems:"center", padding:"13px 18px", background:i%2===0?C.blanco:C.rosaPale, borderBottom:`1px solid ${C.rosa}22` }}>
-                            <div>
-                              <div style={{ fontSize:14, fontWeight:600, color:C.cafe }}>{p.titulo}</div>
-                              <div style={{ fontSize:12, color:C.gris, marginTop:2, fontFamily:"system-ui" }}>{p.detalle}</div>
+                          <div key={periodo.key}>
+                            <div style={{ padding:"10px 18px", background:C.rosaPale, borderBottom:`1px solid ${C.rosa}33`, display:"flex", justifyContent:"space-between", alignItems:"center" }}>
+                              <span style={{ fontSize:11, fontWeight:700, letterSpacing:".15em", textTransform:"uppercase", color:C.rosa }}>{periodo.icono} {periodo.key}</span>
+                              <span style={{ fontSize:10, color:C.gris, fontFamily:"system-ui" }}>{periodo.desc}</span>
                             </div>
-                            <div style={{ textAlign:"right" }}>
-                              <div style={{ fontSize:19, fontWeight:700, color:C.rosa }}>{fmt(p.precio)}</div>
-                              <div style={{ fontSize:10, color:C.gris, fontFamily:"system-ui" }}>/mes</div>
-                            </div>
+                            {planes.map((p,i)=>(
+                              <div key={i} style={{ display:"flex", justifyContent:"space-between", alignItems:"center", padding:"13px 18px", borderBottom:`1px solid ${C.rosa}22` }}>
+                                <div style={{ fontSize:14, fontWeight:600, color:C.cafe }}>{p.titulo.replace(` · ${periodo.key}`,"").replace(" ⭐","")}</div>
+                                <div style={{ textAlign:"right" }}>
+                                  <div style={{ fontSize:19, fontWeight:700, color:C.rosa }}>{fmt(p.precio)}</div>
+                                  <div style={{ fontSize:10, color:C.gris, fontFamily:"system-ui" }}>/mes</div>
+                                </div>
+                              </div>
+                            ))}
                           </div>
                         );
                       })}
@@ -377,22 +387,45 @@ export default function Landing({ onLogin }) {
                     <span style={{ fontSize:11 }}>{denOpen?"▲ Cerrar":"▼ Ver planes"}</span>
                   </button>
                   {denOpen && (
-                    <div style={{ marginTop:2, border:`1px solid ${C.lilaClaro}`, borderRadius:"0 0 10px 10px", overflow:"hidden" }}>
-                      {PRO_MENSUAL.map((p,i)=>{
-                        const star=p.precio===1350000;
+                    <div style={{ marginTop:2, border:`1px solid ${C.lilaClaro}`, borderRadius:"0 0 10px 10px", overflow:"hidden", background:C.blanco }}>
+                      {[
+                        { key:"Mensual",   icono:"📅", desc:"Renueva mes a mes" },
+                        { key:"Semestral", icono:"📆", desc:"Compromiso 6 meses · cobro mensual" },
+                        { key:"Anual",     icono:"🗓️", desc:"Compromiso 12 meses · mejor precio" },
+                      ].map(periodo => {
+                        const planes = PRO_MENSUAL.filter(p => p.titulo.includes(periodo.key));
+                        if(planes.length===0) return null;
                         return (
-                          <div key={i} style={{ display:"flex", justifyContent:"space-between", alignItems:"center", padding:"13px 18px", background:star?C.lila:i%2===0?C.blanco:C.lilaPale, borderBottom:`1px solid ${C.lilaClaro}` }}>
-                            <div>
-                              <div style={{ fontSize:14, fontWeight:600, color:star?C.blanco:C.cafe }}>{p.titulo}</div>
-                              <div style={{ fontSize:12, color:star?C.lilaPale:C.gris, marginTop:2, fontFamily:"system-ui" }}>{p.detalle}</div>
+                          <div key={periodo.key}>
+                            <div style={{ padding:"10px 18px", background:C.lilaPale, borderBottom:`1px solid ${C.lilaClaro}`, display:"flex", justifyContent:"space-between", alignItems:"center" }}>
+                              <span style={{ fontSize:11, fontWeight:700, letterSpacing:".15em", textTransform:"uppercase", color:C.lila }}>{periodo.icono} {periodo.key}</span>
+                              <span style={{ fontSize:10, color:C.gris, fontFamily:"system-ui" }}>{periodo.desc}</span>
                             </div>
-                            <div style={{ textAlign:"right" }}>
-                              <div style={{ fontSize:19, fontWeight:700, color:star?C.blanco:C.lila }}>{fmt(p.precio)}</div>
-                              <div style={{ fontSize:10, color:star?C.lilaPale:C.gris, fontFamily:"system-ui" }}>/mes</div>
-                            </div>
+                            {planes.map((p,i)=>(
+                              <div key={i} style={{ display:"flex", justifyContent:"space-between", alignItems:"center", padding:"13px 18px", borderBottom:`1px solid ${C.lilaClaro}` }}>
+                                <div style={{ fontSize:14, fontWeight:600, color:C.cafe }}>{p.titulo.replace(` · ${periodo.key}`,"").replace(" ⭐","")}</div>
+                                <div style={{ textAlign:"right" }}>
+                                  <div style={{ fontSize:19, fontWeight:700, color:C.lila }}>{fmt(p.precio)}</div>
+                                  <div style={{ fontSize:10, color:C.gris, fontFamily:"system-ui" }}>/mes</div>
+                                </div>
+                              </div>
+                            ))}
                           </div>
                         );
                       })}
+                      {/* Plan Exclusivo destacado */}
+                      {PRO_MENSUAL.filter(p=>p.precio===1350000).map((p,i)=>(
+                        <div key={`excl-${i}`} style={{ display:"flex", justifyContent:"space-between", alignItems:"center", padding:"16px 18px", background:C.lila, borderTop:`2px solid ${C.dorado}` }}>
+                          <div>
+                            <div style={{ fontSize:14, fontWeight:700, color:C.blanco }}>⭐ {p.titulo.replace(" ⭐","")}</div>
+                            <div style={{ fontSize:12, color:C.lilaPale, marginTop:2, fontFamily:"system-ui" }}>{p.detalle}</div>
+                          </div>
+                          <div style={{ textAlign:"right" }}>
+                            <div style={{ fontSize:19, fontWeight:700, color:C.blanco }}>{fmt(p.precio)}</div>
+                            <div style={{ fontSize:10, color:C.lilaPale, fontFamily:"system-ui" }}>/mes</div>
+                          </div>
+                        </div>
+                      ))}
                     </div>
                   )}
                 </div>
