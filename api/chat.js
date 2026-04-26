@@ -111,19 +111,39 @@ Español chileno cordial, cálido y profesional. Conciso (2-4 párrafos máximo)
 
 ## Cómo agendar (flujo paciente)
 
+Tienes **3 herramientas**:
+- \`consultar_disponibilidad(fecha, hora_inicio, duracion_min, box_tipo)\` — verifica si un horario está libre. Devuelve disponible/ocupado y alternativas cercanas si hay conflicto.
+- \`agendar_cita(...)\` — bloquea un horario específico con todos los datos del paciente (estado: agendada).
+- \`registrar_solicitud_paciente(...)\` — solo si el paciente NO quiere elegir horario (ej: "ustedes me dan una opción").
+
+### Flujo recomendado (paciente quiere elegir hora):
 1. Pregunta el **nombre completo**.
-2. Pregunta el **teléfono/WhatsApp** (formato chileno +56 9 XXXX XXXX, acepta cualquier formato).
-3. Pregunta el **motivo o tratamiento** (ej: "Hydrafacial", "limpieza dental", "consulta de Botox", "depilación láser").
-4. Opcionalmente pregunta: profesional preferido, día/horario que acomode, email.
-5. Cuando tengas nombre + teléfono + motivo, **resume y pide confirmación** ("¿Confirmas que registre tu solicitud?").
-6. Cuando confirme, **llama a la herramienta \`registrar_solicitud_paciente\`** con todos los datos.
-7. Comparte el código de solicitud y avisa que se le contactará por WhatsApp para confirmar el horario.
+2. Pregunta el **teléfono/WhatsApp**.
+3. Pregunta el **motivo o tratamiento** (ej: "Hydrafacial", "limpieza dental", "Botox").
+4. Pregunta **fecha preferida** (convierte expresiones como "el viernes" o "mañana" a formato YYYY-MM-DD usando la fecha actual indicada en el bloque dinámico).
+5. Pregunta **hora preferida** (formato HH:MM 24h).
+6. **Clasifica el tratamiento en box_tipo**:
+   - "estetico": Hydrafacial, Endymed, Botox, Sculptra, Exosomas, Profhilo, Mesoterapia, Armonización Facial, depilación, RF corporal, enzimas
+   - "dental": limpieza, blanqueamiento, brackets, ortodoncia, endodoncia, odontopediatría, exodoncias, tapaduras
+   - "medico": consultas médicas generales, controles, procedimientos médicos
+7. **Estima duración_min**: 30, 45 o 60 min según tratamiento (Hydrafacial Signature 30, Intermedia 45, Platinum 60; limpieza 45; Botox 30; Endymed 60; otros 60 por defecto).
+8. **Llama a \`consultar_disponibilidad\`** con esos datos.
+9. Si está disponible, **resume todo y pide confirmación**.
+10. Cuando confirme, **llama a \`agendar_cita\`** con todos los datos. Devuelve un código.
+11. Comparte el código y avisa que se le confirmará por WhatsApp + email en max 2 horas hábiles.
+
+### Si el horario está ocupado:
+La herramienta \`consultar_disponibilidad\` devuelve un campo \`alternativas\` con horarios cercanos libres ese mismo día. Ofrécele al paciente las 2-3 mejores alternativas (más cercanas a la hora pedida). Cuando elija una, llama \`consultar_disponibilidad\` otra vez para confirmar que sigue libre, y luego \`agendar_cita\`.
+
+### Si el paciente NO quiere elegir hora:
+Usa \`registrar_solicitud_paciente\` (la solicitud queda como pendiente y la admin coordina por WhatsApp).
 
 ## Reglas importantes
 
 - **NUNCA inventes precios, profesionales, tratamientos ni horarios.** Si no aparece en este prompt, no existe — redirige a WhatsApp.
-- **NO confirmes horas específicas** — el sistema actual genera una **solicitud**, no una reserva confirmada. La admin coordina el horario final por WhatsApp en máximo 2 horas hábiles.
-- Si el paciente pregunta por disponibilidad concreta, dile: "Voy a registrar tu solicitud y la admin te confirmará el horario disponible más cercano por WhatsApp en máx 2 horas hábiles."
+- **Horario de atención**: Lun-Vie 09:00–19:30, Sáb 09:00–14:00, Dom cerrado. Solo agenda dentro de esos rangos.
+- **No agendes citas en el pasado.** Si el paciente pide una fecha pasada, ofrece la próxima fecha disponible.
+- Si el paciente da un email, regístralo (es importante para enviarle confirmación).
 - Si hay un error técnico al guardar, da el WhatsApp +56 9 8628 4965.
 
 ## Si te preguntan por arriendo de boxes (profesionales)
@@ -133,116 +153,365 @@ La clínica también funciona como cowork médico. Tres boxes: Estético ($10.00
 // ─── HERRAMIENTAS DEL BOT ──────────────────────────────────────────
 const TOOLS = [
   {
-    name: "registrar_solicitud_paciente",
+    name: "consultar_disponibilidad",
     description:
-      "Registra una solicitud de hora de un paciente. Llamar SOLO cuando el paciente confirme que quiere agendar y se tengan al menos nombre, teléfono y motivo de consulta. Devuelve un código de solicitud.",
+      "Verifica si un horario específico está disponible para un tratamiento en el box correspondiente. Devuelve disponible:true/false. Si no está disponible, devuelve un array 'alternativas' con horarios cercanos libres ese mismo día. Llamar ANTES de agendar_cita.",
     input_schema: {
       type: "object",
       properties: {
-        nombre: {
+        fecha: { type: "string", description: "Fecha en formato YYYY-MM-DD" },
+        hora_inicio: { type: "string", description: "Hora de inicio en formato HH:MM (24h)" },
+        duracion_min: { type: "integer", description: "Duración estimada en minutos (30, 45 o 60)" },
+        box_tipo: {
           type: "string",
-          description: "Nombre completo del paciente",
+          enum: ["estetico", "dental", "medico"],
+          description: "Tipo de box requerido según el tratamiento",
         },
-        telefono: {
-          type: "string",
-          description: "Teléfono o WhatsApp del paciente (cualquier formato)",
-        },
-        motivo_consulta: {
-          type: "string",
-          description: "Motivo o razón de la consulta",
-        },
+      },
+      required: ["fecha", "hora_inicio", "duracion_min", "box_tipo"],
+    },
+  },
+  {
+    name: "agendar_cita",
+    description:
+      "Agenda y BLOQUEA una cita en el horario indicado. Llamar SOLO después de haber consultado disponibilidad y de que el paciente haya confirmado todos los datos. Devuelve un código de solicitud.",
+    input_schema: {
+      type: "object",
+      properties: {
+        nombre: { type: "string", description: "Nombre completo del paciente" },
+        telefono: { type: "string", description: "Teléfono o WhatsApp del paciente" },
+        email: { type: "string", description: "Email del paciente (recomendado, para enviarle confirmación)" },
+        tratamiento: { type: "string", description: "Tratamiento específico (ej: 'Hydrafacial Platinum', 'Limpieza dental', 'Botox 3 zonas')" },
+        motivo_consulta: { type: "string", description: "Motivo o razón resumida de la consulta" },
+        fecha: { type: "string", description: "Fecha en formato YYYY-MM-DD" },
+        hora_inicio: { type: "string", description: "Hora de inicio en formato HH:MM" },
+        duracion_min: { type: "integer", description: "Duración en minutos" },
+        box_tipo: { type: "string", enum: ["estetico", "dental", "medico"] },
+        profesional_preferido: { type: "string", description: "Profesional preferido si lo mencionó (opcional)" },
+        rut: { type: "string", description: "RUT del paciente (opcional)" },
+        notas_adicionales: { type: "string", description: "Información adicional relevante (opcional)" },
+      },
+      required: ["nombre", "telefono", "tratamiento", "motivo_consulta", "fecha", "hora_inicio", "duracion_min", "box_tipo"],
+    },
+  },
+  {
+    name: "registrar_solicitud_paciente",
+    description:
+      "Registra una solicitud SIN fecha/hora específica. Solo usar si el paciente NO quiere elegir horario y prefiere que la admin lo contacte para coordinar. Si tiene fecha y hora preferida, usar agendar_cita en su lugar.",
+    input_schema: {
+      type: "object",
+      properties: {
+        nombre: { type: "string", description: "Nombre completo del paciente" },
+        telefono: { type: "string", description: "Teléfono o WhatsApp del paciente" },
+        motivo_consulta: { type: "string", description: "Motivo o razón de la consulta" },
         especialidad_preferida: {
           type: "string",
           enum: ["dental", "estetico", "medico", "cualquiera"],
-          description: "Especialidad preferida si la mencionó",
         },
-        profesional_preferido: {
-          type: "string",
-          description:
-            "Nombre del profesional preferido si lo mencionó (opcional)",
-        },
-        fecha_preferida: {
-          type: "string",
-          description:
-            "Día/horario preferido en texto libre (ej: 'lunes en la mañana', 'cualquier día después de las 17:00')",
-        },
-        email: {
-          type: "string",
-          description: "Email del paciente (opcional)",
-        },
-        rut: {
-          type: "string",
-          description: "RUT del paciente (opcional)",
-        },
-        notas_adicionales: {
-          type: "string",
-          description:
-            "Cualquier información adicional relevante que mencionó el paciente",
-        },
+        profesional_preferido: { type: "string" },
+        fecha_preferida: { type: "string", description: "Día/horario preferido en texto libre" },
+        email: { type: "string" },
+        rut: { type: "string" },
+        notas_adicionales: { type: "string" },
       },
       required: ["nombre", "telefono", "motivo_consulta"],
     },
   },
 ];
 
-// ─── EJECUCIÓN DE HERRAMIENTAS ─────────────────────────────────────
-async function ejecutarHerramienta(name, input) {
-  if (name !== "registrar_solicitud_paciente") {
-    return { error: `Herramienta desconocida: ${name}` };
-  }
+// ─── HELPERS ───────────────────────────────────────────────────────
+function getSupabase() {
+  const url = process.env.REACT_APP_SUPABASE_URL || process.env.SUPABASE_URL;
+  const key = process.env.REACT_APP_SUPABASE_ANON_KEY || process.env.SUPABASE_ANON_KEY;
+  if (!url || !key) return null;
+  return createClient(url, key);
+}
 
-  const supabaseUrl =
-    process.env.REACT_APP_SUPABASE_URL || process.env.SUPABASE_URL;
-  const supabaseKey =
-    process.env.REACT_APP_SUPABASE_ANON_KEY || process.env.SUPABASE_ANON_KEY;
+// Convierte "HH:MM" a minutos desde medianoche
+function hhmmToMin(hhmm) {
+  const [h, m] = (hhmm || "").split(":").map(Number);
+  return (h || 0) * 60 + (m || 0);
+}
+function minToHhmm(min) {
+  const h = Math.floor(min / 60).toString().padStart(2, "0");
+  const m = (min % 60).toString().padStart(2, "0");
+  return `${h}:${m}`;
+}
 
-  if (!supabaseUrl || !supabaseKey) {
-    return {
-      error:
-        "Servicio temporalmente no disponible. Por favor escribe a +56 9 8628 4965.",
-    };
+// Día de semana (0=dom..6=sab) y horario de atención de la clínica
+function diaSemana(fechaStr) {
+  // YYYY-MM-DD -> 0..6
+  const [y, m, d] = fechaStr.split("-").map(Number);
+  return new Date(Date.UTC(y, m - 1, d)).getUTCDay();
+}
+function horarioAtencion(fechaStr) {
+  const dow = diaSemana(fechaStr);
+  if (dow === 0) return null; // domingo cerrado
+  if (dow === 6) return { open: 9 * 60, close: 14 * 60 }; // sáb 9-14
+  return { open: 9 * 60, close: 19 * 60 + 30 }; // lun-vie 9-19:30
+}
+
+// Envía email al admin avisando de nueva cita (Resend). No bloquea si falla.
+async function enviarEmailAdmin(detalles) {
+  const apiKey = process.env.RESEND_API_KEY;
+  if (!apiKey) {
+    console.log("RESEND_API_KEY no configurada — saltando email");
+    return;
   }
+  const adminEmail = process.env.ADMIN_NOTIFY_EMAIL || "vbecerrai@udd.cl";
+  const fromAddr = process.env.RESEND_FROM || "Barcelona Clinic <onboarding@resend.dev>";
+
+  const html = `
+    <h2>📅 Nueva ${detalles.tipo === "cita" ? "cita agendada" : "solicitud sin horario"}</h2>
+    <p><strong>Código:</strong> #${detalles.codigo}</p>
+    <p><strong>Paciente:</strong> ${detalles.nombre}</p>
+    <p><strong>Teléfono:</strong> ${detalles.telefono}</p>
+    ${detalles.email ? `<p><strong>Email:</strong> ${detalles.email}</p>` : ""}
+    ${detalles.tratamiento ? `<p><strong>Tratamiento:</strong> ${detalles.tratamiento}</p>` : ""}
+    <p><strong>Motivo:</strong> ${detalles.motivo_consulta || "—"}</p>
+    ${detalles.fecha ? `<p><strong>Fecha:</strong> ${detalles.fecha} · <strong>Hora:</strong> ${detalles.hora_inicio} – ${detalles.hora_fin}</p>` : ""}
+    ${detalles.box_tipo ? `<p><strong>Box:</strong> ${detalles.box_tipo}</p>` : ""}
+    ${detalles.profesional_preferido ? `<p><strong>Profesional preferido:</strong> ${detalles.profesional_preferido}</p>` : ""}
+    ${detalles.notas_adicionales ? `<p><strong>Notas:</strong> ${detalles.notas_adicionales}</p>` : ""}
+    <hr/>
+    <p style="font-size:12px;color:#666">Entra al panel admin para confirmar por WhatsApp.</p>
+  `;
 
   try {
-    const sb = createClient(supabaseUrl, supabaseKey);
-    const { data, error } = await sb
-      .from("solicitudes_paciente")
-      .insert({
-        nombre: (input.nombre || "").trim().slice(0, 200),
-        telefono: (input.telefono || "").trim().slice(0, 50),
-        motivo_consulta: (input.motivo_consulta || "").trim().slice(0, 1000),
-        especialidad_preferida: input.especialidad_preferida || null,
-        profesional_preferido: input.profesional_preferido || null,
-        fecha_preferida: input.fecha_preferida || null,
-        email: input.email || null,
-        rut: input.rut || null,
-        notas_adicionales: input.notas_adicionales || null,
-        estado: "pendiente",
-      })
-      .select("id")
-      .single();
+    const r = await fetch("https://api.resend.com/emails", {
+      method: "POST",
+      headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
+      body: JSON.stringify({
+        from: fromAddr,
+        to: [adminEmail],
+        subject: detalles.tipo === "cita"
+          ? `Nueva cita #${detalles.codigo} — ${detalles.nombre} (${detalles.fecha} ${detalles.hora_inicio})`
+          : `Nueva solicitud #${detalles.codigo} — ${detalles.nombre}`,
+        html,
+      }),
+    });
+    if (!r.ok) console.error("Resend admin error:", await r.text());
+  } catch (e) {
+    console.error("Resend admin throw:", e);
+  }
+}
 
-    if (error) {
-      console.error("Supabase insert error:", error);
-      return {
-        error:
-          "No pude guardar tu solicitud. Por favor escribe a +56 9 8628 4965.",
-      };
-    }
+// Email confirmación al paciente cuando agenda
+async function enviarEmailPaciente(detalles) {
+  const apiKey = process.env.RESEND_API_KEY;
+  if (!apiKey || !detalles.email) return;
+  const fromAddr = process.env.RESEND_FROM || "Barcelona Clinic <onboarding@resend.dev>";
 
+  const html = `
+    <h2 style="color:#6B5B8A">¡Hola ${detalles.nombre}! 💜</h2>
+    <p>Recibimos tu solicitud en <strong>Barcelona Clinic</strong>. Estos son los datos:</p>
+    <ul>
+      <li><strong>Código de solicitud:</strong> #${detalles.codigo}</li>
+      <li><strong>Tratamiento:</strong> ${detalles.tratamiento || "—"}</li>
+      <li><strong>Fecha:</strong> ${detalles.fecha} · ${detalles.hora_inicio} – ${detalles.hora_fin}</li>
+    </ul>
+    <p>Una persona del equipo te confirmará por <strong>WhatsApp</strong> dentro de las próximas 2 horas hábiles. Si necesitas modificar o cancelar, escribe al +56 9 8628 4965.</p>
+    <p style="font-size:12px;color:#888">Barcelona Clinic · Ruta 225, Tanpu, Puerto Varas · @barcelonaclinic.pv</p>
+  `;
+
+  try {
+    await fetch("https://api.resend.com/emails", {
+      method: "POST",
+      headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
+      body: JSON.stringify({
+        from: fromAddr,
+        to: [detalles.email],
+        subject: `Tu solicitud #${detalles.codigo} en Barcelona Clinic — pendiente de confirmar`,
+        html,
+      }),
+    });
+  } catch (e) {
+    console.error("Resend paciente throw:", e);
+  }
+}
+
+// ─── EJECUCIÓN DE HERRAMIENTAS ─────────────────────────────────────
+async function ejecutarHerramienta(name, input) {
+  const sb = getSupabase();
+  if (!sb) return { error: "Servicio temporalmente no disponible. Escribe a +56 9 8628 4965." };
+
+  if (name === "consultar_disponibilidad") {
+    return await toolConsultar(sb, input);
+  }
+  if (name === "agendar_cita") {
+    return await toolAgendar(sb, input);
+  }
+  if (name === "registrar_solicitud_paciente") {
+    return await toolRegistrar(sb, input);
+  }
+  return { error: `Herramienta desconocida: ${name}` };
+}
+
+// Lee citas ocupadas de un box+fecha y devuelve [{hora_inicio_min, hora_fin_min}]
+async function getOcupados(sb, fecha, box_tipo) {
+  const { data, error } = await sb
+    .from("solicitudes_paciente")
+    .select("hora_inicio, hora_fin")
+    .eq("fecha_solicitada", fecha)
+    .eq("box_tipo", box_tipo)
+    .in("estado", ["agendada", "contactado", "confirmada"]);
+  if (error || !data) return [];
+  return data
+    .filter(r => r.hora_inicio && r.hora_fin)
+    .map(r => ({ ini: hhmmToMin(r.hora_inicio.slice(0,5)), fin: hhmmToMin(r.hora_fin.slice(0,5)) }));
+}
+
+function haySolape(aIni, aFin, bIni, bFin) {
+  return aIni < bFin && bIni < aFin;
+}
+
+async function toolConsultar(sb, input) {
+  const { fecha, hora_inicio, duracion_min, box_tipo } = input;
+  if (!fecha || !hora_inicio || !duracion_min || !box_tipo)
+    return { error: "Faltan datos: fecha, hora_inicio, duracion_min y box_tipo son obligatorios." };
+
+  const horario = horarioAtencion(fecha);
+  if (!horario) return { disponible: false, motivo: "Domingo cerrado", alternativas: [] };
+
+  const ini = hhmmToMin(hora_inicio);
+  const fin = ini + Number(duracion_min);
+
+  // Validar dentro de horario de atención
+  if (ini < horario.open || fin > horario.close) {
     return {
-      success: true,
-      codigo_solicitud: data.id,
-      mensaje:
-        "Solicitud registrada correctamente. La admin contactará al paciente por WhatsApp dentro de las próximas 2 horas hábiles.",
-    };
-  } catch (err) {
-    console.error("Tool execution error:", err);
-    return {
-      error:
-        "Error técnico. Por favor escribe a +56 9 8628 4965.",
+      disponible: false,
+      motivo: `Fuera de horario de atención (${minToHhmm(horario.open)}–${minToHhmm(horario.close)} ese día).`,
+      alternativas: [],
     };
   }
+
+  // Validar fecha pasada
+  const today = new Date(); today.setHours(0,0,0,0);
+  const reqDate = new Date(fecha + "T00:00:00");
+  if (reqDate < today) {
+    return { disponible: false, motivo: "Fecha en el pasado.", alternativas: [] };
+  }
+
+  const ocupados = await getOcupados(sb, fecha, box_tipo);
+  const conflicto = ocupados.find(o => haySolape(ini, fin, o.ini, o.fin));
+
+  if (!conflicto) {
+    return { disponible: true, fecha, hora_inicio, hora_fin: minToHhmm(fin), box_tipo };
+  }
+
+  // Buscar alternativas cercanas el mismo día (±cada 15 min)
+  const alternativas = [];
+  const stepsBefore = [-30, -60, -90, -120];
+  const stepsAfter = [30, 60, 90, 120];
+  const candidatos = [...stepsBefore.reverse(), ...stepsAfter];
+  for (const delta of candidatos) {
+    const cIni = ini + delta;
+    const cFin = cIni + Number(duracion_min);
+    if (cIni < horario.open || cFin > horario.close) continue;
+    const choca = ocupados.some(o => haySolape(cIni, cFin, o.ini, o.fin));
+    if (!choca) alternativas.push({ hora_inicio: minToHhmm(cIni), hora_fin: minToHhmm(cFin) });
+    if (alternativas.length >= 4) break;
+  }
+
+  return {
+    disponible: false,
+    motivo: "El horario solicitado ya está ocupado.",
+    alternativas,
+  };
+}
+
+async function toolAgendar(sb, input) {
+  const { fecha, hora_inicio, duracion_min, box_tipo } = input;
+  if (!fecha || !hora_inicio || !duracion_min || !box_tipo)
+    return { error: "Faltan datos para agendar (fecha, hora, duración, box_tipo)." };
+
+  // Re-verificar disponibilidad antes de insertar (race condition guard)
+  const check = await toolConsultar(sb, { fecha, hora_inicio, duracion_min, box_tipo });
+  if (!check.disponible) {
+    return {
+      error: "Lo siento, el horario ya no está disponible. Por favor elige otra hora.",
+      alternativas: check.alternativas || [],
+    };
+  }
+
+  const ini = hhmmToMin(hora_inicio);
+  const fin = ini + Number(duracion_min);
+  const hora_fin = minToHhmm(fin);
+
+  const payload = {
+    nombre: (input.nombre || "").trim().slice(0, 200),
+    telefono: (input.telefono || "").trim().slice(0, 50),
+    email: input.email || null,
+    rut: input.rut || null,
+    motivo_consulta: (input.motivo_consulta || input.tratamiento || "").trim().slice(0, 1000),
+    tratamiento: input.tratamiento || null,
+    profesional_preferido: input.profesional_preferido || null,
+    notas_adicionales: input.notas_adicionales || null,
+    fecha_solicitada: fecha,
+    hora_inicio,
+    hora_fin,
+    box_tipo,
+    estado: "agendada",
+  };
+
+  const { data, error } = await sb
+    .from("solicitudes_paciente")
+    .insert(payload)
+    .select("id")
+    .single();
+
+  if (error) {
+    console.error("Supabase insert agendar:", error);
+    return { error: "No pude guardar la cita. Por favor escribe a +56 9 8628 4965." };
+  }
+
+  // Enviar emails (no bloqueante)
+  const det = { ...payload, codigo: data.id, tipo: "cita" };
+  enviarEmailAdmin(det).catch(() => {});
+  enviarEmailPaciente(det).catch(() => {});
+
+  return {
+    success: true,
+    codigo_solicitud: data.id,
+    fecha,
+    hora_inicio,
+    hora_fin,
+    mensaje: `Cita agendada y bloqueada para ${fecha} a las ${hora_inicio}. Se confirmará por WhatsApp en máx 2 horas hábiles.`,
+  };
+}
+
+async function toolRegistrar(sb, input) {
+  const payload = {
+    nombre: (input.nombre || "").trim().slice(0, 200),
+    telefono: (input.telefono || "").trim().slice(0, 50),
+    motivo_consulta: (input.motivo_consulta || "").trim().slice(0, 1000),
+    especialidad_preferida: input.especialidad_preferida || null,
+    profesional_preferido: input.profesional_preferido || null,
+    fecha_preferida: input.fecha_preferida || null,
+    email: input.email || null,
+    rut: input.rut || null,
+    notas_adicionales: input.notas_adicionales || null,
+    estado: "pendiente",
+  };
+
+  const { data, error } = await sb
+    .from("solicitudes_paciente")
+    .insert(payload)
+    .select("id")
+    .single();
+
+  if (error) {
+    console.error("Supabase insert registrar:", error);
+    return { error: "No pude guardar tu solicitud. Por favor escribe a +56 9 8628 4965." };
+  }
+
+  enviarEmailAdmin({ ...payload, codigo: data.id, tipo: "solicitud" }).catch(() => {});
+
+  return {
+    success: true,
+    codigo_solicitud: data.id,
+    mensaje: "Solicitud registrada. La admin contactará al paciente por WhatsApp en máx 2 horas hábiles.",
+  };
 }
 
 // ─── HANDLER PRINCIPAL ─────────────────────────────────────────────
@@ -292,7 +561,12 @@ module.exports = async (req, res) => {
 
     let solicitudCodigo = null;
     let iteraciones = 0;
-    const MAX_ITER = 4; // hard cap para no entrar en loop
+    const MAX_ITER = 6; // permite consultar disponibilidad varias veces antes de agendar
+
+    // Fecha actual (Chile) — bloque dinámico (no cacheado) para que el bot resuelva "el viernes" etc.
+    const hoy = new Intl.DateTimeFormat("sv-SE", { timeZone: "America/Santiago" }).format(new Date()); // YYYY-MM-DD
+    const diasEs = ["domingo","lunes","martes","miércoles","jueves","viernes","sábado"];
+    const dowHoy = diasEs[diaSemana(hoy)];
 
     // Loop agéntico: si el bot pide usar una herramienta, ejecutarla y volver
     while (iteraciones < MAX_ITER) {
@@ -306,6 +580,10 @@ module.exports = async (req, res) => {
             type: "text",
             text: SYSTEM_PROMPT,
             cache_control: { type: "ephemeral" },
+          },
+          {
+            type: "text",
+            text: `**Fecha actual**: hoy es ${dowHoy} ${hoy}. Cuando el paciente diga "mañana" o "el viernes", calcula la fecha real basándote en esto.`,
           },
         ],
         tools: TOOLS,

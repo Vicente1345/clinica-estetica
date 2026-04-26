@@ -237,7 +237,7 @@ export default function App() {
   const recArr   = arriendos.filter(a=>a.pagado).reduce((s,a)=>s+a.monto,0);
   const recIns   = movimientos.filter(m=>m.pago_pagado).reduce((s,m)=>s+(m.pago_monto||0),0);
   const pendVerif = [...arriendos, ...movimientos].filter(x => x.verificado === 'pendiente').length;
-  const pendSolic = solicitudes.filter(s => s.estado === 'pendiente').length;
+  const pendSolic = solicitudes.filter(s => s.estado === 'pendiente' || s.estado === 'agendada').length;
   const planes    = [];
   // ─── GUARD ───────────────────────────────────────────────────────
   if (!user) return <Login onLogin={handleLogin}/>;
@@ -750,16 +750,25 @@ export default function App() {
             {CAN.arriendos(user.rol)&&<button style={S.btn('primary',true)} onClick={()=>{setArrStep(0);setTab('arriendos');}}>+ Nuevo arriendo</button>}
           </div>
           {boxes.map(box=>{
-            const res=arriendos.filter(a=>a.box_id===box.id&&a.estado==='confirmado').sort((a,b)=>a.fecha.localeCompare(b.fecha)||a.hora_inicio.localeCompare(b.hora_inicio));
+            const res=arriendos.filter(a=>a.box_id===box.id&&a.estado==='confirmado').map(a=>({tipo:'arriendo', ...a}));
+            const cit=solicitudes.filter(s => s.box_tipo===box.tipo && s.fecha_solicitada && ['agendada','contactado','confirmada'].includes(s.estado))
+              .map(s=>({tipo:'cita', id:'c'+s.id, fecha:s.fecha_solicitada, hora_inicio:(s.hora_inicio||'').slice(0,5), hora_fin:(s.hora_fin||'').slice(0,5), nombre:s.nombre, tratamiento:s.tratamiento||s.motivo_consulta, estado:s.estado}));
+            const todos=[...res,...cit].sort((a,b)=>(a.fecha||'').localeCompare(b.fecha||'')||(a.hora_inicio||'').localeCompare(b.hora_inicio||''));
             return (
               <div key={box.id} style={S.card()}>
                 <div style={{display:'flex',justifyContent:'space-between',alignItems:'center'}}>
                   <div><strong style={{fontSize:15}}>{box.nombre}</strong> <span style={{fontSize:13,color:'#666'}}>· {box.tipo} · {fmt(box.tarifa_hora)}/hr</span></div>
                   <span style={S.badge(box.activo?'ok':'critico')}>{box.activo?'Activo':'Inactivo'}</span>
                 </div>
-                {res.length===0?<div style={{fontSize:13,color:'#888',marginTop:10}}>Sin reservas</div>:(
+                {todos.length===0?<div style={{fontSize:13,color:'#888',marginTop:10}}>Sin reservas</div>:(
                   <div style={{marginTop:10}}>
-                    {res.map(r=>(
+                    {todos.map(r=>r.tipo==='cita' ? (
+                      <div key={r.id} style={{display:'flex',justifyContent:'space-between',padding:'7px 10px',background:'#FCE4EC',borderRadius:8,marginBottom:6,fontSize:13,flexWrap:'wrap',gap:6,borderLeft:'3px solid #9C2960'}}>
+                        <span><strong>{r.fecha}</strong> {r.hora_inicio}–{r.hora_fin}</span>
+                        <span style={{color:'#9C2960'}}>👤 Paciente: {r.nombre}{r.tratamiento?` · ${r.tratamiento}`:''}</span>
+                        <span style={S.badge('purple')}>{r.estado}</span>
+                      </div>
+                    ) : (
                       <div key={r.id} style={{display:'flex',justifyContent:'space-between',padding:'7px 10px',background:'#fff',borderRadius:8,marginBottom:6,fontSize:13,flexWrap:'wrap',gap:6}}>
                         <span><strong>{r.fecha}</strong> {r.hora_inicio}–{r.hora_fin}</span>
                         <span style={{color:'#666'}}>{r.profesional_nombre}</span>
@@ -808,11 +817,11 @@ export default function App() {
 
           {/* Filtros por estado */}
           <div style={{display:'flex',gap:6,marginBottom:14,flexWrap:'wrap'}}>
-            {['pendiente','contactado','agendado','descartado'].map(est => {
+            {['pendiente','agendada','contactado','agendado','confirmada','descartado'].map(est => {
               const cnt = solicitudes.filter(s => s.estado===est).length;
-              const colors = { pendiente:'#FAEEDA', contactado:'#E6F1FB', agendado:'#EAF3DE', descartado:'#f0f0ec' };
+              const colors = { pendiente:'#FAEEDA', agendada:'#FCE4EC', contactado:'#E6F1FB', agendado:'#EAF3DE', confirmada:'#D9F2E5', descartado:'#f0f0ec' };
               return (
-                <span key={est} style={{padding:'4px 10px',borderRadius:14,background:colors[est],fontSize:12,color:'#444',fontWeight:500}}>
+                <span key={est} style={{padding:'4px 10px',borderRadius:14,background:colors[est]||'#f0f0ec',fontSize:12,color:'#444',fontWeight:500}}>
                   {est}: <strong>{cnt}</strong>
                 </span>
               );
@@ -826,10 +835,15 @@ export default function App() {
           )}
 
           {solicitudes.map(s => {
-            const wsBody = encodeURIComponent(`Hola ${s.nombre}, te contactamos desde Cowork Salud (Barcelona Clinic) por tu solicitud de hora. ¿Podemos coordinar?`);
+            const slotTxt = s.fecha_solicitada
+              ? `📆 ${s.fecha_solicitada}${s.hora_inicio?` · ${s.hora_inicio.slice(0,5)}–${(s.hora_fin||'').slice(0,5)}`:''}`
+              : '';
+            const wsBody = encodeURIComponent(
+              `Hola ${s.nombre}, te contactamos desde Barcelona Clinic por tu solicitud de hora${slotTxt?` (${slotTxt})`:''}. ${s.tratamiento?`Tratamiento: ${s.tratamiento}. `:''}¿Confirmamos?`
+            );
             const wsTel = (s.telefono || '').replace(/[^0-9]/g,'');
             const wsLink = wsTel ? `https://wa.me/${wsTel.startsWith('56')?wsTel:'56'+wsTel}?text=${wsBody}` : null;
-            const estadoColors = { pendiente:['#FAEEDA','#854F0B'], contactado:['#E6F1FB','#0C447C'], agendado:['#EAF3DE','#3B6D11'], descartado:['#f0f0ec','#666'] };
+            const estadoColors = { pendiente:['#FAEEDA','#854F0B'], agendada:['#FCE4EC','#9C2960'], contactado:['#E6F1FB','#0C447C'], agendado:['#EAF3DE','#3B6D11'], confirmada:['#D9F2E5','#0F6E56'], descartado:['#f0f0ec','#666'] };
             const [bgEst, colorEst] = estadoColors[s.estado] || estadoColors.pendiente;
 
             return (
@@ -845,6 +859,16 @@ export default function App() {
                   </span>
                 </div>
 
+                {s.fecha_solicitada && (
+                  <div style={{fontSize:13,marginBottom:6,padding:'7px 10px',background:'#FCE4EC',borderRadius:8,color:'#9C2960',fontWeight:600,display:'inline-block'}}>
+                    📆 {s.fecha_solicitada} · {(s.hora_inicio||'').slice(0,5)}–{(s.hora_fin||'').slice(0,5)} {s.box_tipo&&`· Box ${s.box_tipo}`}
+                  </div>
+                )}
+                {s.tratamiento && (
+                  <div style={{fontSize:13,color:'#333',marginBottom:4,lineHeight:1.5}}>
+                    <strong>Tratamiento:</strong> {s.tratamiento}
+                  </div>
+                )}
                 <div style={{fontSize:13,color:'#333',marginBottom:6,lineHeight:1.5}}>
                   <strong>Motivo:</strong> {s.motivo_consulta}
                 </div>
@@ -876,11 +900,17 @@ export default function App() {
                       💬 WhatsApp
                     </a>
                   )}
-                  {s.estado === 'pendiente' && (
+                  {(s.estado === 'pendiente' || s.estado === 'agendada') && (
                     <button style={S.btn('primary',true)} onClick={async()=>{
                       await sb.from('solicitudes_paciente').update({estado:'contactado', contactado_por:user.nombre, contactado_at:new Date().toISOString()}).eq('id',s.id);
                       await fetchAll(); showToast('Marcado como contactado');
                     }}>Marcar contactado</button>
+                  )}
+                  {s.estado === 'agendada' && (
+                    <button style={S.btn('success',true)} onClick={async()=>{
+                      await sb.from('solicitudes_paciente').update({estado:'confirmada', contactado_por:user.nombre, contactado_at:new Date().toISOString()}).eq('id',s.id);
+                      await fetchAll(); showToast('Cita confirmada ✓');
+                    }}>✓ Confirmar cita</button>
                   )}
                   {(s.estado === 'pendiente' || s.estado === 'contactado') && (
                     <button style={S.btn('success',true)} onClick={async()=>{

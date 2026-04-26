@@ -46,6 +46,27 @@ create policy "Permitir todo anon" on solicitudes_paciente
 
 ---
 
+## 1.5. Migración Sprint 3A — Disponibilidad real-time
+
+Si ya tenías la tabla creada, ejecuta este SQL adicional para agregar las columnas de fecha/hora/box:
+
+```sql
+alter table solicitudes_paciente
+  add column if not exists fecha_solicitada date,
+  add column if not exists hora_inicio time,
+  add column if not exists hora_fin time,
+  add column if not exists box_tipo text,
+  add column if not exists tratamiento text;
+
+-- Índice para búsquedas de disponibilidad rápidas
+create index if not exists idx_solicitudes_disp
+  on solicitudes_paciente (fecha_solicitada, box_tipo, estado);
+```
+
+> Estados válidos: `pendiente` (sin fecha), `agendada` (con fecha+hora bloqueada), `contactado`, `confirmada`, `descartada`. Las que cuentan como "ocupado" para disponibilidad: `agendada`, `contactado`, `confirmada`.
+
+---
+
 ## 2. Instalar dependencias
 
 En la terminal del proyecto (VS Code):
@@ -79,11 +100,34 @@ Esto instala `@anthropic-ai/sdk` que se agregó a `package.json`.
 | `ANTHROPIC_API_KEY` | `sk-ant-...` | tu key recién generada |
 | `REACT_APP_SUPABASE_URL` | `https://xxx.supabase.co` | ya configurada para el frontend |
 | `REACT_APP_SUPABASE_ANON_KEY` | `eyJh...` | ya configurada para el frontend |
+| `RESEND_API_KEY` | `re_...` | (opcional) email de aviso al admin · ver paso 4.5 |
+| `ADMIN_NOTIFY_EMAIL` | `vbecerrai@udd.cl` | (opcional, default: vbecerrai@udd.cl) |
+| `RESEND_FROM` | `Barcelona Clinic <onboarding@resend.dev>` | (opcional, hasta verificar dominio) |
 
 Marca los 3 entornos (Production, Preview, Development) en cada una.
 
 4. Click "Save"
 5. Ve a Deployments → último deployment → "Redeploy" (para que tome las nuevas variables)
+
+---
+
+## 4.5. Email automático con Resend (Sprint 3A)
+
+Cuando un paciente agenda hora, se manda un email al admin (con datos completos) y otro al paciente (confirmación). Si no configuras Resend, el sistema sigue funcionando — solo se omiten los emails.
+
+**Setup**:
+1. Crea cuenta gratis en https://resend.com (3.000 emails/mes gratis)
+2. Settings → API Keys → Create API Key → copia el `re_...`
+3. Agrégala como `RESEND_API_KEY` en Vercel (paso 4)
+4. **Importante — dominio**:
+   - **Sin dominio verificado**: usa el `from` por defecto `onboarding@resend.dev`. Resend solo dejará enviar a tu propio email verificado de la cuenta. Funciona para que TÚ recibas avisos pero no para mandar a pacientes.
+   - **Con dominio verificado** (recomendado): en Resend → Domains → Add → verifica registros DNS → en Vercel cambia `RESEND_FROM` a algo como `Barcelona Clinic <hola@barcelonaclinic.cl>`. Así puedes mandar a cualquier email.
+5. Redeploy Vercel para que tome la variable.
+
+**Probar**:
+- Agenda una cita por el chatbot
+- Revisa el inbox de `vbecerrai@udd.cl` — debería llegar un email con los datos
+- Revisa logs en Vercel → Functions → /api/chat si no llega
 
 ---
 
