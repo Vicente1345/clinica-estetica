@@ -287,7 +287,7 @@ async function enviarEmailAdmin(detalles) {
     ${detalles.email ? `<p><strong>Email:</strong> ${detalles.email}</p>` : ""}
     ${detalles.tratamiento ? `<p><strong>Tratamiento:</strong> ${detalles.tratamiento}</p>` : ""}
     <p><strong>Motivo:</strong> ${detalles.motivo_consulta || "—"}</p>
-    ${detalles.fecha ? `<p><strong>Fecha:</strong> ${detalles.fecha} · <strong>Hora:</strong> ${detalles.hora_inicio} – ${detalles.hora_fin}</p>` : ""}
+    ${detalles.fecha_solicitada ? `<p><strong>Fecha:</strong> ${detalles.fecha_solicitada} · <strong>Hora:</strong> ${detalles.hora_inicio} – ${detalles.hora_fin}</p>` : ""}
     ${detalles.box_tipo ? `<p><strong>Box:</strong> ${detalles.box_tipo}</p>` : ""}
     ${detalles.profesional_preferido ? `<p><strong>Profesional preferido:</strong> ${detalles.profesional_preferido}</p>` : ""}
     ${detalles.notas_adicionales ? `<p><strong>Notas:</strong> ${detalles.notas_adicionales}</p>` : ""}
@@ -303,7 +303,7 @@ async function enviarEmailAdmin(detalles) {
         from: fromAddr,
         to: [adminEmail],
         subject: detalles.tipo === "cita"
-          ? `Nueva cita #${detalles.codigo} — ${detalles.nombre} (${detalles.fecha} ${detalles.hora_inicio})`
+          ? `Nueva cita #${detalles.codigo} — ${detalles.nombre} (${detalles.fecha_solicitada} ${detalles.hora_inicio})`
           : `Nueva solicitud #${detalles.codigo} — ${detalles.nombre}`,
         html,
       }),
