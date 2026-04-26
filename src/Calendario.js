@@ -29,7 +29,11 @@ function getLunes(offset=0) {
 }
 
 function formatFecha(d) {
-  return d.toISOString().split("T")[0];
+  // Usar componentes locales para evitar desfase por timezone (Chile UTC-3)
+  const y   = d.getFullYear();
+  const m   = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
 }
 
 export default function Calendario({ user, boxes, profesionales, arriendos: arriendosProp, solicitudes = [], onNuevoArriendo }) {

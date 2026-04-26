@@ -12,7 +12,10 @@ import ChatBot from './ChatBot';
 const CATEGORIAS = ['Inyectables','Materiales descartables','Productos tópicos','Equipos/accesorios','Otros'];
 const METODOS    = ['Efectivo','Tarjeta débito','Tarjeta crédito','Transferencia'];
 const fmt = n => (n||0).toLocaleString('es-CL',{style:'currency',currency:'CLP',maximumFractionDigits:0});
-const today = () => new Date().toISOString().split('T')[0];
+const today = () => {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+};
 const stockSt = i => i.stock===0 ? 'critico' : i.stock<=i.stock_min ? 'bajo' : 'ok';
 
 // Permisos por rol
