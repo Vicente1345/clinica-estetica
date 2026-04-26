@@ -51,6 +51,23 @@ const S = {
   g3: { display:'grid', gridTemplateColumns:'repeat(3,1fr)', gap:12 },
 };
 
+// ─── HELPER: genera todas las fechas del plan ─────────────────────
+// Devuelve array de strings YYYY-MM-DD que caen en los días indicados
+// dentro del período fechaIni + meses meses.
+function generarFechasJornada(fechaIni, meses, diasNombres) {
+  const diasMap = { 'Lun':1, 'Mar':2, 'Mié':3, 'Jue':4, 'Vie':5, 'Sáb':6, 'Dom':0 };
+  const diasNum = diasNombres.map(d => diasMap[d]).filter(n => n !== undefined);
+  const fechas  = [];
+  const cur     = new Date(fechaIni + 'T12:00:00');
+  const fin     = new Date(fechaIni + 'T12:00:00');
+  fin.setMonth(fin.getMonth() + meses);
+  while (cur < fin) {
+    if (diasNum.includes(cur.getDay())) fechas.push(cur.toISOString().split('T')[0]);
+    cur.setDate(cur.getDate() + 1);
+  }
+  return fechas;
+}
+
 // ─── COMPONENTES UTILS ────────────────────────────────────────────
 function Modal({ title, onClose, children }) {
   return (
@@ -205,16 +222,80 @@ export default function App() {
   const confirmarArriendo = async () => {
     const prof = profesionales.find(p=>p.id===arrForm.profId);
     const box  = boxes.find(b=>b.id===arrForm.boxId);
-    const { data } = await sb.from('arriendos').insert({
-      fecha:arrForm.fecha, box_id:arrForm.boxId, box_nombre:box.nombre,
-      profesional_id:arrForm.profId, profesional_nombre:prof.nombre,
-      hora_inicio:arrForm.horaInicio, hora_fin:arrForm.horaFin,
-      horas:horasArr, monto:montoArr, metodo:arrForm.metodo,
-      pagado:false, estado:'pendiente', verificado:'sin_pago'
-    }).select().single();
-    await fetchAll();
-    setArrNuevoId(data?.id || null);
-    setArrForm(emptyArr); setArrStep(2);
+
+    if (arrForm.esPlan && arrForm.diasJornada?.length > 0 && arrForm.planMeses) {
+      // ── PLAN: bulk-create de todas las jornadas del período ──────
+      const fechas = generarFechasJornada(arrForm.fecha, arrForm.planMeses, arrForm.diasJornada);
+      if (fechas.length === 0) {
+        showToast('No se generaron fechas. Revisa el día y la fecha de inicio.', 'err');
+        return;
+      }
+      const rows = fechas.map(f => ({
+        fecha:              f,
+        box_id:             arrForm.boxId,
+        box_nombre:         box?.nombre || '',
+        profesional_id:     arrForm.profId,
+        profesional_nombre: prof?.nombre || '',
+        hora_inicio:        arrForm.horaInicio,
+        hora_fin:           arrForm.horaFin,
+        horas:              horasArr,
+        monto:              montoArr,       // tarifa rack por jornada
+        metodo:             arrForm.metodo || 'Transferencia',
+        pagado:             false,
+        estado:             'pendiente',
+        verificado:         'sin_pago',
+      }));
+
+      await sb.from('arriendos').insert(rows);
+
+      // Registrar plan con días y horario fijo
+      const fechaVenc = new Date(arrForm.fecha + 'T12:00:00');
+      fechaVenc.setMonth(fechaVenc.getMonth() + arrForm.planMeses);
+      await sb.from('planes_profesional').insert({
+        profesional_id:     arrForm.profId,
+        profesional_nombre: prof?.nombre || '',
+        box_tipo:           arrForm.tipoBox || '',
+        plan_id:            arrForm.planId  || '',
+        plan_label:         arrForm.planLabel || '',
+        plan_precio:        arrForm.monto,
+        con_asistente:      arrForm.planAsistente || false,
+        jornadas_totales:   fechas.length,
+        jornadas_stock:     fechas.length,
+        fecha_inicio:       arrForm.fecha,
+        fecha_vencimiento:  fechaVenc.toISOString().split('T')[0],
+        estado:             'pendiente',
+        verificado:         'sin_pago',
+        dias_semana:        arrForm.diasJornada,
+        hora_inicio:        arrForm.horaInicio,
+        hora_fin:           arrForm.horaFin,
+      });
+
+      await fetchAll();
+      setArrForm(emptyArr);
+      setArrStep(0);
+      showToast(`✓ Plan creado: ${fechas.length} jornadas agendadas automáticamente`);
+    } else {
+      // ── JORNADA SUELTA ────────────────────────────────────────────
+      const { data } = await sb.from('arriendos').insert({
+        fecha:              arrForm.fecha,
+        box_id:             arrForm.boxId,
+        box_nombre:         box?.nombre || '',
+        profesional_id:     arrForm.profId,
+        profesional_nombre: prof?.nombre || '',
+        hora_inicio:        arrForm.horaInicio,
+        hora_fin:           arrForm.horaFin,
+        horas:              horasArr,
+        monto:              montoArr,
+        metodo:             arrForm.metodo,
+        pagado:             false,
+        estado:             'pendiente',
+        verificado:         'sin_pago',
+      }).select().single();
+      await fetchAll();
+      setArrNuevoId(data?.id || null);
+      setArrForm(emptyArr);
+      setArrStep(2);
+    }
   };
 
   // ── INSUMO FORM ──
@@ -684,7 +765,7 @@ export default function App() {
                     setArrForm(a=>({
                       ...a,
                       planSel:      seleccion,
-                      boxId:        boxes.find(b=>b.tipo===(arrForm.tipoBox==='dental'?'Dental':'Estético') && b.activo)?.id || '',
+                      boxId:        boxes.find(b=>b.tipo===seleccion.tipoBox && b.activo)?.id || '',
                       planId:       seleccion.plan.id,
                       planLabel:    seleccion.plan.label,
                       planMeses:    seleccion.plan.meses,
