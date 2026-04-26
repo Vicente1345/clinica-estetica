@@ -32,7 +32,7 @@ function formatFecha(d) {
   return d.toISOString().split("T")[0];
 }
 
-export default function Calendario({ user, boxes, profesionales, arriendos: arriendosProp, onNuevoArriendo }) {
+export default function Calendario({ user, boxes, profesionales, arriendos: arriendosProp, solicitudes = [], onNuevoArriendo }) {
   const [semana, setSemana]       = useState(0);
   const [boxSel, setBoxSel]       = useState(null);
   const [reserva, setReserva]     = useState(null);
@@ -75,6 +75,32 @@ useEffect(() => { recargarArriendos(); }, []);
   );
 };
 
+// Detecta si un slot de la grilla (1 hora completa) está bloqueado por una cita de paciente
+// del mismo tipo de box (ej: si el box seleccionado es "dental" y hay una cita de paciente
+// dental ese día y hora, queda bloqueado para todos los profesionales)
+const cellEnd = (hora) => {
+  const [h] = hora.split(":").map(Number);
+  return (h+1).toString().padStart(2,"0") + ":00";
+};
+
+const citaPacienteEnSlot = (fecha, hora) => {
+  if (!boxSel || !solicitudes?.length) return null;
+  const tipoBox = (boxSel.tipo || boxSel.nombre || "").toLowerCase();
+  const tipoNorm = tipoBox.includes("dental") ? "dental"
+                 : tipoBox.includes("medic")  ? "medico"
+                 : "estetico";
+  const cellIni = hora;
+  const cellFin = cellEnd(hora);
+  return solicitudes.find(s =>
+    s.box_tipo === tipoNorm &&
+    s.fecha_solicitada === fecha &&
+    ["agendada","contactado","confirmada"].includes(s.estado) &&
+    s.hora_inicio && s.hora_fin &&
+    cellIni < s.hora_fin.slice(0,5) &&
+    cellFin > s.hora_inicio.slice(0,5)
+  ) || null;
+};
+
   const esMiReserva = (fecha, hora) => {
   if (!boxSel || !user) return false;
   return arriendos.some(a =>
@@ -89,7 +115,7 @@ useEffect(() => { recargarArriendos(); }, []);
   const esPasado = (fecha, hora) => new Date(`${fecha}T${hora}:00`) < new Date();
 
   const handleClickSlot = (fecha, hora) => {
-    if (!boxSel || estaOcupado(fecha,hora) || esPasado(fecha,hora)) return;
+    if (!boxSel || estaOcupado(fecha,hora) || esPasado(fecha,hora) || citaPacienteEnSlot(fecha,hora)) return;
     const esDental = boxSel.nombre?.toLowerCase().includes("dental") || boxSel.tipo?.toLowerCase().includes("dental");
     const minHoras = esDental ? 2 : 1;
     const idxInicio = HORAS.indexOf(hora);
@@ -199,7 +225,7 @@ useEffect(() => { recargarArriendos(); }, []);
 
       {/* Leyenda */}
       <div style={{ display:"flex", gap:16, fontSize:12, marginBottom:10, flexWrap:"wrap" }}>
-        {[["#D4EDDA","#155724","✓ Disponible"],["#F8D7DA","#721C24","X Ocupado"],["#e8e8e8","#888","Pasado"],["#CCE5FF","#004085","Tu reserva"]].map(([bg,col,l])=>(
+        {[["#D4EDDA","#155724","✓ Disponible"],["#F8D7DA","#721C24","X Ocupado prof."],["#FCE4EC","#9C2960","👤 Cita paciente"],["#e8e8e8","#888","Pasado"],["#CCE5FF","#004085","Tu reserva"]].map(([bg,col,l])=>(
           <span key={l} style={{ display:"flex", alignItems:"center", gap:5 }}>
             <span style={{ display:"inline-block", width:14, height:14, background:bg, border:`1px solid ${col}`, borderRadius:3 }}/>
             <span style={{ color:"#555" }}>{l}</span>
@@ -226,16 +252,21 @@ useEffect(() => { recargarArriendos(); }, []);
                 <td style={{ padding:"3px 8px", color:"#888", fontSize:11 }}>{hora}</td>
                 {diasSemana.map(d=>{
                   const ocupado    = estaOcupado(d.fecha, hora);
+                  const cita       = citaPacienteEnSlot(d.fecha, hora);
                   const miReserva  = esMiReserva(d.fecha, hora);
                   const pasado     = esPasado(d.fecha, hora);
                   const selec      = reserva?.fecha===d.fecha && reserva?.horaInicio===hora;
-                  let bg="#D4EDDA", color="#155724", label="Disponible", cursor="pointer";
+                  let bg="#D4EDDA", color="#155724", label="Disponible", cursor="pointer", title="";
                   if (pasado)   { bg="#f0f0f0"; color="#aaa"; label="–"; cursor="default"; }
                   if (ocupado)  { bg="#F8D7DA"; color="#721C24"; label="Ocupado"; cursor="default"; }
-                  if (miReserva){ bg="#CCE5FF"; color="#004085"; label="Mi reserva"; cursor="default"; }
+                  if (cita)     {
+                    bg="#FCE4EC"; color="#9C2960"; label="👤 Paciente"; cursor="not-allowed";
+                    title = `Cita: ${cita.nombre}${cita.tratamiento?` · ${cita.tratamiento}`:""} (${(cita.hora_inicio||"").slice(0,5)}–${(cita.hora_fin||"").slice(0,5)}) · ${cita.estado}`;
+                  }
+                  if (miReserva){ bg="#CCE5FF"; color="#004085"; label="Mi reserva"; cursor="default"; title=""; }
                   if (selec)    { bg="#FFF3CD"; color="#856404"; label="Selec."; }
                   return (
-                    <td key={d.fecha} onClick={()=>handleClickSlot(d.fecha,hora)}
+                    <td key={d.fecha} onClick={()=>handleClickSlot(d.fecha,hora)} title={title}
                       style={{ padding:"3px 4px", textAlign:"center", cursor, userSelect:"none" }}>
                       <div style={{ background:bg, color, borderRadius:4, padding:"4px 2px", fontSize:11, fontWeight:500 }}>{label}</div>
                     </td>

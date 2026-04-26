@@ -726,6 +726,7 @@ export default function App() {
             boxes={boxes}
             arriendos={arriendos}
             profesionales={profesionales}
+            solicitudes={solicitudes}
             onNuevoArriendo={async()=>{ await fetchAll(); setTab('arriendos'); }}
           />
         </div>
