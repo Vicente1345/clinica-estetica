@@ -1,6 +1,5 @@
 import { useState, useEffect } from "react";
 import { sb } from "./supabase";
-import ChatBot from "./ChatBot";
 
 // ── PALETA inspirada en Barcelona Clinic Instagram ─────────────
 const C = {
@@ -80,6 +79,7 @@ export default function Landing({ onLogin }) {
   const [dentalCat, setDentalCat]   = useState("flex");
   const [estOpen,   setEstOpen]     = useState(false);
   const [denOpen,   setDenOpen]     = useState(false);
+  const [denFreq,   setDenFreq]     = useState(null); // "1j" | "2j" | null — qué frecuencia está expandida en el acordeón progresivo
   const [dispBoxes, setDispBoxes]         = useState([]);
   const [dispArriendos, setDispArriendos] = useState([]);
   const [dispBoxSel, setDispBoxSel]       = useState(null);
@@ -108,11 +108,16 @@ export default function Landing({ onLogin }) {
     <div style={{ fontFamily:"'Georgia',serif", background:C.beige, color:C.cafe, minHeight:"100vh" }}>
 
       {/* ── TOPBAR ── */}
-      <div style={{ background:C.lila, color:C.blanco, padding:"8px 40px", display:"flex", justifyContent:"space-between", alignItems:"center", fontSize:12, letterSpacing:".1em" }}>
+      <div style={{ background:C.lila, color:C.blanco, padding:"8px 40px", display:"flex", justifyContent:"space-between", alignItems:"center", fontSize:12, letterSpacing:".1em", flexWrap:"wrap", gap:10 }}>
         <span>+56 9 8628 4965 · San Ignacio 1263, Puerto Varas</span>
-        <button onClick={()=>setModalLogin(true)} style={{ background:"none", border:`1px solid rgba(255,255,255,0.6)`, color:C.blanco, padding:"4px 16px", borderRadius:20, cursor:"pointer", fontSize:11, letterSpacing:".1em" }}>
-          ACCESO EQUIPO
-        </button>
+        <div style={{ display:"flex", gap:10, alignItems:"center", flexWrap:"wrap" }}>
+          <a href="/barcelona-clinic.html" style={{ background:C.blanco, border:"none", color:C.lila, padding:"5px 16px", borderRadius:20, cursor:"pointer", fontSize:11, letterSpacing:".1em", fontWeight:700, textDecoration:"none" }}>
+            ✨ SOY PACIENTE
+          </a>
+          <button onClick={()=>setModalLogin(true)} style={{ background:"none", border:`1px solid rgba(255,255,255,0.6)`, color:C.blanco, padding:"4px 16px", borderRadius:20, cursor:"pointer", fontSize:11, letterSpacing:".1em" }}>
+            ACCESO EQUIPO
+          </button>
+        </div>
       </div>
 
       {/* ── NAVBAR ── */}
@@ -305,7 +310,7 @@ export default function Landing({ onLogin }) {
               {/* Subtabs */}
               <div style={{ display:"flex", gap:8, marginBottom:20, flexWrap:"wrap", justifyContent:"center" }}>
                 {[["flex","Plan Flex (sin asistente)"],["pro","Plan PRO (con asistente)"]].map(([k,l])=>(
-                  <button key={k} onClick={()=>{ setDentalCat(k); setDenOpen(false); }}
+                  <button key={k} onClick={()=>{ setDentalCat(k); setDenOpen(false); setDenFreq(null); }}
                     style={{ padding:"8px 22px", borderRadius:20, border:`2px solid ${dentalCat===k?C.rosa:C.beigeOscuro}`, background:dentalCat===k?C.rosa:C.blanco, color:dentalCat===k?C.blanco:C.cafeClaro, fontSize:12, fontWeight:600, cursor:"pointer", transition:"all .2s" }}>
                     {l}
                   </button>
@@ -327,38 +332,65 @@ export default function Landing({ onLogin }) {
                   <div style={{ marginBottom:14, padding:"11px 14px", background:C.lilaPale, borderRadius:10, fontSize:12, color:C.cafeClaro, fontFamily:"system-ui", lineHeight:1.8, borderLeft:`3px solid ${C.lila}` }}>
                     💡 Los <strong>planes mensuales aseguran el mismo horario</strong> reservado cada semana y son más convenientes que el arriendo por jornada suelta.
                   </div>
-                  <button onClick={()=>setDenOpen(o=>!o)}
+                  <button onClick={()=>{ setDenOpen(o=>!o); setDenFreq(null); }}
                     style={{ width:"100%", padding:"13px 18px", background:denOpen?C.rosa:C.blanco, color:denOpen?C.blanco:C.rosa, border:`2px solid ${C.rosa}`, borderRadius:10, cursor:"pointer", fontSize:13, fontWeight:700, letterSpacing:".05em", display:"flex", justifyContent:"space-between", alignItems:"center", transition:"all .2s" }}>
-                    <span>📅 Planes mensuales Plan Flex</span>
+                    <span>📅 Planes Mensuales Plan Flex</span>
                     <span style={{ fontSize:11 }}>{denOpen?"▲ Cerrar":"▼ Ver planes"}</span>
                   </button>
                   {denOpen && (
                     <div style={{ marginTop:2, border:`1px solid ${C.rosa}44`, borderRadius:"0 0 10px 10px", overflow:"hidden", background:C.blanco }}>
                       {[
-                        { key:"Mensual",   icono:"📅", desc:"Renueva mes a mes" },
-                        { key:"Semestral", icono:"📆", desc:"Compromiso 6 meses · cobro mensual" },
-                        { key:"Anual",     icono:"🗓️", desc:"Compromiso 12 meses · mejor precio" },
-                      ].map(periodo => {
-                        const planes = FLEX_MENSUAL.filter(p => p.titulo.includes(periodo.key));
-                        if(planes.length===0) return null;
-                        return (
-                          <div key={periodo.key}>
-                            <div style={{ padding:"10px 18px", background:C.rosaPale, borderBottom:`1px solid ${C.rosa}33`, display:"flex", justifyContent:"space-between", alignItems:"center" }}>
-                              <span style={{ fontSize:11, fontWeight:700, letterSpacing:".15em", textTransform:"uppercase", color:C.rosa }}>{periodo.icono} {periodo.key}</span>
-                              <span style={{ fontSize:10, color:C.gris, fontFamily:"system-ui" }}>{periodo.desc}</span>
+                        { freq:"1j", titulo:"1 jornada/semana", mensual:170000, semestral:160000, anual:150000 },
+                        { freq:"2j", titulo:"2 jornadas/semana", mensual:340000, semestral:320000, anual:300000 },
+                      ].map(f => (
+                        <div key={f.freq}>
+                          {/* Nivel 2: frecuencia (clickable) */}
+                          <button
+                            onClick={()=> setDenFreq(o => o===f.freq ? null : f.freq)}
+                            style={{ width:"100%", padding:"14px 18px", background: denFreq===f.freq ? C.rosaPale : C.blanco, border:"none", borderBottom:`1px solid ${C.rosa}33`, display:"flex", justifyContent:"space-between", alignItems:"center", cursor:"pointer", transition:"all .2s", textAlign:"left", fontFamily:"inherit" }}
+                          >
+                            <div>
+                              <div style={{ fontSize:14, fontWeight:700, color:C.cafe }}>{f.titulo}</div>
+                              <div style={{ fontSize:10, color:C.gris, fontFamily:"system-ui", marginTop:2 }}>📅 Plan Mensual · renueva mes a mes</div>
                             </div>
-                            {planes.map((p,i)=>(
-                              <div key={i} style={{ display:"flex", justifyContent:"space-between", alignItems:"center", padding:"13px 18px", borderBottom:`1px solid ${C.rosa}22` }}>
-                                <div style={{ fontSize:14, fontWeight:600, color:C.cafe }}>{p.titulo.replace(` · ${periodo.key}`,"").replace(" ⭐","")}</div>
+                            <div style={{ display:"flex", alignItems:"center", gap:12 }}>
+                              <div style={{ textAlign:"right" }}>
+                                <div style={{ fontSize:18, fontWeight:700, color:C.rosa }}>{fmt(f.mensual)}</div>
+                                <div style={{ fontSize:9, color:C.gris, fontFamily:"system-ui" }}>/mes</div>
+                              </div>
+                              <span style={{ fontSize:11, color:C.rosa }}>{denFreq===f.freq ? "▲" : "▼"}</span>
+                            </div>
+                          </button>
+                          {/* Nivel 3: 6m + 12m (expandido) */}
+                          {denFreq===f.freq && (
+                            <div style={{ background:C.beige, borderBottom:`1px solid ${C.rosa}33` }}>
+                              <div style={{ padding:"10px 18px 6px", fontSize:10, fontWeight:700, letterSpacing:".15em", textTransform:"uppercase", color:C.rosa }}>
+                                💎 Compromiso largo · mejor precio
+                              </div>
+                              <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", padding:"12px 18px", borderTop:`1px solid ${C.rosa}22` }}>
+                                <div>
+                                  <div style={{ fontSize:13, fontWeight:600, color:C.cafe }}>📆 6 meses · Semestral</div>
+                                  <div style={{ fontSize:10, color:C.gris, fontFamily:"system-ui" }}>Compromiso 6 meses · cobro mensual</div>
+                                </div>
                                 <div style={{ textAlign:"right" }}>
-                                  <div style={{ fontSize:19, fontWeight:700, color:C.rosa }}>{fmt(p.precio)}</div>
-                                  <div style={{ fontSize:10, color:C.gris, fontFamily:"system-ui" }}>/mes</div>
+                                  <div style={{ fontSize:17, fontWeight:700, color:C.rosa }}>{fmt(f.semestral)}</div>
+                                  <div style={{ fontSize:9, color:C.gris, fontFamily:"system-ui" }}>/mes</div>
                                 </div>
                               </div>
-                            ))}
-                          </div>
-                        );
-                      })}
+                              <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", padding:"12px 18px", borderTop:`1px solid ${C.rosa}22` }}>
+                                <div>
+                                  <div style={{ fontSize:13, fontWeight:600, color:C.cafe }}>🗓️ 12 meses · Anual ⭐</div>
+                                  <div style={{ fontSize:10, color:C.gris, fontFamily:"system-ui" }}>Compromiso 12 meses · mejor precio</div>
+                                </div>
+                                <div style={{ textAlign:"right" }}>
+                                  <div style={{ fontSize:17, fontWeight:700, color:C.rosa }}>{fmt(f.anual)}</div>
+                                  <div style={{ fontSize:9, color:C.gris, fontFamily:"system-ui" }}>/mes</div>
+                                </div>
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      ))}
                     </div>
                   )}
                 </div>
@@ -382,39 +414,66 @@ export default function Landing({ onLogin }) {
                   <div style={{ marginBottom:14, padding:"11px 14px", background:C.rosaPale, borderRadius:10, fontSize:12, color:C.cafeClaro, fontFamily:"system-ui", lineHeight:1.8, borderLeft:`3px solid ${C.rosa}` }}>
                     💡 Los <strong>planes mensuales aseguran el mismo horario</strong> reservado cada semana y son más convenientes que el arriendo por jornada suelta.
                   </div>
-                  <button onClick={()=>setDenOpen(o=>!o)}
+                  <button onClick={()=>{ setDenOpen(o=>!o); setDenFreq(null); }}
                     style={{ width:"100%", padding:"13px 18px", background:denOpen?C.lila:C.blanco, color:denOpen?C.blanco:C.lila, border:`2px solid ${C.lila}`, borderRadius:10, cursor:"pointer", fontSize:13, fontWeight:700, letterSpacing:".05em", display:"flex", justifyContent:"space-between", alignItems:"center", transition:"all .2s" }}>
-                    <span>📅 Planes mensuales Plan PRO</span>
+                    <span>📅 Planes Mensuales Plan PRO</span>
                     <span style={{ fontSize:11 }}>{denOpen?"▲ Cerrar":"▼ Ver planes"}</span>
                   </button>
                   {denOpen && (
                     <div style={{ marginTop:2, border:`1px solid ${C.lilaClaro}`, borderRadius:"0 0 10px 10px", overflow:"hidden", background:C.blanco }}>
                       {[
-                        { key:"Mensual",   icono:"📅", desc:"Renueva mes a mes" },
-                        { key:"Semestral", icono:"📆", desc:"Compromiso 6 meses · cobro mensual" },
-                        { key:"Anual",     icono:"🗓️", desc:"Compromiso 12 meses · mejor precio" },
-                      ].map(periodo => {
-                        const planes = PRO_MENSUAL.filter(p => p.titulo.includes(periodo.key));
-                        if(planes.length===0) return null;
-                        return (
-                          <div key={periodo.key}>
-                            <div style={{ padding:"10px 18px", background:C.lilaPale, borderBottom:`1px solid ${C.lilaClaro}`, display:"flex", justifyContent:"space-between", alignItems:"center" }}>
-                              <span style={{ fontSize:11, fontWeight:700, letterSpacing:".15em", textTransform:"uppercase", color:C.lila }}>{periodo.icono} {periodo.key}</span>
-                              <span style={{ fontSize:10, color:C.gris, fontFamily:"system-ui" }}>{periodo.desc}</span>
+                        { freq:"1j", titulo:"1 jornada/semana", mensual:250000, semestral:240000, anual:230000 },
+                        { freq:"2j", titulo:"2 jornadas/semana", mensual:500000, semestral:480000, anual:450000 },
+                      ].map(f => (
+                        <div key={f.freq}>
+                          {/* Nivel 2: frecuencia (clickable) */}
+                          <button
+                            onClick={()=> setDenFreq(o => o===f.freq ? null : f.freq)}
+                            style={{ width:"100%", padding:"14px 18px", background: denFreq===f.freq ? C.lilaPale : C.blanco, border:"none", borderBottom:`1px solid ${C.lilaClaro}`, display:"flex", justifyContent:"space-between", alignItems:"center", cursor:"pointer", transition:"all .2s", textAlign:"left", fontFamily:"inherit" }}
+                          >
+                            <div>
+                              <div style={{ fontSize:14, fontWeight:700, color:C.cafe }}>{f.titulo}</div>
+                              <div style={{ fontSize:10, color:C.gris, fontFamily:"system-ui", marginTop:2 }}>📅 Plan Mensual · con asistente · renueva mes a mes</div>
                             </div>
-                            {planes.map((p,i)=>(
-                              <div key={i} style={{ display:"flex", justifyContent:"space-between", alignItems:"center", padding:"13px 18px", borderBottom:`1px solid ${C.lilaClaro}` }}>
-                                <div style={{ fontSize:14, fontWeight:600, color:C.cafe }}>{p.titulo.replace(` · ${periodo.key}`,"").replace(" ⭐","")}</div>
+                            <div style={{ display:"flex", alignItems:"center", gap:12 }}>
+                              <div style={{ textAlign:"right" }}>
+                                <div style={{ fontSize:18, fontWeight:700, color:C.lila }}>{fmt(f.mensual)}</div>
+                                <div style={{ fontSize:9, color:C.gris, fontFamily:"system-ui" }}>/mes</div>
+                              </div>
+                              <span style={{ fontSize:11, color:C.lila }}>{denFreq===f.freq ? "▲" : "▼"}</span>
+                            </div>
+                          </button>
+                          {/* Nivel 3: 6m + 12m (expandido) */}
+                          {denFreq===f.freq && (
+                            <div style={{ background:C.beige, borderBottom:`1px solid ${C.lilaClaro}` }}>
+                              <div style={{ padding:"10px 18px 6px", fontSize:10, fontWeight:700, letterSpacing:".15em", textTransform:"uppercase", color:C.lila }}>
+                                💎 Compromiso largo · mejor precio
+                              </div>
+                              <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", padding:"12px 18px", borderTop:`1px solid ${C.lilaClaro}` }}>
+                                <div>
+                                  <div style={{ fontSize:13, fontWeight:600, color:C.cafe }}>📆 6 meses · Semestral</div>
+                                  <div style={{ fontSize:10, color:C.gris, fontFamily:"system-ui" }}>Compromiso 6 meses · con asistente</div>
+                                </div>
                                 <div style={{ textAlign:"right" }}>
-                                  <div style={{ fontSize:19, fontWeight:700, color:C.lila }}>{fmt(p.precio)}</div>
-                                  <div style={{ fontSize:10, color:C.gris, fontFamily:"system-ui" }}>/mes</div>
+                                  <div style={{ fontSize:17, fontWeight:700, color:C.lila }}>{fmt(f.semestral)}</div>
+                                  <div style={{ fontSize:9, color:C.gris, fontFamily:"system-ui" }}>/mes</div>
                                 </div>
                               </div>
-                            ))}
-                          </div>
-                        );
-                      })}
-                      {/* Plan Exclusivo destacado */}
+                              <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", padding:"12px 18px", borderTop:`1px solid ${C.lilaClaro}` }}>
+                                <div>
+                                  <div style={{ fontSize:13, fontWeight:600, color:C.cafe }}>🗓️ 12 meses · Anual ⭐</div>
+                                  <div style={{ fontSize:10, color:C.gris, fontFamily:"system-ui" }}>Compromiso 12 meses · mejor precio</div>
+                                </div>
+                                <div style={{ textAlign:"right" }}>
+                                  <div style={{ fontSize:17, fontWeight:700, color:C.lila }}>{fmt(f.anual)}</div>
+                                  <div style={{ fontSize:9, color:C.gris, fontFamily:"system-ui" }}>/mes</div>
+                                </div>
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      ))}
+                      {/* Plan Exclusivo destacado al final */}
                       {PRO_MENSUAL.filter(p=>p.precio===1350000).map((p,i)=>(
                         <div key={`excl-${i}`} style={{ display:"flex", justifyContent:"space-between", alignItems:"center", padding:"16px 18px", background:C.lila, borderTop:`2px solid ${C.dorado}` }}>
                           <div>
@@ -718,8 +777,7 @@ export default function Landing({ onLogin }) {
         </div>
       )}
 
-      {/* ── CHATBOT ── */}
-      <ChatBot variante="publico" />
+      {/* Bot público movido a /barcelona-clinic.html (página de pacientes) */}
     </div>
   );
 }

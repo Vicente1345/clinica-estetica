@@ -1,0 +1,1273 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Barcelona Clinic — Estética & Dental Premium · Puerto Varas</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,700;1,400;1,700&family=Cormorant+Garamond:ital,wght@0,400;0,600;1,400;1,600&family=Poppins:wght@300;400;500;600&display=swap" rel="stylesheet" />
+<style>
+:root{
+  --lila:#8B84C0; --rose-pale:#F2B8D0; --beige:#F2E4D0; --sky:#A8D4DC;
+  --sage:#A8BDB5; --wine:#9B6B8A; --salmon:#E8B4A0; --sky-light:#B8DDE4;
+  --dark:#2D2D2D; --terracotta:#E8896A; --petrol:#4A8FA8; --lilac-dk:#6B5B8A;
+  --deep:#2E2168; --lavender:#AE9DC8; --lilac:#CFC0E2; --gold:#C9A96E;
+  --rose:#D4558A; --soft-white:#FEFBFE; --cream:#FAF2F6;
+}
+*{margin:0;padding:0;box-sizing:border-box;}
+html{scroll-behavior:smooth;}
+body{font-family:'Poppins',sans-serif;background:var(--soft-white);color:var(--dark);line-height:1.6;cursor:none;overflow-x:hidden;}
+h1,h2,h3{font-family:'Playfair Display',serif;font-weight:700;line-height:1.15;}
+h4{font-family:'Cormorant Garamond',serif;font-weight:600;}
+a{color:inherit;text-decoration:none;}
+img{max-width:100%;display:block;}
+
+/* Cursor */
+.cursor-dot,.cursor-ring{position:fixed;top:0;left:0;pointer-events:none;z-index:9999;transform:translate(-50%,-50%);border-radius:50%;}
+.cursor-dot{width:6px;height:6px;background:var(--rose);}
+.cursor-ring{width:36px;height:36px;border:1.5px solid var(--rose);transition:transform .25s,width .2s,height .2s,border-color .2s;}
+.cursor-ring.active{width:50px;height:50px;border-color:var(--lila);}
+@media(max-width:768px){.cursor-dot,.cursor-ring{display:none;}body{cursor:auto;}}
+
+/* Nav */
+nav{position:fixed;top:0;left:0;right:0;z-index:100;padding:1.4rem 3rem;display:flex;align-items:center;justify-content:space-between;transition:all .35s;}
+nav.scrolled{padding:.85rem 3rem;background:rgba(255,255,255,.96);backdrop-filter:blur(14px);box-shadow:0 2px 20px rgba(139,132,192,.15);}
+.logo{font-family:'Cormorant Garamond',serif;font-size:1.8rem;font-weight:600;font-style:italic;color:#fff;transition:color .3s;}
+nav.scrolled .logo{color:var(--deep);}
+.nav-links{display:flex;gap:2rem;align-items:center;}
+.nav-links a{font-size:.85rem;color:rgba(255,255,255,.9);transition:color .2s;font-weight:400;}
+nav.scrolled .nav-links a{color:var(--dark);}
+.nav-links a:hover{opacity:.7;}
+nav.scrolled .nav-links a:hover{color:var(--lilac-dk);opacity:1;}
+.btn-nav{background:rgba(255,255,255,.2);color:#fff!important;border:1.5px solid rgba(255,255,255,.55);padding:.5rem 1.3rem;border-radius:50px;font-size:.82rem!important;font-weight:500!important;transition:all .3s!important;cursor:none;}
+nav.scrolled .btn-nav{background:var(--lilac-dk);color:#fff!important;border-color:transparent;}
+.btn-nav:hover{background:#fff!important;color:var(--lila)!important;opacity:1!important;}
+.menu-toggle{display:none;background:none;border:none;font-size:1.6rem;color:#fff;cursor:none;}
+nav.scrolled .menu-toggle{color:var(--dark);}
+
+/* Buttons */
+.btn{display:inline-block;padding:.8rem 1.8rem;border-radius:50px;font-size:.88rem;font-weight:500;transition:all .3s;cursor:none;border:none;font-family:'Poppins',sans-serif;}
+.btn-primary{background:linear-gradient(135deg,var(--lilac-dk),var(--deep));color:#fff;}
+.btn-primary:hover{transform:translateY(-2px);box-shadow:0 12px 28px rgba(107,91,138,.3);}
+.btn-white{background:#fff;color:var(--lilac-dk);}
+.btn-white:hover{background:var(--lilac-dk);color:#fff;transform:translateY(-2px);}
+.btn-outline-white{background:transparent;color:#fff;border:1.5px solid rgba(255,255,255,.7);}
+.btn-outline-white:hover{background:#fff;color:var(--lilac-dk);}
+.btn-terracotta{background:var(--terracotta);color:#fff;}
+.btn-terracotta:hover{background:#d4734e;transform:translateY(-2px);}
+.btn-gold{background:var(--gold);color:var(--deep);}
+.btn-gold:hover{background:var(--deep);color:var(--gold);}
+
+/* Price Pills */
+.pill{display:inline-block;padding:.32rem .95rem;border-radius:50px;font-weight:600;font-size:.88rem;color:#fff;background:var(--lilac-dk);font-family:'Poppins',sans-serif;white-space:nowrap;}
+.pill.terracotta{background:var(--terracotta);}
+.pill.petrol{background:var(--petrol);}
+.pill.wine{background:var(--wine);}
+.pill.gold{background:var(--gold);color:var(--deep);}
+.pill.lg{font-size:1.15rem;padding:.45rem 1.3rem;}
+.pill.xl{font-size:1.5rem;padding:.6rem 1.8rem;}
+
+/* Wave separators */
+.wave{line-height:0;display:block;}
+.wave svg{width:100%;display:block;}
+
+/* S-curve deco */
+.s-deco{position:absolute;pointer-events:none;}
+
+/* Eyebrow */
+.eyebrow{display:inline-block;font-family:'Poppins',sans-serif;font-size:.7rem;letter-spacing:3px;text-transform:uppercase;font-weight:500;margin-bottom:.9rem;}
+
+/* Accordion */
+details.acc{margin:.8rem 0;}
+details.acc>summary{display:flex;align-items:center;gap:.5rem;font-size:.8rem;font-weight:500;letter-spacing:.5px;color:var(--lilac-dk);background:none;border:1.5px solid var(--lilac-dk);border-radius:50px;padding:.38rem 1rem;cursor:pointer;font-family:'Poppins',sans-serif;list-style:none;transition:all .25s;}
+details.acc>summary::-webkit-details-marker{display:none;}
+details.acc>summary:hover{background:var(--lilac-dk);color:#fff;}
+.tog{display:inline-block;transition:transform .35s;font-style:normal;}
+details.acc[open] .tog{transform:rotate(180deg);}
+.price-rows{border-radius:10px;margin-top:.6rem;}
+.price-row{display:flex;justify-content:space-between;align-items:center;padding:.48rem .8rem;font-size:.82rem;border-radius:7px;margin-bottom:.28rem;background:rgba(107,91,138,.08);}
+.price-row strong{color:var(--dark);font-weight:500;}
+.price-row:last-child{margin-bottom:0;}
+
+/* Fade-in */
+.fi{opacity:0;transform:translateY(28px);transition:opacity .8s,transform .8s;}
+.fi.visible{opacity:1;transform:translateY(0);}
+
+/* HERO */
+.hero-sec{background:var(--lila);min-height:100vh;position:relative;overflow:hidden;}
+.hero-sec::before{content:'';position:absolute;top:-120px;right:-120px;width:500px;height:500px;border-radius:50%;background:radial-gradient(circle,rgba(255,255,255,.13),transparent 70%);}
+.hero-sec::after{content:'';position:absolute;bottom:80px;left:-80px;width:350px;height:350px;border-radius:50%;background:radial-gradient(circle,rgba(255,255,255,.07),transparent 70%);}
+.hero-in{position:relative;z-index:2;padding:9rem 3rem 5rem;max-width:1280px;margin:0 auto;}
+.hero-logo-row{display:flex;align-items:center;justify-content:flex-end;margin-bottom:3rem;gap:1rem;}
+.hero-logo-text{font-family:'Cormorant Garamond',serif;font-size:3rem;font-weight:600;font-style:italic;color:#fff;line-height:1;}
+.hero-logo-sub{font-family:'Poppins',sans-serif;font-size:.7rem;letter-spacing:3px;text-transform:uppercase;color:rgba(255,255,255,.65);display:block;text-align:right;margin-top:.25rem;}
+.hero-h1{font-size:clamp(2rem,4.5vw,2.8rem);color:#fff;text-align:center;font-weight:700;margin-bottom:.8rem;}
+.hero-sub{font-size:.95rem;color:rgba(255,255,255,.78);text-align:center;margin-bottom:3rem;font-weight:300;}
+.hero-cards{display:grid;grid-template-columns:repeat(3,1fr);gap:1.1rem;}
+.hcard{border:1.5px solid rgba(255,255,255,.32);border-radius:16px;padding:1.7rem 1.4rem;background:rgba(255,255,255,.1);backdrop-filter:blur(8px);transition:all .3s;cursor:none;display:block;}
+.hcard:hover{background:rgba(255,255,255,.2);transform:translateY(-5px);border-color:rgba(255,255,255,.6);}
+.hcard.feat{background:rgba(255,255,255,.18);border-color:rgba(255,255,255,.6);}
+.hcard-badge{display:inline-block;font-size:.62rem;letter-spacing:2px;text-transform:uppercase;padding:.2rem .6rem;border-radius:50px;background:rgba(255,255,255,.28);color:#fff;font-weight:500;margin-bottom:.6rem;}
+.hcard-icon{font-size:1.5rem;margin-bottom:.7rem;display:block;}
+.hcard h3{font-family:'Playfair Display',serif;font-size:1.2rem;color:#fff;margin-bottom:.35rem;font-weight:700;}
+.hcard p{font-size:.78rem;color:rgba(255,255,255,.72);line-height:1.5;font-weight:300;}
+.hero-stats{display:flex;gap:3rem;justify-content:center;margin-top:3rem;flex-wrap:wrap;}
+.hstat{text-align:center;color:#fff;}
+.hstat-num{font-family:'Cormorant Garamond',serif;font-size:2.4rem;font-weight:600;line-height:1;}
+.hstat-label{font-size:.68rem;letter-spacing:2px;text-transform:uppercase;color:rgba(255,255,255,.65);margin-top:.2rem;}
+
+/* MARQUEE */
+.marquee{background:var(--dark);color:#fff;padding:1.5rem 0;overflow:hidden;}
+.marquee-track{display:flex;gap:4rem;white-space:nowrap;animation:scroll 38s linear infinite;font-family:'Cormorant Garamond',serif;font-size:1.55rem;font-style:italic;}
+.marquee-track span::before{content:'✦';color:var(--lavender);margin:0 2rem;}
+@keyframes scroll{0%{transform:translateX(0);}100%{transform:translateX(-50%);}}
+
+/* HYDRAFACIAL */
+.hf-sec{background:var(--beige);position:relative;overflow:hidden;}
+.hf-in{max-width:1280px;margin:0 auto;padding:7rem 3rem;display:grid;grid-template-columns:1fr 1fr;gap:5rem;align-items:center;position:relative;z-index:2;}
+.hf-text .eyebrow{color:var(--terracotta);}
+.hf-text h2{font-size:clamp(2.4rem,5vw,3.8rem);color:var(--dark);margin-bottom:1rem;}
+.hf-text h2 em{color:var(--terracotta);font-style:italic;}
+.hf-text .lead{font-size:.95rem;color:#555;margin-bottom:1.5rem;font-weight:300;line-height:1.75;}
+.hf-excl{display:inline-flex;align-items:center;gap:.5rem;background:var(--terracotta);color:#fff;padding:.42rem 1.1rem;border-radius:50px;font-size:.75rem;font-weight:600;letter-spacing:1px;text-transform:uppercase;margin-bottom:1.5rem;}
+.hf-plans-title{font-family:'Poppins',sans-serif;font-size:.88rem;font-weight:600;color:var(--dark);margin-bottom:.8rem;text-transform:uppercase;letter-spacing:1px;}
+.hf-plan{display:flex;justify-content:space-between;align-items:center;padding:.95rem 1.1rem;border-bottom:1px solid rgba(0,0,0,.07);}
+.hf-plan:first-of-type{border-top:1px solid rgba(0,0,0,.07);}
+.hf-plan-l h4{font-family:'Poppins',sans-serif;font-size:.9rem;font-weight:600;color:var(--dark);}
+.hf-plan-l small{font-size:.72rem;color:#777;}
+.hf-plan-specs{display:flex;flex-wrap:wrap;gap:.3rem;margin-top:.35rem;}
+.hf-spec{font-size:.64rem;background:rgba(107,91,138,.1);color:var(--lilac-dk);padding:.12rem .45rem;border-radius:50px;font-weight:500;}
+.hf-stats{display:grid;grid-template-columns:repeat(3,1fr);gap:.8rem;margin:1.4rem 0;}
+.hf-stat{text-align:center;background:rgba(255,255,255,.7);border-radius:14px;padding:.9rem .5rem;}
+.hf-stat span:first-child{font-family:'Cormorant Garamond',serif;font-size:2rem;color:var(--terracotta);font-weight:600;line-height:1;display:block;}
+.hf-stat span:last-child{font-size:.66rem;color:#666;margin-top:.25rem;display:block;line-height:1.3;}
+.hf-steps{margin-bottom:1.4rem;}
+.hf-step{display:flex;align-items:flex-start;gap:.75rem;padding:.55rem 0;border-bottom:1px solid rgba(0,0,0,.05);}
+.hf-step:last-child{border-bottom:none;}
+.hf-snum{font-family:'Cormorant Garamond',serif;font-size:1.05rem;color:var(--terracotta);font-weight:600;min-width:22px;}
+.hf-step strong{display:block;font-size:.82rem;font-weight:600;color:var(--dark);}
+.hf-step span{font-size:.73rem;color:#666;}
+.hf-vis{position:relative;}
+.hf-machine{width:100%;height:360px;object-fit:contain;background:rgba(255,255,255,.7);border-radius:24px;padding:2rem;box-shadow:0 20px 60px rgba(0,0,0,.07);}
+.hf-float{position:absolute;top:-14px;right:-14px;background:var(--terracotta);color:#fff;font-size:.73rem;font-weight:600;padding:.48rem .95rem;border-radius:50px;box-shadow:0 8px 20px rgba(232,137,106,.38);}
+.hf-result{width:100%;height:200px;object-fit:cover;border-radius:16px;box-shadow:0 15px 40px rgba(0,0,0,.09);margin-top:1rem;}
+.hf-result-cap{font-size:.73rem;color:#777;text-align:center;margin-top:.45rem;font-style:italic;}
+
+/* ENDYMED */
+.emy-sec{background:linear-gradient(135deg,#1e1852 0%,#3a2d7a 45%,var(--lilac-dk) 100%);color:#fff;position:relative;overflow:hidden;}
+.emy-sec::before{content:'';position:absolute;top:-150px;right:-150px;width:500px;height:500px;border-radius:50%;background:radial-gradient(circle,rgba(255,255,255,.07),transparent 70%);}
+.emy-sec::after{content:'';position:absolute;bottom:-100px;left:-100px;width:400px;height:400px;border-radius:50%;background:radial-gradient(circle,rgba(174,157,200,.12),transparent 70%);}
+.emy-in{max-width:1280px;margin:0 auto;padding:7rem 3rem;display:grid;grid-template-columns:1fr 1fr;gap:5rem;align-items:center;position:relative;z-index:2;}
+.emy-text .eyebrow{color:var(--lavender);}
+.emy-text h2{font-size:clamp(2.4rem,5vw,3.8rem);color:#fff;margin-bottom:1rem;}
+.emy-text h2 em{color:var(--lavender);font-style:italic;}
+.emy-text .lead{color:rgba(255,255,255,.78);margin-bottom:1.5rem;font-size:.95rem;font-weight:300;line-height:1.75;}
+.emy-excl{display:inline-flex;align-items:center;gap:.5rem;background:rgba(255,255,255,.14);border:1px solid rgba(255,255,255,.38);color:#fff;padding:.42rem 1.1rem;border-radius:50px;font-size:.75rem;font-weight:500;letter-spacing:1px;text-transform:uppercase;margin-bottom:1.5rem;}
+.emy-specs{display:grid;grid-template-columns:repeat(3,1fr);gap:.9rem;margin-bottom:1.8rem;}
+.emy-spec{text-align:center;background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.1);border-radius:14px;padding:1.1rem .5rem;}
+.emy-spec span:first-child{font-family:'Cormorant Garamond',serif;font-size:2.2rem;color:var(--gold);font-weight:600;line-height:1;display:block;}
+.emy-spec span:last-child{font-size:.66rem;color:rgba(255,255,255,.65);margin-top:.28rem;display:block;}
+.emy-treats{display:grid;grid-template-columns:1fr 1fr;gap:.45rem;margin-bottom:1.8rem;}
+.emy-treat{background:rgba(255,255,255,.07);border-radius:10px;padding:.6rem .9rem;font-size:.8rem;color:rgba(255,255,255,.88);border-left:3px solid var(--lavender);}
+.emy-table{background:rgba(255,255,255,.05);border-radius:16px;padding:1rem;margin-bottom:1.5rem;}
+.emy-row{display:flex;justify-content:space-between;align-items:center;padding:.58rem .8rem;border-bottom:1px solid rgba(255,255,255,.05);font-size:.82rem;}
+.emy-row:last-child{border-bottom:none;}
+.emy-row span:first-child{color:rgba(255,255,255,.82);}
+.emy-price{font-family:'Cormorant Garamond',serif;font-size:1.1rem;color:var(--gold);font-weight:600;}
+.emy-vis{position:relative;}
+.emy-machine{width:100%;height:420px;object-fit:contain;background:rgba(255,255,255,.05);border-radius:24px;padding:2rem;}
+.emy-float{position:absolute;top:-14px;left:-14px;background:var(--gold);color:var(--deep);font-size:.73rem;font-weight:600;padding:.48rem .95rem;border-radius:50px;box-shadow:0 8px 20px rgba(201,169,110,.38);}
+
+/* ARMONIZACION */
+.arm-sec{background:var(--rose-pale);position:relative;overflow:hidden;}
+.arm-in{max-width:1280px;margin:0 auto;padding:6rem 3rem;display:grid;grid-template-columns:1fr 1.3fr;gap:5rem;align-items:center;position:relative;z-index:2;}
+.arm-text .eyebrow{color:var(--lilac-dk);}
+.arm-text h2{font-size:clamp(2rem,4vw,3.2rem);color:var(--dark);margin-bottom:1rem;}
+.arm-text h2 em{color:var(--lilac-dk);font-style:italic;}
+.arm-text .desc{color:#555;margin-bottom:2rem;font-size:.92rem;font-weight:300;line-height:1.75;}
+.arm-items{display:flex;flex-direction:column;gap:.85rem;}
+.arm-item{display:flex;justify-content:space-between;align-items:center;padding:1rem 1.2rem;background:rgba(255,255,255,.6);border-radius:14px;}
+.arm-item strong{font-size:.9rem;font-weight:600;color:var(--dark);display:block;}
+.arm-item small{font-size:.75rem;color:#666;}
+.arm-vis{display:flex;flex-direction:column;align-items:center;gap:1.5rem;}
+.arm-circle{width:280px;height:280px;border-radius:50%;object-fit:cover;object-position:center top;box-shadow:0 20px 50px rgba(107,91,138,.2);border:6px solid rgba(255,255,255,.7);}
+.arm-deco{width:340px;height:340px;border-radius:50%;border:2px dashed rgba(107,91,138,.28);position:absolute;}
+
+/* BOTOX */
+.botox-sec{background:var(--salmon);position:relative;overflow:hidden;}
+.botox-in{max-width:1000px;margin:0 auto;padding:6rem 3rem;position:relative;z-index:2;}
+.botox-hd{text-align:center;margin-bottom:3rem;}
+.botox-hd .eyebrow{color:rgba(107,91,138,.8);}
+.botox-hd h2{font-size:clamp(2rem,3.5vw,2.8rem);color:var(--dark);}
+.botox-cols{display:grid;grid-template-columns:1fr auto 1fr;gap:1.5rem;align-items:center;}
+.bcol{background:rgba(255,255,255,.5);border-radius:20px;padding:2.5rem 2rem;text-align:center;}
+.bcol-img{width:170px;height:170px;border-radius:50%;object-fit:cover;object-position:center top;margin:0 auto 1.4rem;border:4px solid rgba(255,255,255,.8);box-shadow:0 10px 30px rgba(0,0,0,.09);}
+.bcol h3{font-family:'Poppins',sans-serif;font-size:.98rem;font-weight:600;color:var(--dark);margin-bottom:.45rem;}
+.bcol .desc{font-size:.8rem;color:#555;margin-bottom:1.2rem;line-height:1.6;}
+.botox-div svg{opacity:.25;}
+
+/* SCULPTRA / EXOSOMAS / PROFHILO */
+.sculptra-sec{background:var(--wine);color:#fff;position:relative;overflow:hidden;}
+.sculptra-sec::before{content:'';position:absolute;inset:0;background:radial-gradient(ellipse at 70% 50%,rgba(255,255,255,.05),transparent 60%);}
+.sculptra-in{max-width:1100px;margin:0 auto;padding:6rem 3rem;display:grid;grid-template-columns:1fr 1fr;gap:4rem;align-items:center;position:relative;z-index:2;}
+.sculptra-text .eyebrow{color:rgba(255,255,255,.65);}
+.sculptra-text h2{font-size:clamp(1.8rem,3.5vw,2.6rem);color:#fff;margin-bottom:1rem;}
+.sculptra-text h2 em{font-style:italic;color:rgba(255,255,255,.8);}
+.sculptra-text p{color:rgba(255,255,255,.75);margin-bottom:2rem;font-size:.92rem;font-weight:300;line-height:1.75;}
+.sculptra-price{text-align:center;}
+.sculptra-price .slabel{font-size:.75rem;letter-spacing:2px;text-transform:uppercase;color:rgba(255,255,255,.58);margin-bottom:.5rem;display:block;}
+.sculptra-price .samount{font-family:'Cormorant Garamond',serif;font-size:4.5rem;font-weight:600;color:#fff;line-height:1;display:block;}
+.sculptra-price .snote{font-size:.72rem;color:rgba(255,255,255,.48);margin-top:.3rem;display:block;}
+
+.exo-sec{background:var(--beige);position:relative;overflow:hidden;}
+.exo-in{max-width:1100px;margin:0 auto;padding:6rem 3rem;display:grid;grid-template-columns:1.2fr 1fr;gap:4rem;align-items:center;position:relative;z-index:2;}
+.exo-text .eyebrow{color:var(--terracotta);}
+.exo-text h2{font-size:clamp(1.8rem,3.5vw,2.5rem);color:var(--dark);margin-bottom:.8rem;}
+.exo-text p{color:#555;margin-bottom:1.8rem;font-size:.92rem;font-weight:300;line-height:1.75;}
+.exo-prices{display:flex;flex-direction:column;gap:.55rem;}
+.exo-row{display:flex;justify-content:space-between;align-items:center;padding:.7rem 1rem;background:rgba(255,255,255,.7);border-radius:12px;font-size:.84rem;}
+.exo-row span:first-child{color:#555;}
+
+.profhilo-sec{background:var(--sky);position:relative;overflow:hidden;}
+.profhilo-in{max-width:1100px;margin:0 auto;padding:6rem 3rem;position:relative;z-index:2;}
+.profhilo-hd{text-align:center;max-width:700px;margin:0 auto 3rem;}
+.profhilo-hd .eyebrow{color:var(--petrol);}
+.profhilo-hd h2{font-size:clamp(1.8rem,3.5vw,2.5rem);color:var(--dark);margin-bottom:.8rem;}
+.profhilo-hd p{color:#444;font-size:.92rem;font-weight:300;}
+.profhilo-cards{display:flex;gap:2rem;justify-content:center;flex-wrap:wrap;}
+.profhilo-card{background:#fff;border-radius:20px;padding:2rem 2.5rem;text-align:center;flex:1;min-width:220px;max-width:300px;box-shadow:0 10px 30px rgba(0,0,0,.07);}
+.profhilo-card h4{font-size:1.5rem;color:var(--dark);margin-bottom:.4rem;}
+.profhilo-card p{font-size:.78rem;color:#666;margin-bottom:1rem;}
+.profhilo-card .big-price{font-family:'Cormorant Garamond',serif;font-size:2.6rem;color:var(--petrol);font-weight:600;line-height:1;}
+
+/* MESOTERAPIA */
+.meso-sec{background:var(--sky);position:relative;overflow:hidden;}
+.meso-in{max-width:1100px;margin:0 auto;padding:6rem 3rem;position:relative;z-index:2;}
+.meso-hd{text-align:center;margin-bottom:2.5rem;}
+.meso-hd .eyebrow{color:var(--petrol);}
+.meso-hd h2{font-size:clamp(2rem,4vw,3rem);color:var(--dark);}
+.meso-body{display:grid;grid-template-columns:1fr 1fr;gap:4rem;align-items:start;}
+.meso-text p{color:#444;font-size:.92rem;font-weight:300;line-height:1.75;margin-bottom:1.5rem;}
+.meso-rows{display:flex;flex-direction:column;gap:.55rem;}
+.meso-row{display:flex;justify-content:space-between;align-items:center;padding:.7rem 1rem;background:rgba(255,255,255,.6);border-radius:12px;font-size:.84rem;}
+.meso-row span:first-child{color:#444;}
+
+/* CORPORAL */
+.corp-sec{background:var(--sage);position:relative;overflow:hidden;}
+.corp-in{max-width:1200px;margin:0 auto;padding:6rem 3rem;position:relative;z-index:2;}
+.corp-hd{text-align:center;margin-bottom:3rem;}
+.corp-hd .eyebrow{color:rgba(44,74,60,.75);}
+.corp-hd h2{font-size:clamp(2rem,4vw,3rem);color:var(--dark);}
+.corp-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:1.4rem;}
+.corp-card{background:rgba(255,255,255,.55);border-radius:18px;padding:2rem 1.5rem;}
+.corp-card h3{font-family:'Poppins',sans-serif;font-size:.95rem;font-weight:600;color:var(--dark);margin-bottom:.45rem;}
+.corp-card p{font-size:.8rem;color:#555;margin-bottom:1rem;font-weight:300;line-height:1.6;}
+.corp-pills{display:flex;flex-wrap:wrap;gap:.45rem;}
+
+/* ODONTOLOGIA */
+.odonto-sec{background:var(--sky-light);position:relative;overflow:hidden;}
+.odonto-in{max-width:1280px;margin:0 auto;padding:6rem 3rem;position:relative;z-index:2;}
+.odonto-hd{text-align:center;margin-bottom:3rem;}
+.odonto-hd .eyebrow{color:var(--petrol);}
+.odonto-hd h2{font-size:clamp(2rem,4vw,3rem);color:var(--dark);}
+.odonto-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:1.2rem;}
+.ocard{background:rgba(255,255,255,.65);border-radius:16px;padding:1.4rem 1.1rem;text-align:center;}
+.ocard h3{font-family:'Poppins',sans-serif;font-size:.84rem;font-weight:600;color:var(--dark);margin-bottom:.45rem;}
+.ocard p{font-size:.73rem;color:#555;margin-bottom:.9rem;line-height:1.5;}
+.ocard .oprice{font-family:'Cormorant Garamond',serif;font-size:1.35rem;color:var(--petrol);font-weight:600;display:block;}
+.ocard .oprice2{font-size:.72rem;color:#777;}
+
+/* EQUIPO */
+.team-sec{background:linear-gradient(135deg,var(--rose-pale) 0%,#e8d0ea 100%);position:relative;overflow:hidden;}
+.team-in{max-width:1300px;margin:0 auto;padding:6rem 3rem;position:relative;z-index:2;}
+.team-hd{text-align:center;margin-bottom:3rem;}
+.team-hd .eyebrow{color:var(--lilac-dk);}
+.team-hd h2{font-size:clamp(2rem,4vw,3rem);color:var(--dark);}
+.team-hd p{color:#666;font-size:.92rem;font-weight:300;margin-top:.7rem;}
+.team-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:1.2rem;}
+.tcard{border-radius:18px;overflow:hidden;position:relative;height:360px;cursor:none;transition:transform .4s,box-shadow .4s;background:var(--lavender);}
+.tcard:hover{transform:translateY(-7px);box-shadow:0 24px 48px rgba(107,91,138,.2);}
+.tcard:hover .tcard-lbl{opacity:1;}
+.tcard-lbl{position:absolute;bottom:0;left:0;right:0;padding:1rem;background:linear-gradient(to top,rgba(46,33,104,.88),transparent);opacity:0;transition:opacity .35s;}
+.tcard-lbl h4{font-size:.95rem;color:#fff;font-family:'Cormorant Garamond',serif;font-weight:600;margin-bottom:.15rem;}
+.tcard-lbl p{font-size:.7rem;color:rgba(255,255,255,.82);}
+.tcard img{width:100%;height:100%;object-fit:cover;object-position:center 38%;display:block;transition:transform .5s;}
+.tcard:hover img{transform:scale(1.04);}
+.tcard-nophoto{display:flex;flex-direction:column;align-items:center;justify-content:center;background:linear-gradient(135deg,var(--lavender),var(--lilac-dk));}
+.tcard-nophoto .tcard-overlay{display:flex;flex-direction:column;align-items:center;justify-content:center;position:absolute;inset:0;background:none;padding:1.5rem;text-align:center;}
+.tcard-nophoto .tcard-overlay h4{font-size:1.1rem;color:#fff;font-family:'Cormorant Garamond',serif;font-weight:600;margin-bottom:.4rem;}
+.tcard-nophoto .tcard-overlay p{font-size:.78rem;color:rgba(255,255,255,.85);}
+.tcard-initials{font-family:'Cormorant Garamond',serif;font-size:4.5rem;color:rgba(255,255,255,.45);line-height:1;margin-bottom:.8rem;}
+
+/* INSTAGRAM */
+.ig-sec{background:var(--dark);color:#fff;padding:4rem 3rem;text-align:center;}
+.ig-sec h2{font-size:clamp(1.8rem,3vw,2.5rem);margin-bottom:.8rem;}
+.ig-sec h2 em{color:var(--lavender);font-style:italic;}
+.ig-sec p{color:rgba(255,255,255,.6);margin-bottom:2rem;font-weight:300;}
+.ig-link{display:inline-flex;align-items:center;gap:.8rem;padding:.9rem 2rem;border:1px solid var(--lavender);border-radius:50px;color:var(--lavender);transition:all .3s;font-size:.9rem;}
+.ig-link:hover{background:var(--lavender);color:var(--deep);}
+
+/* TESTI */
+.testi-sec{background:var(--soft-white);padding:6rem 3rem;}
+.testi-in{max-width:1200px;margin:0 auto;}
+.testi-hd{text-align:center;margin-bottom:3rem;}
+.testi-hd .eyebrow{color:var(--lilac-dk);}
+.testi-hd h2{font-size:clamp(2rem,3.5vw,2.8rem);color:var(--dark);}
+.testi-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:2rem;}
+.testimonial{background:var(--cream);padding:2.2rem 2rem;border-radius:18px;position:relative;}
+.testimonial::before{content:'"';position:absolute;top:-10px;left:18px;font-family:'Cormorant Garamond',serif;font-size:6rem;color:var(--lilac-dk);opacity:.13;line-height:1;}
+.stars{color:var(--gold);margin-bottom:.9rem;letter-spacing:3px;}
+.testi-text{font-size:.92rem;color:var(--dark);margin-bottom:1.4rem;font-style:italic;position:relative;z-index:2;font-weight:300;}
+.testi-author{display:flex;align-items:center;gap:.9rem;border-top:1px solid var(--lilac);padding-top:1.1rem;}
+.avatar{width:44px;height:44px;border-radius:50%;background:linear-gradient(135deg,var(--rose-pale),var(--lavender));display:flex;align-items:center;justify-content:center;font-family:'Cormorant Garamond',serif;font-size:1.2rem;color:var(--dark);font-weight:500;}
+.testi-author strong{display:block;font-size:.9rem;color:var(--dark);font-weight:600;}
+.testi-author small{color:#777;font-size:.76rem;}
+
+/* UBI */
+.ubi-sec{background:var(--cream);padding:6rem 3rem;}
+.ubi-in{max-width:1200px;margin:0 auto;}
+.ubi-hd{text-align:center;margin-bottom:3rem;}
+.ubi-hd .eyebrow{color:var(--lilac-dk);}
+.ubi-hd h2{font-size:clamp(2rem,3.5vw,2.8rem);color:var(--dark);}
+.ubi-grid{display:grid;grid-template-columns:1fr 1fr;gap:3rem;align-items:stretch;}
+.ubi-block{margin-bottom:1.7rem;}
+.ubi-block strong{display:block;font-size:.69rem;letter-spacing:2px;text-transform:uppercase;color:var(--lilac-dk);margin-bottom:.4rem;font-weight:600;}
+.ubi-block p{color:var(--dark);font-size:.93rem;}
+.map-wrap{border-radius:18px;overflow:hidden;height:420px;}
+.map-wrap iframe{width:100%;height:100%;border:0;filter:saturate(80%) hue-rotate(200deg) brightness(1.05);}
+
+/* CTA BANNER */
+.cta-banner{background:linear-gradient(135deg,var(--lilac-dk),var(--deep));color:#fff;text-align:center;padding:6rem 3rem;position:relative;overflow:hidden;}
+.cta-banner::before{content:'';position:absolute;top:-100px;right:-100px;width:400px;height:400px;border-radius:50%;background:radial-gradient(circle,rgba(255,255,255,.1),transparent 70%);}
+.cta-banner h2{font-size:clamp(2.2rem,4.5vw,3.4rem);margin-bottom:1.2rem;}
+.cta-banner h2 em{color:var(--gold);font-style:italic;}
+.cta-banner p{margin:0 auto 2.2rem;opacity:.85;font-size:.98rem;max-width:580px;font-weight:300;}
+
+/* FOOTER */
+footer{background:var(--deep);color:#fff;padding:4.5rem 3rem 2rem;}
+.footer-grid{display:grid;grid-template-columns:2fr 1fr 1fr 1fr;gap:3rem;max-width:1280px;margin:0 auto 3rem;}
+.footer-grid h4{font-family:'Poppins',sans-serif;font-size:.73rem;letter-spacing:2px;text-transform:uppercase;color:var(--lavender);margin-bottom:1.2rem;font-weight:500;}
+.footer-logo{font-family:'Cormorant Garamond',serif;font-size:2rem;font-style:italic;font-weight:600;color:#fff;display:block;margin-bottom:.9rem;}
+.footer-grid ul{list-style:none;}
+.footer-grid ul li{margin-bottom:.65rem;}
+.footer-grid ul li a{font-size:.83rem;color:rgba(255,255,255,.55);transition:color .2s;}
+.footer-grid ul li a:hover{color:var(--lavender);}
+.footer-grid p{font-size:.83rem;color:rgba(255,255,255,.55);max-width:300px;font-weight:300;}
+.footer-bottom{border-top:1px solid rgba(255,255,255,.1);padding-top:1.8rem;text-align:center;font-size:.76rem;color:rgba(255,255,255,.3);max-width:1280px;margin:0 auto;}
+
+/* CHAT */
+.chat-btn{position:fixed;bottom:30px;right:30px;width:64px;height:64px;border-radius:50%;background:linear-gradient(135deg,var(--rose),var(--lilac-dk));color:#fff;border:none;cursor:none;z-index:200;box-shadow:0 10px 30px rgba(107,91,138,.4);display:flex;align-items:center;justify-content:center;font-size:1.6rem;transition:all .3s;}
+.chat-btn:hover{transform:scale(1.08);}
+.chat-btn .notif-dot{position:absolute;top:4px;right:4px;width:14px;height:14px;border-radius:50%;background:var(--gold);border:2px solid #fff;animation:pulse 2s infinite;}
+@keyframes pulse{0%,100%{transform:scale(1);box-shadow:0 0 0 0 rgba(201,169,110,.6);}50%{transform:scale(1.15);box-shadow:0 0 0 10px rgba(201,169,110,0);}}
+.chat-hint{position:fixed;bottom:105px;right:30px;background:var(--deep);color:#fff;padding:.85rem 1.2rem;border-radius:12px;font-size:.85rem;z-index:199;box-shadow:0 10px 25px rgba(0,0,0,.15);max-width:240px;animation:hint-in .5s ease;cursor:none;}
+.chat-hint::after{content:'';position:absolute;bottom:-6px;right:25px;width:12px;height:12px;background:var(--deep);transform:rotate(45deg);}
+@keyframes hint-in{from{opacity:0;transform:translateY(10px);}to{opacity:1;transform:translateY(0);}}
+.chat-window{position:fixed;bottom:110px;right:30px;width:380px;height:570px;max-height:80vh;background:var(--soft-white);border-radius:20px;overflow:hidden;z-index:201;box-shadow:0 20px 60px rgba(46,33,104,.25);display:flex;flex-direction:column;transform:scale(0);opacity:0;transform-origin:bottom right;transition:transform .3s cubic-bezier(.4,0,.2,1),opacity .3s;pointer-events:none;}
+.chat-window.open{transform:scale(1);opacity:1;pointer-events:auto;}
+.chat-header{background:linear-gradient(135deg,var(--deep),var(--lilac-dk));color:#fff;padding:1.2rem 1.3rem;display:flex;align-items:center;gap:.85rem;}
+.chat-avatar{width:42px;height:42px;border-radius:50%;background:var(--rose);display:flex;align-items:center;justify-content:center;font-family:'Cormorant Garamond',serif;font-size:1.2rem;color:#fff;font-weight:500;}
+.chat-info strong{display:block;font-size:.95rem;font-weight:500;}
+.chat-info small{font-size:.75rem;color:rgba(255,255,255,.7);display:flex;align-items:center;gap:.3rem;}
+.chat-info small::before{content:'';width:7px;height:7px;border-radius:50%;background:#5FD068;display:inline-block;animation:pulse-g 2s infinite;}
+@keyframes pulse-g{0%,100%{opacity:1;}50%{opacity:.5;}}
+.chat-close{margin-left:auto;background:none;border:none;color:#fff;font-size:1.4rem;cursor:none;opacity:.7;transition:opacity .2s;}
+.chat-close:hover{opacity:1;}
+.chat-messages{flex:1;padding:1.2rem;overflow-y:auto;background:var(--cream);display:flex;flex-direction:column;gap:.7rem;}
+.msg{max-width:78%;padding:.75rem 1rem;border-radius:16px;font-size:.88rem;line-height:1.4;animation:msg-in .3s ease;white-space:pre-wrap;word-break:break-word;}
+@keyframes msg-in{from{opacity:0;transform:translateY(8px);}to{opacity:1;transform:translateY(0);}}
+.msg.bot{background:#fff;color:var(--dark);border-top-left-radius:4px;align-self:flex-start;box-shadow:0 2px 8px rgba(0,0,0,.06);}
+.msg.user{background:linear-gradient(135deg,var(--rose),var(--lilac-dk));color:#fff;border-top-right-radius:4px;align-self:flex-end;}
+.msg .codigo-badge{display:block;margin-top:8px;padding:6px 10px;background:#E8F5E9;color:#1B5E20;border-radius:8px;font-size:11px;font-weight:700;border:1px solid #A5D6A7;}
+.chat-quick{padding:.8rem 1rem 0;background:var(--cream);display:flex;gap:.4rem;flex-wrap:wrap;}
+.chat-quick button{background:#fff;color:var(--dark);border:1px solid var(--lilac);padding:.4rem .85rem;border-radius:50px;font-size:.73rem;cursor:none;transition:all .2s;font-family:'Poppins',sans-serif;}
+.chat-quick button:hover{background:var(--rose);color:#fff;border-color:var(--rose);}
+.chat-input-area{padding:.9rem 1rem;background:#fff;display:flex;gap:.6rem;align-items:center;border-top:1px solid var(--lilac);}
+.chat-input-area input{flex:1;padding:.7rem 1rem;border:1px solid var(--lilac);border-radius:50px;font-family:'Poppins',sans-serif;font-size:.88rem;outline:none;background:var(--cream);color:var(--dark);transition:border-color .2s;cursor:none;}
+.chat-input-area input:focus{border-color:var(--lilac-dk);}
+.chat-input-area input:disabled{opacity:.5;}
+.chat-send{width:40px;height:40px;border-radius:50%;background:linear-gradient(135deg,var(--rose),var(--lilac-dk));color:#fff;border:none;cursor:none;display:flex;align-items:center;justify-content:center;font-size:1.1rem;transition:all .2s;}
+.chat-send:hover{transform:scale(1.08);}
+.chat-send:disabled{opacity:.5;cursor:not-allowed;transform:none;}
+.chat-powered{font-size:9px;color:#999;text-align:center;padding:4px 0 8px;background:#fff;}
+
+/* RESPONSIVE */
+@media(max-width:1024px){
+  .hf-in,.emy-in,.arm-in,.sculptra-in,.exo-in,.meso-body,.ubi-grid{grid-template-columns:1fr;gap:3rem;}
+  .emy-treats{grid-template-columns:1fr;}
+  .odonto-grid{grid-template-columns:repeat(3,1fr);}
+  .team-grid{grid-template-columns:repeat(3,1fr);}
+  .testi-grid{grid-template-columns:1fr;}
+  .footer-grid{grid-template-columns:1fr 1fr;gap:2rem;}
+  .botox-cols{grid-template-columns:1fr 1fr;gap:1.5rem;}
+  .botox-div{display:none;}
+}
+@media(max-width:768px){
+  nav{padding:1rem 1.2rem;}
+  nav.scrolled{padding:.7rem 1.2rem;}
+  .nav-links{display:none;position:fixed;top:70px;left:0;right:0;background:rgba(255,255,255,.97);flex-direction:column;gap:0;padding:1.5rem;box-shadow:0 10px 20px rgba(0,0,0,.05);}
+  .nav-links.mobile-open{display:flex;}
+  .nav-links a{padding:.8rem 0;border-bottom:1px solid var(--lilac);width:100%;color:var(--dark)!important;}
+  .menu-toggle{display:block;}
+  .hero-cards{grid-template-columns:1fr 1fr;}
+  .hero-in,.hf-in,.emy-in,.arm-in{padding:4rem 1.2rem;}
+  .sculptra-in,.exo-in,.profhilo-in,.botox-in,.meso-in,.corp-in,.odonto-in{padding:4rem 1.2rem;}
+  .arm-circle{width:220px;height:220px;}
+  .arm-deco{width:260px;height:260px;}
+  .botox-cols{grid-template-columns:1fr;}
+  .corp-grid{grid-template-columns:1fr;}
+  .odonto-grid{grid-template-columns:repeat(2,1fr);}
+  .team-grid{grid-template-columns:repeat(2,1fr);}
+  .tcard{height:280px;}
+  .chat-window{width:calc(100% - 20px);right:10px;bottom:90px;height:75vh;}
+  .chat-btn{bottom:20px;right:20px;}
+  .profhilo-cards{flex-direction:column;align-items:center;}
+  .testi-sec,.ubi-sec{padding:4rem 1.2rem;}
+  footer{padding:3rem 1.2rem 2rem;}
+  .footer-grid{grid-template-columns:1fr;gap:2rem;}
+  .ig-sec,.cta-banner{padding:3.5rem 1.2rem;}
+}
+@media(max-width:500px){
+  .hero-cards{grid-template-columns:1fr;}
+  .odonto-grid{grid-template-columns:1fr 1fr;}
+  .team-grid{grid-template-columns:1fr;}
+  .emy-treats{grid-template-columns:1fr;}
+  .hf-stats,.emy-specs{grid-template-columns:repeat(3,1fr);}
+  .hero-stats{gap:1.5rem;}
+}
+</style>
+</head>
+<body>
+
+<div class="cursor-dot" id="cursorDot"></div>
+<div class="cursor-ring" id="cursorRing"></div>
+
+<!-- NAV -->
+<nav id="mainNav">
+  <a href="#" class="logo">Barcelona</a>
+  <div class="nav-links" id="navLinks">
+    <a href="#hydrafacial">Hydrafacial</a>
+    <a href="#endymed">Endymed Pro</a>
+    <a href="#armonizacion">Tratamientos</a>
+    <a href="#equipo">Equipo</a>
+    <a href="#ubicacion">Ubicación</a>
+    <button class="btn-nav" onclick="openChat()">Reservar Hora</button>
+  </div>
+  <button class="menu-toggle" onclick="toggleMobileMenu()">☰</button>
+</nav>
+
+<!-- HERO -->
+<section class="hero-sec">
+  <svg class="s-deco" style="top:15%;left:1.5rem;width:55px;height:280px;opacity:.18;" viewBox="0 0 55 280" fill="none">
+    <path d="M28 0 C5 70 50 140 28 210 C5 280 50 350 28 280" stroke="white" stroke-width="2.5" fill="none"/>
+  </svg>
+  <div class="hero-in fi">
+    <div class="hero-logo-row">
+      <svg width="55" height="75" viewBox="0 0 55 75" fill="none">
+        <path d="M45,8 Q8,37 45,66" stroke="white" stroke-width="2" fill="none" opacity=".55"/>
+        <path d="M36,4 Q4,37 36,70" stroke="white" stroke-width="1.2" fill="none" opacity=".32"/>
+      </svg>
+      <div>
+        <span class="hero-logo-text">Barcelona</span>
+        <span class="hero-logo-sub">Clínica Estética &amp; Dental · Puerto Varas</span>
+      </div>
+    </div>
+    <h1 class="hero-h1">Tratamientos</h1>
+    <p class="hero-sub">Estética facial, medicina estética y odontología de alta tecnología en el sur de Chile</p>
+    <div class="hero-cards">
+      <a href="#hydrafacial" class="hcard feat">
+        <span class="hcard-badge">★ EXCLUSIVA PUERTO VARAS</span>
+        <span class="hcard-icon">◈</span>
+        <h3>Hydrafacial</h3>
+        <p>7 tratamientos en 1 sesión. Limpieza, extracción, hidratación y fototerapia LED.</p>
+      </a>
+      <a href="#endymed" class="hcard feat">
+        <span class="hcard-badge">★ EXCLUSIVA PUERTO VARAS</span>
+        <span class="hcard-icon">◉</span>
+        <h3>Endymed Pro</h3>
+        <p>Radiofrecuencia 3DEEP. Bioestimulación de colágeno y tensado facial sin cirugía.</p>
+      </a>
+      <a href="#armonizacion" class="hcard">
+        <span class="hcard-icon">✦</span>
+        <h3>Armonización Facial</h3>
+        <p>Botox, ácido hialurónico, hilos PDO, rellenos y rinomodelación.</p>
+      </a>
+      <a href="#bioestimulacion" class="hcard">
+        <span class="hcard-icon">✧</span>
+        <h3>Bioestimulación</h3>
+        <p>Sculptra, Exosomas Purasomes NC150+, Profhilo y Mesoterapia.</p>
+      </a>
+      <a href="#corporal" class="hcard">
+        <span class="hcard-icon">❋</span>
+        <h3>Estética Corporal</h3>
+        <p>Depilación láser diodo, RF corporal y enzimas lipolíticas.</p>
+      </a>
+      <a href="#odontologia" class="hcard">
+        <span class="hcard-icon">◎</span>
+        <h3>Odontología</h3>
+        <p>Limpieza, blanqueamiento, brackets, ortodoncia y odontopediatría.</p>
+      </a>
+    </div>
+    <div class="hero-stats">
+      <div class="hstat"><div class="hstat-num">2023</div><div class="hstat-label">Inauguración</div></div>
+      <div class="hstat"><div class="hstat-num">5</div><div class="hstat-label">Profesionales</div></div>
+      <div class="hstat"><div class="hstat-num">★ 5.0</div><div class="hstat-label">Valoración</div></div>
+      <div class="hstat"><div class="hstat-num">2</div><div class="hstat-label">Tecnologías Exclusivas</div></div>
+    </div>
+  </div>
+</section>
+
+<!-- MARQUEE -->
+<div class="marquee">
+  <div class="marquee-track">
+    <span>Hydrafacial</span><span>Armonización Facial</span><span>Endymed Pro</span><span>Botox</span><span>Mesoterapia</span><span>Sculptra</span><span>Exosomas</span><span>Profhilo</span><span>Depilación Láser</span><span>Odontología</span>
+    <span>Hydrafacial</span><span>Armonización Facial</span><span>Endymed Pro</span><span>Botox</span><span>Mesoterapia</span><span>Sculptra</span><span>Exosomas</span><span>Profhilo</span><span>Depilación Láser</span><span>Odontología</span>
+  </div>
+</div>
+
+<div class="wave" style="background:var(--beige);">
+  <svg viewBox="0 0 1440 70" xmlns="http://www.w3.org/2000/svg" preserveAspectRatio="none">
+    <path d="M0,0 L1440,0 C1080,70 360,0 0,70 Z" fill="#2D2D2D"/>
+  </svg>
+</div>
+
+<!-- HYDRAFACIAL -->
+<section class="hf-sec" id="hydrafacial">
+  <svg class="s-deco" style="right:1.5rem;top:50%;transform:translateY(-50%);width:55px;height:300px;opacity:.14;" viewBox="0 0 55 300" fill="none">
+    <path d="M28 0 C5 75 50 150 28 225 C5 300 50 375 28 300" stroke="#E8896A" stroke-width="2.5" fill="none"/>
+  </svg>
+  <div class="hf-in">
+    <div class="hf-text fi">
+      <span class="eyebrow" style="color:var(--terracotta);">★ Exclusiva en Puerto Varas</span>
+      <h2>Hydrafacial —<br><em>tu mejor piel</em> en 1 sesión</h2>
+      <p class="lead">El único tratamiento que combina 7 pasos en una sola sesión: limpieza profunda, exfoliación, extracción sin dolor, hidratación activa y fototerapia LED. Sin tiempo de recuperación. Resultados visibles desde el primer día.</p>
+
+      <div class="hf-excl">◈ 7 en 1 · Sin Downtime · Resultados inmediatos</div>
+
+      <div class="hf-steps">
+        <div class="hf-step"><span class="hf-snum">01</span><div><strong>Drenaje Linfático</strong><span>Succión suave que desintoxica y reduce inflamación</span></div></div>
+        <div class="hf-step"><span class="hf-snum">02</span><div><strong>Microdermoabrasión</strong><span>Exfoliación física que elimina células muertas</span></div></div>
+        <div class="hf-step"><span class="hf-snum">03</span><div><strong>Peeling Suave</strong><span>Exfoliación química que desobstruye poros sin irritar</span></div></div>
+        <div class="hf-step"><span class="hf-snum">04</span><div><strong>Extracción sin dolor</strong><span>Resurfacing que potencia la absorción de activos</span></div></div>
+        <div class="hf-step"><span class="hf-snum">05</span><div><strong>Boosters Activos</strong><span>Serums especializados para tu tipo de piel</span></div></div>
+        <div class="hf-step"><span class="hf-snum">06</span><div><strong>Fototerapia LED</strong><span>Luz roja estimula colágeno · Luz azul controla bacterias</span></div></div>
+        <div class="hf-step"><span class="hf-snum">07</span><div><strong>Infusión Hidratante</strong><span>Serum antioxidante que sella y nutre la piel</span></div></div>
+      </div>
+
+      <div class="hf-stats">
+        <div class="hf-stat"><span>100%</span><span>reducción de poros visible</span></div>
+        <div class="hf-stat"><span>90%</span><span>menos líneas de expresión</span></div>
+        <div class="hf-stat"><span>1</span><span>sesión para ver resultados</span></div>
+      </div>
+
+      <p class="hf-plans-title">Experiencias disponibles</p>
+      <div class="hf-plan">
+        <div class="hf-plan-l">
+          <h4>Experiencia Platinum</h4>
+          <small>60 minutos</small>
+          <div class="hf-plan-specs"><span class="hf-spec">Esculpe</span><span class="hf-spec">Limpia</span><span class="hf-spec">Extrae</span><span class="hf-spec">Nutre</span><span class="hf-spec">Hidrata</span><span class="hf-spec">Rejuvenece</span></div>
+        </div>
+        <span class="pill terracotta lg">$99.990</span>
+      </div>
+      <div class="hf-plan">
+        <div class="hf-plan-l">
+          <h4>Experiencia Intermedia</h4>
+          <small>45 minutos</small>
+        </div>
+        <span class="pill terracotta lg">$84.990</span>
+      </div>
+      <div class="hf-plan">
+        <div class="hf-plan-l">
+          <h4>Experiencia Signature</h4>
+          <small>30 minutos</small>
+        </div>
+        <span class="pill terracotta lg">$69.990</span>
+      </div>
+
+      <div style="display:flex;gap:.8rem;flex-wrap:wrap;margin-top:1.8rem;">
+        <button class="btn btn-terracotta" onclick="openChatWith('Quiero reservar un Hydrafacial')">Reservar Hydrafacial</button>
+        <button class="btn btn-outline-white" style="color:var(--dark);border-color:var(--dark);" onclick="openChatWith('Quiero info del Hydrafacial')">Consultar</button>
+      </div>
+    </div>
+
+    <div class="hf-vis fi">
+      <div style="position:relative;margin-bottom:1rem;">
+        <img class="hf-machine" src="hf-maquina.png" alt="Máquina Hydrafacial" onerror="this.style.display='none'" />
+        <div class="hf-float">✦ 7 en 1 · Sin Downtime</div>
+      </div>
+      <img class="hf-result" src="hf-resultado.png" alt="Resultado Hydrafacial — Antes y Después" onerror="this.style.display='none'" />
+      <p class="hf-result-cap">✦ Resultado real · Antes &amp; Después</p>
+    </div>
+  </div>
+</section>
+
+<div class="wave" style="background:#1e1852;">
+  <svg viewBox="0 0 1440 70" xmlns="http://www.w3.org/2000/svg" preserveAspectRatio="none">
+    <path d="M0,70 C480,0 960,70 1440,0 L1440,70 Z" fill="var(--beige)"/>
+  </svg>
+</div>
+
+<!-- ENDYMED -->
+<section class="emy-sec" id="endymed">
+  <svg class="s-deco" style="left:1.5rem;top:50%;transform:translateY(-50%);width:55px;height:300px;opacity:.15;" viewBox="0 0 55 300" fill="none">
+    <path d="M28 0 C5 75 50 150 28 225 C5 300 50 375 28 300" stroke="white" stroke-width="2.5" fill="none"/>
+  </svg>
+  <div class="emy-in">
+    <div class="emy-text fi">
+      <span class="eyebrow" style="color:var(--lavender);">★ Exclusiva en Puerto Varas</span>
+      <h2>Endymed Pro —<br><em>colágeno real,</em> sin cirugía</h2>
+      <p class="lead">La tecnología 3DEEP RF con 6 generadores de radiofrecuencia simultáneos que alcanzan 52–55°C en la dermis, estimulando colágeno de forma precisa. Sin dolor, sin downtime. Presente en 80+ países — solo en Barcelona Clinic en Puerto Varas.</p>
+
+      <div class="emy-excl">◉ 3DEEP RF · 85W · 6 Generadores · 80+ países</div>
+
+      <div class="emy-specs">
+        <div class="emy-spec"><span>85W</span><span>Energía RF focalizada</span></div>
+        <div class="emy-spec"><span>6</span><span>Generadores RF simultáneos</span></div>
+        <div class="emy-spec"><span>80+</span><span>Países con esta tecnología</span></div>
+      </div>
+
+      <div class="emy-treats">
+        <div class="emy-treat">✦ Tensado y lifting facial</div>
+        <div class="emy-treat">✦ Lifting de ojos</div>
+        <div class="emy-treat">✦ Contorno mandibular</div>
+        <div class="emy-treat">✦ Cicatrices de acné</div>
+        <div class="emy-treat">✦ Reducción de arrugas</div>
+        <div class="emy-treat">✦ Estrías y cicatrices</div>
+      </div>
+
+      <p style="font-size:.78rem;letter-spacing:2px;text-transform:uppercase;font-weight:600;color:rgba(255,255,255,.55);margin-bottom:.7rem;">Sesiones y Paquetes</p>
+      <div class="emy-table">
+        <div class="emy-row"><span>Sesión contorno ojos o labios</span><span class="emy-price">$59.990</span></div>
+        <div class="emy-row"><span>Sesión contorno mandibular</span><span class="emy-price">$79.990</span></div>
+        <div class="emy-row"><span>Sesión rejuvenecimiento y tensado</span><span class="emy-price">$119.990</span></div>
+        <div class="emy-row"><span>Pack 3 sesiones contorno</span><span class="emy-price">$159.990</span></div>
+        <div class="emy-row"><span>Pack 3 sesiones rejuvenecimiento</span><span class="emy-price">$299.990</span></div>
+        <div class="emy-row"><span>Pack rejuvenecimiento + poros</span><span class="emy-price">$329.990</span></div>
+      </div>
+
+      <div style="display:flex;gap:.8rem;flex-wrap:wrap;">
+        <button class="btn btn-gold" onclick="openChatWith('Quiero reservar Endymed Pro')">Reservar Endymed Pro</button>
+        <button class="btn btn-outline-white" onclick="openChatWith('Quiero info del Endymed Pro')">Consultar</button>
+      </div>
+    </div>
+
+    <div class="emy-vis fi">
+      <div style="position:relative;">
+        <img class="emy-machine" src="endymed-maquina.png" alt="Máquina Endymed Pro" onerror="this.style.display='none'" />
+        <div class="emy-float">✦ Exclusiva Puerto Varas</div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:.8rem;margin-top:1.2rem;">
+        <div style="background:rgba(255,255,255,.07);border-radius:12px;padding:1rem;text-align:center;">
+          <div style="font-family:'Cormorant Garamond',serif;font-size:1.6rem;color:var(--gold);font-weight:600;">52–55°C</div>
+          <div style="font-size:.65rem;color:rgba(255,255,255,.6);margin-top:.2rem;">Temperatura dermis</div>
+        </div>
+        <div style="background:rgba(255,255,255,.07);border-radius:12px;padding:1rem;text-align:center;">
+          <div style="font-family:'Cormorant Garamond',serif;font-size:1.6rem;color:var(--gold);font-weight:600;">0</div>
+          <div style="font-size:.65rem;color:rgba(255,255,255,.6);margin-top:.2rem;">Downtime</div>
+        </div>
+        <div style="background:rgba(255,255,255,.07);border-radius:12px;padding:1rem;text-align:center;">
+          <div style="font-family:'Cormorant Garamond',serif;font-size:1.6rem;color:var(--gold);font-weight:600;">1ª</div>
+          <div style="font-size:.65rem;color:rgba(255,255,255,.6);margin-top:.2rem;">Sesión con resultados</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<div class="wave" style="background:var(--rose-pale);">
+  <svg viewBox="0 0 1440 70" xmlns="http://www.w3.org/2000/svg" preserveAspectRatio="none">
+    <path d="M0,0 L1440,0 C1080,70 360,0 0,70 Z" fill="#1e1852"/>
+  </svg>
+</div>
+
+<!-- ARMONIZACION -->
+<section class="arm-sec" id="armonizacion">
+  <svg class="s-deco" style="left:1.2rem;top:50%;transform:translateY(-50%);width:50px;height:280px;opacity:.13;" viewBox="0 0 50 280" fill="none">
+    <path d="M25 0 C4 70 46 140 25 210 C4 280 46 350 25 280" stroke="var(--lilac-dk)" stroke-width="2.5" fill="none"/>
+  </svg>
+  <div class="arm-in">
+    <div class="arm-text fi">
+      <span class="eyebrow" style="color:var(--lilac-dk);">Medicina Estética Facial</span>
+      <h2>Armonización<br><em>Facial</em></h2>
+      <p class="desc">Botox, ácido hialurónico, hilos PDO, rellenos y rinomodelación. Resultados naturales y armónicos de la mano de la Dra. Catalina de la Maza.</p>
+      <div class="arm-items">
+        <div class="arm-item"><div><strong>Hilos PDO</strong><small>Lifting y bioestimulación</small></div><span class="pill wine">$10.000 c/hilo</span></div>
+        <div class="arm-item"><div><strong>Relleno de ojeras</strong><small>Ácido hialurónico</small></div><span class="pill wine">$199.990</span></div>
+        <div class="arm-item"><div><strong>Relleno de labios</strong><small>Volumen natural</small></div><span class="pill wine">$229.990</span></div>
+        <div class="arm-item"><div><strong>Relleno de mentón</strong><small>Definición y proyección</small></div><span class="pill wine">$229.990</span></div>
+        <div class="arm-item"><div><strong>Contorno mandibular</strong><small>Lifting y definición</small></div><span class="pill wine">$349.990</span></div>
+        <div class="arm-item"><div><strong>Rinomodelación</strong><small>Sin cirugía</small></div><span class="pill wine">$259.990</span></div>
+      </div>
+      <div style="margin-top:1.8rem;">
+        <button class="btn btn-primary" onclick="openChatWith('Quiero info de Armonización Facial')">Reservar Hora</button>
+      </div>
+    </div>
+    <div style="display:flex;flex-direction:column;align-items:center;position:relative;" class="fi">
+      <div class="arm-deco"></div>
+      <img class="arm-circle" src="catalina.png" alt="Dra. Catalina de la Maza" onerror="this.style.background='linear-gradient(135deg,var(--lavender),var(--lilac-dk))';this.removeAttribute('src');" />
+      <div style="text-align:center;margin-top:1rem;">
+        <strong style="font-family:'Cormorant Garamond',serif;font-size:1.2rem;color:var(--dark);">Dra. Catalina de la Maza</strong>
+        <p style="font-size:.78rem;color:#666;margin-top:.2rem;">Odontología y Medicina Estética Facial</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<div class="wave" style="background:var(--salmon);">
+  <svg viewBox="0 0 1440 70" xmlns="http://www.w3.org/2000/svg" preserveAspectRatio="none">
+    <path d="M0,70 C480,0 960,70 1440,0 L1440,70 Z" fill="var(--rose-pale)"/>
+  </svg>
+</div>
+
+<!-- BOTOX -->
+<section class="botox-sec">
+  <svg class="s-deco" style="right:1.2rem;top:50%;transform:translateY(-50%);width:50px;height:280px;opacity:.13;" viewBox="0 0 50 280" fill="none">
+    <path d="M25 0 C4 70 46 140 25 210 C4 280 46 350 25 280" stroke="white" stroke-width="2.5" fill="none"/>
+  </svg>
+  <div class="botox-in">
+    <div class="botox-hd fi">
+      <span class="eyebrow" style="color:rgba(107,91,138,.7);">Toxina Botulínica</span>
+      <h2>Botox</h2>
+    </div>
+    <div class="botox-cols fi">
+      <div class="bcol">
+        <img class="bcol-img" src="catalina.png" alt="Aplicación Botox 3 zonas" onerror="this.style.display='none'" />
+        <h3>3 Zonas · 50UI</h3>
+        <p class="desc">Distribución en 3 zonas del rostro. Frente, entrecejo y patas de gallo. Resultados naturales.</p>
+        <span class="pill wine lg">$199.990</span>
+      </div>
+      <div class="botox-div">
+        <svg width="2" height="200" viewBox="0 0 2 200" fill="none">
+          <path d="M1 0 Q30 50 1 100 Q-28 150 1 200" stroke="rgba(107,91,138,.4)" stroke-width="2" fill="none"/>
+        </svg>
+      </div>
+      <div class="bcol">
+        <img class="bcol-img" src="catalina.png" alt="Aplicación Botox full face" onerror="this.style.display='none'" />
+        <h3>Full Face · 100UI</h3>
+        <p class="desc">Distribución en 6 zonas del rostro, superior e inferior. Lifting facial y eliminación de arrugas.</p>
+        <span class="pill wine lg">$349.990</span>
+      </div>
+    </div>
+    <div style="text-align:center;margin-top:2rem;" class="fi">
+      <button class="btn btn-primary" onclick="openChatWith('Quiero info de Botox')">Reservar Botox</button>
+    </div>
+  </div>
+</section>
+
+<div class="wave" style="background:var(--wine);">
+  <svg viewBox="0 0 1440 70" xmlns="http://www.w3.org/2000/svg" preserveAspectRatio="none">
+    <path d="M0,0 L1440,0 C1080,70 360,0 0,70 Z" fill="var(--salmon)"/>
+  </svg>
+</div>
+
+<!-- SCULPTRA -->
+<section class="sculptra-sec" id="bioestimulacion">
+  <svg class="s-deco" style="left:1.2rem;top:50%;transform:translateY(-50%);width:50px;height:280px;opacity:.15;" viewBox="0 0 50 280" fill="none">
+    <path d="M25 0 C4 70 46 140 25 210 C4 280 46 350 25 280" stroke="white" stroke-width="2.5" fill="none"/>
+  </svg>
+  <div class="sculptra-in">
+    <div class="sculptra-text fi">
+      <span class="eyebrow">Bioestimulación Premium</span>
+      <h2>Sculptra —<br><em>colágeno desde adentro</em></h2>
+      <p>Bioestimulación en base a ácido poli-L-láctico. Estimula la producción natural de colágeno regenerando el volumen y la firmeza desde dentro.</p>
+      <button class="btn btn-outline-white" onclick="openChatWith('Quiero info de Sculptra')">Consultar</button>
+    </div>
+    <div class="sculptra-price fi">
+      <span class="slabel">Precio por sesión</span>
+      <span class="samount">$549.990</span>
+      <span class="snote">Resultados progresivos · 2–3 sesiones recomendadas</span>
+    </div>
+  </div>
+</section>
+
+<div class="wave" style="background:var(--beige);">
+  <svg viewBox="0 0 1440 70" xmlns="http://www.w3.org/2000/svg" preserveAspectRatio="none">
+    <path d="M0,70 C480,0 960,70 1440,0 L1440,70 Z" fill="var(--wine)"/>
+  </svg>
+</div>
+
+<!-- EXOSOMAS -->
+<section class="exo-sec">
+  <div class="exo-in">
+    <div class="exo-text fi">
+      <span class="eyebrow" style="color:var(--terracotta);">Regeneración Celular</span>
+      <h2>Exosomas Purasomes NC150+</h2>
+      <p>La tecnología de exosomas más avanzada para la regeneración celular profunda, estimulación de colágeno y elastina. Compatible con Endymed Pro y Botox para resultados potenciados.</p>
+      <div class="exo-prices">
+        <div class="exo-row"><span>1 sesión · Exosomas</span><span class="pill terracotta">$179.990</span></div>
+        <div class="exo-row"><span>+ Sesión RF Endymed Pro</span><span class="pill terracotta">$249.990</span></div>
+        <div class="exo-row"><span>+ Toxina Botulínica Dysport</span><span class="pill terracotta">$349.990</span></div>
+        <div class="exo-row"><span>Pack 3 sesiones Exosomas</span><span class="pill terracotta">$499.990</span></div>
+      </div>
+      <div style="margin-top:1.8rem;">
+        <button class="btn btn-primary" onclick="openChatWith('Quiero info de Exosomas')">Reservar</button>
+      </div>
+    </div>
+    <div class="fi" style="display:flex;align-items:center;justify-content:center;">
+      <div style="background:rgba(255,255,255,.6);border-radius:24px;padding:3rem 2rem;text-align:center;">
+        <div style="font-family:'Cormorant Garamond',serif;font-size:4rem;margin-bottom:.5rem;">🧬</div>
+        <h4 style="font-size:1.5rem;color:var(--dark);margin-bottom:.5rem;">NC150+</h4>
+        <p style="font-size:.8rem;color:#666;line-height:1.6;max-width:220px;">La concentración más alta de exosomas mesenquimales disponible</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<div class="wave" style="background:var(--sky);">
+  <svg viewBox="0 0 1440 70" xmlns="http://www.w3.org/2000/svg" preserveAspectRatio="none">
+    <path d="M0,0 L1440,0 C1080,70 360,0 0,70 Z" fill="var(--beige)"/>
+  </svg>
+</div>
+
+<!-- PROFHILO -->
+<section class="profhilo-sec">
+  <svg class="s-deco" style="right:1.2rem;top:50%;transform:translateY(-50%);width:50px;height:280px;opacity:.13;" viewBox="0 0 50 280" fill="none">
+    <path d="M25 0 C4 70 46 140 25 210 C4 280 46 350 25 280" stroke="var(--petrol)" stroke-width="2.5" fill="none"/>
+  </svg>
+  <div class="profhilo-in">
+    <div class="profhilo-hd fi">
+      <span class="eyebrow" style="color:var(--petrol);">Bioestimulación &amp; Hidratación Ultra Pura</span>
+      <h2>Profhilo</h2>
+      <p>Bioestimulación de colágeno y plena hidratación de la piel en base a ácido hialurónico de grado ultra puro. Dos formulaciones para resultados distintos.</p>
+    </div>
+    <div class="profhilo-cards fi">
+      <div class="profhilo-card">
+        <h4>Face</h4>
+        <p>Hidratación profunda y firmeza. Piel radiante y rejuvenecida.</p>
+        <div class="big-price">$279.990</div>
+        <div style="font-size:.72rem;color:#999;margin-top:.3rem;">por sesión</div>
+      </div>
+      <div class="profhilo-card">
+        <h4>Structura</h4>
+        <p>Reestructuración y definición del contorno facial.</p>
+        <div class="big-price">$319.990</div>
+        <div style="font-size:.72rem;color:#999;margin-top:.3rem;">por sesión</div>
+      </div>
+    </div>
+    <div style="text-align:center;margin-top:2rem;" class="fi">
+      <button class="btn btn-primary" onclick="openChatWith('Quiero info de Profhilo')">Reservar Profhilo</button>
+    </div>
+  </div>
+</section>
+
+<div class="wave" style="background:var(--sage);">
+  <svg viewBox="0 0 1440 70" xmlns="http://www.w3.org/2000/svg" preserveAspectRatio="none">
+    <path d="M0,70 C480,0 960,70 1440,0 L1440,70 Z" fill="var(--sky)"/>
+  </svg>
+</div>
+
+<!-- MESOTERAPIA -->
+<section class="meso-sec" id="mesoterapia">
+  <svg class="s-deco" style="left:1.2rem;top:50%;transform:translateY(-50%);width:50px;height:280px;opacity:.13;" viewBox="0 0 50 280" fill="none">
+    <path d="M25 0 C4 70 46 140 25 210 C4 280 46 350 25 280" stroke="var(--petrol)" stroke-width="2.5" fill="none"/>
+  </svg>
+  <div class="meso-in">
+    <div class="meso-hd fi">
+      <span class="eyebrow" style="color:var(--petrol);">Vitaminas y Activos</span>
+      <h2>Mesoterapia Vitaminas</h2>
+    </div>
+    <div class="meso-body">
+      <div class="fi">
+        <p>Tratamiento de microinyecciones de vitaminas directamente en la piel, bioestimulando el colágeno para lograr una piel más luminosa. Atenúa arrugas y ayuda a eliminar manchas. Compatible con todos los tipos de piel.</p>
+        <button class="btn btn-primary" style="margin-top:1.5rem;" onclick="openChatWith('Quiero info de Mesoterapia')">Reservar</button>
+      </div>
+      <div class="fi">
+        <div class="meso-rows">
+          <div class="meso-row"><span>Mesoterapia Team Glow</span><span class="pill petrol">$79.990</span></div>
+          <div class="meso-row"><span>Mesoterapia NCTF</span><span class="pill petrol">$149.990</span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<div class="wave" style="background:var(--sky-light);">
+  <svg viewBox="0 0 1440 70" xmlns="http://www.w3.org/2000/svg" preserveAspectRatio="none">
+    <path d="M0,0 L1440,0 C1080,70 360,0 0,70 Z" fill="var(--sage)"/>
+  </svg>
+</div>
+
+<!-- CORPORAL -->
+<section class="corp-sec" id="corporal">
+  <div class="corp-in">
+    <div class="corp-hd fi">
+      <span class="eyebrow" style="color:rgba(44,74,60,.75);">Tratamientos Corporales</span>
+      <h2>Estética Corporal</h2>
+    </div>
+    <div class="corp-grid fi">
+      <div class="corp-card">
+        <h3>Depilación Láser Diodo</h3>
+        <p>6 sesiones pierna completa + axila + rebaje de vello. Resultado definitivo y sin dolor.</p>
+        <div class="corp-pills">
+          <span class="pill" style="background:rgba(44,74,60,.7);">Pierna c/axila · $150.000</span>
+        </div>
+      </div>
+      <div class="corp-card">
+        <h3>Depilación Láser · Pack</h3>
+        <p>6 sesiones axila + media pierna + rebaje. Ideal para zonas específicas.</p>
+        <div class="corp-pills">
+          <span class="pill" style="background:rgba(44,74,60,.7);">Axila + ½ pierna · $120.000</span>
+        </div>
+      </div>
+      <div class="corp-card">
+        <h3>Remodelación RF &amp; Enzimas</h3>
+        <p>Radiofrecuencia corporal y enzimas lipolíticas. Reducción de medidas y tratamiento de estrías.</p>
+        <div class="corp-pills">
+          <span class="pill" style="background:rgba(44,74,60,.7);">Remodelación · $79.990</span>
+          <span class="pill" style="background:rgba(44,74,60,.7);margin-top:.3rem;">Estrías · $89.990</span>
+          <span class="pill" style="background:rgba(44,74,60,.7);margin-top:.3rem;">Enzimas lipolíticas · $109.990</span>
+        </div>
+      </div>
+    </div>
+    <div style="text-align:center;margin-top:2rem;" class="fi">
+      <button class="btn btn-primary" onclick="openChatWith('Quiero info de Estética Corporal')">Reservar</button>
+    </div>
+  </div>
+</section>
+
+<div class="wave" style="background:var(--sky-light);">
+  <svg viewBox="0 0 1440 70" xmlns="http://www.w3.org/2000/svg" preserveAspectRatio="none">
+    <path d="M0,70 C480,0 960,70 1440,0 L1440,70 Z" fill="var(--sage)"/>
+  </svg>
+</div>
+
+<!-- ODONTOLOGIA -->
+<section class="odonto-sec" id="odontologia">
+  <div class="odonto-in">
+    <div class="odonto-hd fi">
+      <span class="eyebrow" style="color:var(--petrol);">Salud Dental</span>
+      <h2>Odontología</h2>
+    </div>
+    <div class="odonto-grid fi">
+      <div class="ocard">
+        <h3>Brackets e Implantes</h3>
+        <p>Ortodoncia fija y ortopedia dental.</p>
+        <span class="oprice">$299.990</span>
+        <span class="oprice2">Instalación brackets · Controles $50.000</span>
+      </div>
+      <div class="ocard">
+        <h3>Higiene Dental</h3>
+        <p>Limpieza profesional y tapaduras estéticas.</p>
+        <span class="oprice">$34.990</span>
+        <span class="oprice2">Limpieza · Tapaduras $50.000 · Exodoncias $55.000</span>
+      </div>
+      <div class="ocard">
+        <h3>Blanqueamiento</h3>
+        <p>Tratamiento de dolor articular y bruxismo.</p>
+        <span class="oprice">$89.990</span>
+        <span class="oprice2">Blanqueamiento · Bruxismo $45.000</span>
+      </div>
+      <div class="ocard">
+        <h3>Odontopediatría</h3>
+        <p>Atención especializada para los más pequeños.</p>
+        <span class="oprice">desde $12.500</span>
+        <span class="oprice2">Menores 4 años · $15.800</span>
+      </div>
+      <div class="ocard">
+        <h3>Endodoncia</h3>
+        <p>Tratamiento de conducto sin dolor.</p>
+        <span class="oprice">desde $99.990</span>
+        <span class="oprice2">Tratamiento de conducto</span>
+      </div>
+    </div>
+    <div style="text-align:center;margin-top:2.5rem;" class="fi">
+      <button class="btn btn-primary" onclick="openChatWith('Quiero reservar hora en Odontología')">Reservar Hora Dental</button>
+    </div>
+  </div>
+</section>
+
+<div class="wave" style="background:var(--rose-pale);">
+  <svg viewBox="0 0 1440 70" xmlns="http://www.w3.org/2000/svg" preserveAspectRatio="none">
+    <path d="M0,0 L1440,0 C1080,70 360,0 0,70 Z" fill="var(--sky-light)"/>
+  </svg>
+</div>
+
+<!-- EQUIPO -->
+<section class="team-sec" id="equipo">
+  <svg class="s-deco" style="right:1.5rem;top:50%;transform:translateY(-50%);width:55px;height:300px;opacity:.13;" viewBox="0 0 55 300" fill="none">
+    <path d="M28 0 C5 75 50 150 28 225 C5 300 50 375 28 300" stroke="var(--lilac-dk)" stroke-width="2.5" fill="none"/>
+  </svg>
+  <div class="team-in">
+    <div class="team-hd fi">
+      <span class="eyebrow" style="color:var(--lilac-dk);">Nuestras Profesionales</span>
+      <h2>El equipo detrás de <em>Barcelona</em></h2>
+      <p>Especialistas certificadas y en constante actualización, comprometidas con tu cuidado y bienestar.</p>
+    </div>
+    <div class="team-grid">
+      <div class="tcard fi">
+        <img src="catalina.png" alt="Dra. Catalina de la Maza" onerror="this.parentElement.classList.add('tcard-nophoto');this.parentElement.innerHTML='<div class=\'tcard-overlay\'><div class=\'tcard-initials\'>C</div><h4>Dra. Catalina de la Maza</h4><p>Odontología y Medicina Estética Facial</p></div>'" />
+        <div class="tcard-lbl"><h4>Dra. Catalina de la Maza</h4><p>Odontología y Medicina Estética Facial</p></div>
+      </div>
+      <div class="tcard fi">
+        <img src="katherine.png" alt="Dra. Katherine Büchner" onerror="this.parentElement.classList.add('tcard-nophoto');this.parentElement.innerHTML='<div class=\'tcard-overlay\'><div class=\'tcard-initials\'>K</div><h4>Dra. Katherine Büchner</h4><p>Asesoría de Lactancia con Enfoque Odontológico</p></div>'" />
+        <div class="tcard-lbl"><h4>Dra. Katherine Büchner</h4><p>Asesoría de Lactancia con Enfoque Odontológico</p></div>
+      </div>
+      <div class="tcard fi">
+        <img src="carolina.png" alt="Dra. Carolina Minte" onerror="this.parentElement.classList.add('tcard-nophoto');this.parentElement.innerHTML='<div class=\'tcard-overlay\'><div class=\'tcard-initials\'>C</div><h4>Dra. Carolina Minte</h4><p>Ortodoncia y Ortopedia Dental</p></div>'" />
+        <div class="tcard-lbl"><h4>Dra. Carolina Minte</h4><p>Ortodoncia y Ortopedia Dental</p></div>
+      </div>
+      <div class="tcard tcard-nophoto fi">
+        <div class="tcard-initials">F</div>
+        <div class="tcard-overlay"><h4>Dra. Francisca Salvo</h4><p>Rehabilitación Oral y Estética Facial</p></div>
+      </div>
+      <div class="tcard fi">
+        <img src="marjorie.png" alt="Marjorie Orellana" onerror="this.parentElement.classList.add('tcard-nophoto');this.parentElement.innerHTML='<div class=\'tcard-overlay\'><div class=\'tcard-initials\'>M</div><h4>Marjorie Orellana</h4><p>Depilación Láser Diodo y Masajes Reductivos</p></div>'" />
+        <div class="tcard-lbl"><h4>Marjorie Orellana</h4><p>Depilación Láser Diodo y Masajes Reductivos</p></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- INSTAGRAM -->
+<section class="ig-sec">
+  <div class="fi">
+    <h2>Síguenos en <em>Instagram</em></h2>
+    <p>Resultados reales, tips de cuidado y novedades de Barcelona Clinic cada día.</p>
+    <a href="https://www.instagram.com/barcelonaclinic.pv/" target="_blank" rel="noopener" class="ig-link">◎ @barcelonaclinic.pv</a>
+  </div>
+</section>
+
+<!-- MARQUEE 2 -->
+<div class="marquee">
+  <div class="marquee-track">
+    <span>Hydrafacial</span><span>Endymed Pro</span><span>Armonización Facial</span><span>Botox</span><span>Sculptra</span><span>Exosomas</span><span>Profhilo</span><span>Mesoterapia</span><span>Depilación Láser</span><span>Odontología</span>
+    <span>Hydrafacial</span><span>Endymed Pro</span><span>Armonización Facial</span><span>Botox</span><span>Sculptra</span><span>Exosomas</span><span>Profhilo</span><span>Mesoterapia</span><span>Depilación Láser</span><span>Odontología</span>
+  </div>
+</div>
+
+<!-- TESTIMONIOS -->
+<section class="testi-sec" id="testimonios">
+  <div class="testi-in">
+    <div class="testi-hd fi">
+      <span class="eyebrow" style="color:var(--lilac-dk);">Lo que dicen de nosotras</span>
+      <h2>Experiencias <em>reales</em></h2>
+    </div>
+    <div class="testi-grid">
+      <div class="testimonial fi">
+        <div class="stars">★★★★★</div>
+        <p class="testi-text">El Hydrafacial superó todas mis expectativas. Mi piel quedó luminosa desde el primer día. El ambiente es precioso y las chicas son increíbles.</p>
+        <div class="testi-author"><div class="avatar">C</div><div><strong>Camila Rojas</strong><small>Hydrafacial Platinum</small></div></div>
+      </div>
+      <div class="testimonial fi">
+        <div class="stars">★★★★★</div>
+        <p class="testi-text">Me hice la armonización facial con la Dra. Catalina y el resultado es natural y hermoso. Muy profesional y detallista. 100% recomendada.</p>
+        <div class="testi-author"><div class="avatar">J</div><div><strong>Javiera Soto</strong><small>Armonización Facial</small></div></div>
+      </div>
+      <div class="testimonial fi">
+        <div class="stars">★★★★★</div>
+        <p class="testi-text">Vine por depilación láser con Marjorie y aproveché el Endymed Pro. Los dos tratamientos excelentes. Ya tengo mi próxima sesión agendada.</p>
+        <div class="testi-author"><div class="avatar">V</div><div><strong>Valentina Muñoz</strong><small>Láser + Endymed Pro</small></div></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- UBICACION -->
+<section class="ubi-sec" id="ubicacion">
+  <div class="ubi-in">
+    <div class="ubi-hd fi">
+      <span class="eyebrow" style="color:var(--lilac-dk);">Visítanos</span>
+      <h2>Nuestra <em>ubicación</em></h2>
+    </div>
+    <div class="ubi-grid">
+      <div class="fi">
+        <div class="ubi-block"><strong>Dirección</strong><p>Ruta 225, Tanpu<br/>5550000 Puerto Varas, Los Lagos</p></div>
+        <div class="ubi-block"><strong>Horario</strong><p>Lunes a Viernes: 9:00 — 19:30<br/>Sábados: 9:00 — 14:00<br/>Domingos: Cerrado</p></div>
+        <div class="ubi-block"><strong>Instagram</strong><p><a href="https://www.instagram.com/barcelonaclinic.pv/" target="_blank" rel="noopener" style="color:var(--rose);">@barcelonaclinic.pv</a></p></div>
+        <div class="ubi-block"><strong>Reservas</strong><p>Agenda por nuestro chat — disponible para ti siempre.</p></div>
+        <button class="btn btn-primary" onclick="openChat()" style="margin-top:1rem;">Reservar Hora</button>
+      </div>
+      <div class="map-wrap fi">
+        <iframe src="https://maps.google.com/maps?q=Ruta+225+Tanpu+Puerto+Varas+Los+Lagos&z=14&output=embed" allowfullscreen="" loading="lazy" referrerpolicy="no-referrer-when-downgrade" title="Ubicación Barcelona Clinic Puerto Varas"></iframe>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- CTA BANNER -->
+<section class="cta-banner">
+  <div class="fi">
+    <h2>Reserva tu <em>primera sesión</em></h2>
+    <p>Descubre la experiencia Barcelona Clinic en Puerto Varas. Te ayudamos a encontrar el tratamiento ideal para ti.</p>
+    <button class="btn btn-gold" onclick="openChat()">Reservar Ahora</button>
+  </div>
+</section>
+
+<!-- FOOTER -->
+<footer>
+  <div class="footer-grid">
+    <div>
+      <span class="footer-logo">Barcelona</span>
+      <p>Clínica estética y dental premium en Puerto Varas. Inaugurada en 2023 con tecnología exclusiva y profesionales certificadas para tu bienestar integral.</p>
+    </div>
+    <div>
+      <h4>Tratamientos</h4>
+      <ul>
+        <li><a href="#hydrafacial">Hydrafacial</a></li>
+        <li><a href="#endymed">Endymed Pro</a></li>
+        <li><a href="#armonizacion">Armonización Facial</a></li>
+        <li><a href="#bioestimulacion">Sculptra / Exosomas</a></li>
+        <li><a href="#corporal">Estética Corporal</a></li>
+        <li><a href="#odontologia">Odontología</a></li>
+      </ul>
+    </div>
+    <div>
+      <h4>Reservas</h4>
+      <ul>
+        <li><a href="#" onclick="openChatWith('Quiero reservar hora');return false;">Reservar hora</a></li>
+        <li><a href="#" onclick="openChatWith('Quiero cancelar mi hora');return false;">Cancelar hora</a></li>
+        <li><a href="#" onclick="openChatWith('Quiero confirmar mi hora');return false;">Confirmar hora</a></li>
+        <li><a href="#" onclick="openChatWith('¿Cuáles son los precios?');return false;">Ver precios</a></li>
+      </ul>
+    </div>
+    <div>
+      <h4>Contacto</h4>
+      <ul>
+        <li><a href="https://www.instagram.com/barcelonaclinic.pv/" target="_blank" rel="noopener">Instagram</a></li>
+        <li><a href="#" onclick="openChat();return false;">Chat</a></li>
+        <li><a href="#ubicacion">Puerto Varas, Los Lagos</a></li>
+      </ul>
+    </div>
+  </div>
+  <div class="footer-bottom">© 2026 Barcelona Clinic · Puerto Varas, Los Lagos · Todos los derechos reservados.</div>
+</footer>
+
+<!-- CHAT -->
+<button class="chat-btn" id="chat-btn" onclick="toggleChat()" aria-label="Abrir chat">
+  💬<span class="notif-dot"></span>
+</button>
+<div class="chat-window" id="chat-window">
+  <div class="chat-header">
+    <div class="chat-avatar">B</div>
+    <div class="chat-info"><strong>Barcelona Clinic</strong><small>En línea ahora</small></div>
+    <button class="chat-close" onclick="toggleChat()">×</button>
+  </div>
+  <div class="chat-messages" id="chat-messages">
+    <div class="msg bot">¡Hola! 💜 Bienvenida a Barcelona Clinic, Puerto Varas. Soy tu asistente virtual y puedo ayudarte a reservar hora, responderte sobre nuestros tratamientos, precios y profesionales. ¿En qué te puedo ayudar?</div>
+  </div>
+  <div class="chat-quick">
+    <button onclick="openChatWith('Quiero reservar hora')">Reservar hora</button>
+    <button onclick="openChatWith('Quiero info del Hydrafacial')">Hydrafacial</button>
+    <button onclick="openChatWith('Quiero info del Endymed Pro')">Endymed Pro</button>
+    <button onclick="openChatWith('¿Cuáles son los precios?')">Precios</button>
+    <button onclick="openChatWith('¿Qué horarios tienen?')">Horarios</button>
+  </div>
+  <div class="chat-input-area">
+    <input type="text" id="chat-input" placeholder="Escribe tu mensaje..." onkeydown="if(event.key==='Enter')sendMessage()" />
+    <button class="chat-send" id="chat-send" onclick="sendMessage()">➤</button>
+  </div>
+  <div class="chat-powered">Powered by Claude · Las respuestas pueden contener errores</div>
+</div>
+
+<script>
+  // Cursor
+  const dot=document.getElementById('cursorDot'),ring=document.getElementById('cursorRing');
+  let mx=0,my=0,rx=0,ry=0;
+  document.addEventListener('mousemove',e=>{mx=e.clientX;my=e.clientY;dot.style.left=mx+'px';dot.style.top=my+'px';});
+  (function anim(){rx+=(mx-rx)*.15;ry+=(my-ry)*.15;ring.style.left=rx+'px';ring.style.top=ry+'px';requestAnimationFrame(anim);})();
+  document.querySelectorAll('a,button,.hcard,.tcard,input').forEach(el=>{
+    el.addEventListener('mouseenter',()=>ring.classList.add('active'));
+    el.addEventListener('mouseleave',()=>ring.classList.remove('active'));
+  });
+
+  // Nav scroll
+  const nav=document.getElementById('mainNav');
+  window.addEventListener('scroll',()=>{nav.classList.toggle('scrolled',window.scrollY>60);});
+
+  // Mobile menu
+  function toggleMobileMenu(){document.getElementById('navLinks').classList.toggle('mobile-open');}
+  document.querySelectorAll('#navLinks a').forEach(a=>a.addEventListener('click',()=>document.getElementById('navLinks').classList.remove('mobile-open')));
+
+  // Fade-in
+  const obs=new IntersectionObserver(entries=>{entries.forEach(e=>{if(e.isIntersecting){e.target.classList.add('visible');obs.unobserve(e.target);}});},{threshold:.1,rootMargin:'0px 0px -50px 0px'});
+  document.querySelectorAll('.fi').forEach(el=>obs.observe(el));
+
+  // ════ CHAT — conectado a /api/chat (Claude) ════
+  const chatWindow=document.getElementById('chat-window');
+  const chatMessages=document.getElementById('chat-messages');
+  const chatInput=document.getElementById('chat-input');
+  const chatSend=document.getElementById('chat-send');
+  let chatHistory=[]; // historial enviado al backend (solo user/assistant)
+  let chatBusy=false;
+
+  function toggleChat(){chatWindow.classList.toggle('open');const h=document.getElementById('chat-hint');if(h)h.remove();if(chatWindow.classList.contains('open'))setTimeout(()=>chatInput.focus(),300);}
+  function openChat(){if(!chatWindow.classList.contains('open')){chatWindow.classList.add('open');const h=document.getElementById('chat-hint');if(h)h.remove();setTimeout(()=>chatInput.focus(),300);}}
+  function openChatWith(msg){openChat();chatInput.value=msg;chatInput.focus();}
+
+  function appendMsg(role,text,codigo){
+    const el=document.createElement('div');
+    el.className='msg '+(role==='user'?'user':'bot');
+    el.textContent=text;
+    if(codigo){
+      const b=document.createElement('span');
+      b.className='codigo-badge';
+      b.textContent='✅ Código de solicitud: #'+codigo;
+      el.appendChild(b);
+    }
+    chatMessages.appendChild(el);
+    chatMessages.scrollTop=chatMessages.scrollHeight;
+    return el;
+  }
+
+  function setBusy(b){
+    chatBusy=b;
+    chatSend.disabled=b;
+    chatInput.disabled=b;
+  }
+
+  async function sendMessage(){
+    if(chatBusy)return;
+    const text=chatInput.value.trim();
+    if(!text)return;
+    chatInput.value='';
+    appendMsg('user',text);
+    chatHistory.push({role:'user',content:text});
+
+    setBusy(true);
+    const typing=document.createElement('div');
+    typing.className='msg bot';
+    typing.style.fontStyle='italic';
+    typing.style.opacity='.7';
+    typing.textContent='escribiendo...';
+    chatMessages.appendChild(typing);
+    chatMessages.scrollTop=chatMessages.scrollHeight;
+
+    try{
+      const resp=await fetch('/api/chat',{
+        method:'POST',
+        headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({messages:chatHistory})
+      });
+      const data=await resp.json();
+      typing.remove();
+
+      if(!resp.ok){
+        const err=(data&&data.error)||'Hubo un problema técnico.';
+        appendMsg('assistant','😕 '+err+' Por favor escríbenos por WhatsApp al +56 9 8628 4965.');
+        return;
+      }
+
+      const txt=data.text||'(sin respuesta)';
+      appendMsg('assistant',txt,data.codigo_solicitud);
+      chatHistory.push({role:'assistant',content:txt});
+    }catch(err){
+      typing.remove();
+      console.error(err);
+      appendMsg('assistant','😕 Disculpa, tuve un problema de conexión. Escríbenos por WhatsApp al +56 9 8628 4965.');
+    }finally{
+      setBusy(false);
+      chatInput.focus();
+    }
+  }
+
+  // Hint flotante después de 8s
+  setTimeout(()=>{
+    if(chatWindow.classList.contains('open'))return;
+    const h=document.createElement('div');h.className='chat-hint';h.id='chat-hint';
+    h.textContent='¿Quieres reservar tu hora? ¡Estamos aquí! ✨';h.onclick=openChat;
+    document.body.appendChild(h);setTimeout(()=>{if(h.parentNode)h.remove();},5000);
+  },8000);
+</script>
+</body>
+</html>
