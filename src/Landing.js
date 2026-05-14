@@ -199,8 +199,8 @@ export default function Landing({ onLogin }) {
           </div>
           <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fit,minmax(260px,1fr))", gap:24 }}>
             {[
-              { icon:"✨", color:C.lila, bg:C.lilaPale, nombre:"Box 1 · Estético", desc:"Equipado para medicina estética, cosmetología y tratamientos faciales y corporales.", items:["Camilla profesional","Iluminación especializada","WiFi y climatización","Insumos básicos disponibles"] },
-              { icon:"🦷", color:C.rosa, bg:C.rosaPale, nombre:"Box 2 · Dental", desc:"Unidad dental completa con todos los equipos necesarios, con o sin asistente.", items:["Sillón dental completo","Equipamiento diagnóstico","Opción con asistente","Esterilización disponible"] },
+              { icon:"✨", color:C.lila, bg:C.lilaPale, nombre:"Box 1 · Estético", desc:"Equipado para medicina estética, cosmetología y tratamientos faciales y corporales.", items:["Camilla profesional","Aro de luz profesional","Refrigerador","Alcohol y desinfección","EPP básico","Sabanilla desechable","Carpule","WiFi y climatización","Eliminación de residuos · +$2.000 adicional"] },
+              { icon:"🦷", color:C.rosa, bg:C.rosaPale, nombre:"Box 2 · Dental", desc:"Unidad dental completa con todos los equipos necesarios, con o sin asistente.", items:["Sillón dental completo","Lámpara de fotocurado","Bandeja de examen","Instrumental básico","Carpule","Rayos X · equipo portátil","Esterilización básica","Eliminación de residuos","Opción con asistente"] },
               { icon:"🏥", color:C.dorado, bg:C.beige, nombre:"Box 3 · Médico", desc:"Espacio clínico para médicos y profesionales de la salud. Ideal para consultas, procedimientos y atención ambulatoria.", items:["Camilla","Escritorio y lavamanos","EPP incluido","Esterilización de instrumental simple","Eliminación de residuos básicos y cortopunzantes"] },
             ].map(b=>(
               <div key={b.nombre} style={{ background:C.blanco, borderRadius:16, overflow:"hidden", boxShadow:"0 4px 24px rgba(155,142,196,0.12)" }}>
@@ -267,7 +267,7 @@ export default function Landing({ onLogin }) {
                 </div>
                 <div style={{ padding:"11px 14px", background:C.lilaPale, borderRadius:10, fontSize:12, color:C.cafeClaro, fontFamily:"system-ui", lineHeight:1.8, borderLeft:`3px solid ${C.lila}` }}>
                   <strong style={{ color:C.cafe }}>✅ Incluye</strong><br/>
-                  Sabanilla desechable · <span style={{ color:C.cafeClaro }}>Carpule disponible (+{fmt(2000)} adicional)</span>
+                  Alcohol y desinfección · EPP básico · Aro de luz · Refrigerador · Sabanilla desechable · Carpule · <span style={{ color:C.cafeClaro }}>Eliminación de residuos (+{fmt(2000)} adicional)</span>
                 </div>
               </div>
 
