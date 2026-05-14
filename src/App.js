@@ -203,6 +203,14 @@ export default function App() {
   const emptyArr = { boxId:'', profId:'', fecha:today(), horaInicio:'09:00', horaFin:'10:00', metodo:'Efectivo' };
   const [arrForm, setArrForm]   = useState(emptyArr);
   const [arrStep, setArrStep]   = useState(0);
+
+  // Auto-asignar profesional si el user logueado tiene rol 'prof'
+  useEffect(() => {
+    if (user?.rol === 'prof' && profesionales.length > 0 && !arrForm.profId) {
+      const mi = profesionales.find(p => p.nombre === user.nombre);
+      if (mi) setArrForm(a => ({ ...a, profId: mi.id }));
+    }
+  }, [user, profesionales, arrForm.profId]);
   const boxArr = boxes.find(b=>b.id===arrForm.boxId);
   const horasArr = useMemo(()=>{
     const [h1,m1]=arrForm.horaInicio.split(':').map(Number);
@@ -734,14 +742,24 @@ export default function App() {
              <h3 style={{margin:'0 0 4px',fontSize:15,fontWeight:500}}>Paso 1 — Selecciona box y plan</h3>
               <p style={{margin:'0 0 14px',fontSize:13,color:'#666'}}>El horario se agenda solo tras confirmar el pago.</p>
 
-              {/* Selector de profesional */}
-              <div style={{marginBottom:14}}>
-                <label style={S.label}>Profesional *</label>
-                <select style={S.input} value={arrForm.profId} onChange={e=>setArrForm(a=>({...a,profId:e.target.value}))}>
-                  <option value="">— Seleccionar profesional —</option>
-                 {profesionales.map(p=><option key={p.id} value={p.id}>{p.nombre}</option>)}
-                </select>
-              </div>
+              {/* Selector de profesional — admin/recep elige, prof se auto-asigna */}
+              {user.rol === 'prof' ? (
+                <div style={{marginBottom:14}}>
+                  <label style={S.label}>Profesional</label>
+                  <div style={{...S.input, background:'#f5f5f5', display:'flex', alignItems:'center', justifyContent:'space-between'}}>
+                    <span style={{fontWeight:500}}>{user.nombre}</span>
+                    <span style={{fontSize:11, color:'#888'}}>(asignado automáticamente)</span>
+                  </div>
+                </div>
+              ) : (
+                <div style={{marginBottom:14}}>
+                  <label style={S.label}>Profesional *</label>
+                  <select style={S.input} value={arrForm.profId} onChange={e=>setArrForm(a=>({...a,profId:e.target.value}))}>
+                    <option value="">— Seleccionar profesional —</option>
+                    {profesionales.map(p=><option key={p.id} value={p.id}>{p.nombre}</option>)}
+                  </select>
+                </div>
+              )}
 
               {/* Selector de tipo de box */}
               <div style={{marginBottom:16}}>
