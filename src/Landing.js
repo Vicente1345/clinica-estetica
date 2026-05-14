@@ -111,7 +111,7 @@ export default function Landing({ onLogin }) {
       <div style={{ background:C.lila, color:C.blanco, padding:"8px 40px", display:"flex", justifyContent:"space-between", alignItems:"center", fontSize:12, letterSpacing:".1em", flexWrap:"wrap", gap:10 }}>
         <span>+56 9 8628 4965 · San Ignacio 1263, Puerto Varas</span>
         <div style={{ display:"flex", gap:10, alignItems:"center", flexWrap:"wrap" }}>
-          <a href="/barcelona-clinic.html" style={{ background:C.blanco, border:"none", color:C.lila, padding:"5px 16px", borderRadius:20, cursor:"pointer", fontSize:11, letterSpacing:".1em", fontWeight:700, textDecoration:"none" }}>
+          <a href="/" style={{ background:C.blanco, border:"none", color:C.lila, padding:"5px 16px", borderRadius:20, cursor:"pointer", fontSize:11, letterSpacing:".1em", fontWeight:700, textDecoration:"none" }}>
             ✨ SOY PACIENTE
           </a>
           <button onClick={()=>setModalLogin(true)} style={{ background:"none", border:`1px solid rgba(255,255,255,0.6)`, color:C.blanco, padding:"4px 16px", borderRadius:20, cursor:"pointer", fontSize:11, letterSpacing:".1em" }}>

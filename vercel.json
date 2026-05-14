@@ -1,4 +1,9 @@
 {
+  "rewrites": [
+    { "source": "/", "destination": "/barcelona-clinic.html" },
+    { "source": "/cowork", "destination": "/index.html" },
+    { "source": "/cowork/(.*)", "destination": "/index.html" }
+  ],
   "crons": [
     {
       "path": "/api/recordatorio",
