@@ -6,9 +6,8 @@ const fmt = n => (n||0).toLocaleString("es-CL",{style:"currency",currency:"CLP",
 const PLANES_DEF = {
   estetico: [
     { id:"est_1j", label:"1 jornada/semana",   precio:170000, jornadas:4,  asistente:false, detalle:"4 jornadas al mes · horario fijo" },
-    { id:"est_2j", label:"2 jornadas/semana",  precio:340000, jornadas:8,  asistente:false, detalle:"8 jornadas al mes · horario fijo" },
+    { id:"est_2j", label:"2 jornadas/semana",  precio:330000, jornadas:8,  asistente:false, detalle:"8 jornadas al mes · horario fijo" },
     { id:"est_3j", label:"3 jornadas/semana",  precio:480000, jornadas:12, asistente:false, detalle:"12 jornadas al mes · horario fijo" },
-    { id:"est_exc",label:"Plan Exclusivo ⭐",  precio:1350000,jornadas:20, asistente:false, detalle:"5 jornadas semanales" },
   ],
   dental: [
     { id:"den_1j",  label:"1 jornada/semana",         precio:170000, jornadas:4,  asistente:false, detalle:"Sin asistente · 4 jornadas/mes" },
