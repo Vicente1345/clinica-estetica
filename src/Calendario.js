@@ -203,6 +203,70 @@ const citaPacienteEnSlot = (fecha, hora) => {
     onNuevoArriendo && onNuevoArriendo();
   };
 
+  // ── Pagar con Webpay desde el modal de reserva ──
+  const iniciarPagoWebpay = async () => {
+    if (!precio.valido) return;
+    const pid = user?.rol === "prof"
+      ? profesionales?.find(p => normalizeNombre(p.nombre) === normalizeNombre(user.nombre))?.id
+      : profId;
+    if (!pid) return alert(user?.rol === "prof"
+      ? "Tu usuario no está vinculado a un profesional. Pide al admin que te agregue en la tabla de Profesionales."
+      : "Selecciona una profesional");
+    const prof = profesionales?.find(p => p.id === pid);
+    setGuardando(true);
+
+    // 1. Crear arriendo pendiente con metodo='Webpay'
+    const { data: nuevoArr, error } = await sb.from("arriendos").insert({
+      fecha:              reserva.fecha,
+      box_id:             reserva.box.id,
+      box_nombre:         reserva.box.nombre,
+      profesional_id:     pid,
+      profesional_nombre: prof?.nombre || "",
+      hora_inicio:        reserva.horaInicio,
+      hora_fin:           horaFin,
+      horas,
+      monto:              precio.monto,
+      metodo:             "Webpay",
+      pagado:             false,
+      estado:             "pendiente",
+      verificado:         "pendiente",
+    }).select().single();
+
+    if (error || !nuevoArr) {
+      setGuardando(false);
+      alert("No se pudo crear el arriendo previo al pago");
+      return;
+    }
+
+    // 2. Iniciar transacción Webpay
+    let initData;
+    try {
+      const r = await fetch("/api/webpay-init", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ arriendoId: nuevoArr.id, monto: precio.monto }),
+      });
+      if (!r.ok) throw new Error(await r.text());
+      initData = await r.json();
+    } catch (e) {
+      setGuardando(false);
+      alert("Error al iniciar Webpay. Intenta con transferencia.");
+      return;
+    }
+
+    // 3. Submit form POST a Webpay (requerido por Transbank)
+    const form = document.createElement("form");
+    form.method = "POST";
+    form.action = initData.url;
+    const input = document.createElement("input");
+    input.type  = "hidden";
+    input.name  = "token_ws";
+    input.value = initData.token;
+    form.appendChild(input);
+    document.body.appendChild(form);
+    form.submit();
+  };
+
   const hoy = formatFecha(new Date());
 
   return (
@@ -324,22 +388,30 @@ const citaPacienteEnSlot = (fecha, hora) => {
                 </select>
               </>
             )}
-            <div style={{ background:"#E6F1FB", border:"1px solid #B5D4F4", borderRadius:8, padding:"10px 14px", fontSize:12, color:"#042C53", marginBottom:16, lineHeight:1.7 }}>
-              💳 <strong>Pago por transferencia bancaria.</strong><br/>
-              Al confirmar, adjunta el comprobante para validar la reserva.
+            <div style={{ fontSize:11, color:"#666", fontWeight:600, letterSpacing:".05em", textTransform:"uppercase", marginBottom:6 }}>Elige cómo pagar</div>
+            <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:8, marginBottom:14 }}>
+              <div style={{ background:"#E6F1FB", border:"1px solid #B5D4F4", borderRadius:8, padding:"8px 10px", fontSize:11, color:"#042C53", lineHeight:1.5 }}>
+                <strong>🏦 Transferencia</strong>
+                <div style={{ marginTop:2, fontFamily:"system-ui" }}>Adjuntas comprobante después. Reserva pendiente hasta aprobación.</div>
+              </div>
+              <div style={{ background:"#F0F4FF", border:"1px solid #B5C4FA", borderRadius:8, padding:"8px 10px", fontSize:11, color:"#1A2B6B", lineHeight:1.5 }}>
+                <strong>💳 Webpay</strong>
+                <div style={{ marginTop:2, fontFamily:"system-ui" }}>Pago inmediato con tarjeta. Reserva confirmada automáticamente.</div>
+              </div>
             </div>
-            <div style={{ display:"flex", gap:10 }}>
+            <div style={{ display:"flex", gap:8, flexWrap:"wrap" }}>
               <button onClick={confirmarReserva} disabled={!precio.valido||guardando}
-                style={{ flex:1, padding:"11px", borderRadius:8, border:"none", background:precio.valido?"#111":"#ccc", color:"#fff", cursor:precio.valido?"pointer":"default", fontSize:14, fontWeight:500 }}>
-                {guardando?"Guardando…":"✓ Confirmar reserva"}
+                style={{ flex:"1 1 0", padding:"11px", borderRadius:8, border:"none", background:precio.valido?"#1D9E75":"#ccc", color:"#fff", cursor:precio.valido?"pointer":"default", fontSize:13, fontWeight:600 }}>
+                {guardando?"Guardando…":"🏦 Transferencia"}
+              </button>
+              <button onClick={iniciarPagoWebpay} disabled={!precio.valido||guardando}
+                style={{ flex:"1 1 0", padding:"11px", borderRadius:8, border:"none", background:precio.valido?"#185FA5":"#ccc", color:"#fff", cursor:precio.valido?"pointer":"default", fontSize:13, fontWeight:600 }}>
+                💳 Webpay →
               </button>
               <button onClick={()=>setReserva(null)}
-                style={{ padding:"11px 18px", borderRadius:8, border:"1px solid #ddd", background:"#fff", cursor:"pointer", fontSize:14 }}>
+                style={{ padding:"11px 16px", borderRadius:8, border:"1px solid #ddd", background:"#fff", cursor:"pointer", fontSize:13 }}>
                 Cancelar
               </button>
-            </div>
-            <div style={{ textAlign:"center", fontSize:11, color:"#888", marginTop:10 }}>
-              La reserva queda pendiente hasta confirmar el pago con comprobante
             </div>
           </div>
         </div>
