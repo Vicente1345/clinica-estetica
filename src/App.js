@@ -165,7 +165,8 @@ export default function App() {
     // Limpiar query y refrescar
     window.history.replaceState({}, '', window.location.pathname);
     if (user) fetchAll();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    // Solo debe correr al montar para detectar el retorno de Webpay
+    // (intencionalmente sin deps — user/fetchAll capturados por closure)
   }, []);
 
   // ── FILTRO MOVIMIENTOS POR ROL ──
