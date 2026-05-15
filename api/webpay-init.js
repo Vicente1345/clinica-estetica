@@ -52,9 +52,10 @@ module.exports = async (req, res) => {
       return res.status(500).json({ error: 'Webpay no configurado en el servidor' });
     }
 
-    // buy_order: max 26 caracteres, alfanumérico + algunos signos
-    const buyOrder  = `bcn-${Date.now()}-${arriendoId}`.slice(0, 26);
-    const sessionId = `s-${Date.now()}-${arriendoId}`.slice(0, 61);
+    // buy_order: max 26 caracteres. arriendoId es UUID (36 chars), uso los últimos 8.
+    const shortId   = String(arriendoId).slice(-8).replace(/-/g,'');
+    const buyOrder  = `bcn${Date.now()}${shortId}`.slice(0, 26);
+    const sessionId = `s-${Date.now()}-${shortId}`.slice(0, 61);
 
     // Calcular returnUrl absoluta (Vercel preserva host original)
     const host  = req.headers['x-forwarded-host'] || req.headers.host;
