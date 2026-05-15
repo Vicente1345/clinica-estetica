@@ -140,6 +140,30 @@ export default function App() {
 
   useEffect(() => { if (user) fetchAll(); }, [user, fetchAll]);
 
+  // ── Detectar retorno de Webpay (?webpay=ok|fail|cancelada|error) ──
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const wp = params.get('webpay');
+    if (!wp) return;
+    if (wp === 'ok') {
+      const codigo = params.get('codigo') || '';
+      const monto  = +(params.get('monto') || 0);
+      showToast(`✓ Pago Webpay aprobado · ${fmt(monto)}${codigo ? ` · Cód ${codigo}` : ''}`);
+    } else if (wp === 'fail') {
+      showToast(`✗ Pago Webpay rechazado (motivo ${params.get('motivo') || '?'})`, 'err');
+    } else if (wp === 'cancelada') {
+      showToast('Pago Webpay cancelado por el usuario', 'err');
+    } else if (wp === 'missing') {
+      showToast('Sesión Webpay expirada o sin token', 'err');
+    } else {
+      showToast('Error procesando Webpay', 'err');
+    }
+    // Limpiar query y refrescar
+    window.history.replaceState({}, '', window.location.pathname);
+    if (user) fetchAll();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   // ── FILTRO MOVIMIENTOS POR ROL ──
   const movsVisibles = useMemo(() => {
     if (user?.rol === 'prof') return movimientos.filter(m => m.profesional_nombre === user.nombre);
@@ -307,6 +331,70 @@ export default function App() {
       setArrForm(emptyArr);
       setArrStep(2);
     }
+  };
+
+  // ── INICIAR PAGO CON WEBPAY ──
+  // Crea el arriendo en Supabase (pendiente) y redirige al usuario a Webpay
+  const iniciarPagoWebpay = async () => {
+    if (arrForm.esPlan) {
+      showToast('Webpay disponible solo para arriendos sueltos. Para planes usa transferencia.', 'err');
+      return;
+    }
+    const prof = profesionales.find(p=>p.id===arrForm.profId);
+    const box  = boxes.find(b=>b.id===arrForm.boxId);
+    if (!box || !prof || montoArr <= 0) {
+      showToast('Datos de arriendo incompletos', 'err');
+      return;
+    }
+
+    // 1. Crear arriendo (estado pendiente, metodo Webpay)
+    const { data: nuevoArr, error } = await sb.from('arriendos').insert({
+      fecha:              arrForm.fecha,
+      box_id:             arrForm.boxId,
+      box_nombre:         box.nombre,
+      profesional_id:     arrForm.profId,
+      profesional_nombre: prof.nombre,
+      hora_inicio:        arrForm.horaInicio,
+      hora_fin:           arrForm.horaFin,
+      horas:              horasArr,
+      monto:              montoArr,
+      metodo:             'Webpay',
+      pagado:             false,
+      estado:             'pendiente',
+      verificado:         'pendiente',
+    }).select().single();
+
+    if (error || !nuevoArr) {
+      showToast('No se pudo crear el arriendo previo al pago', 'err');
+      return;
+    }
+
+    // 2. Iniciar transacción en Transbank
+    let initData;
+    try {
+      const r = await fetch('/api/webpay-init', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ arriendoId: nuevoArr.id, monto: montoArr }),
+      });
+      if (!r.ok) throw new Error(await r.text());
+      initData = await r.json();
+    } catch (e) {
+      showToast('Error al iniciar Webpay. Intenta con transferencia.', 'err');
+      return;
+    }
+
+    // 3. Form POST a la URL de Webpay (requerido por Transbank)
+    const form = document.createElement('form');
+    form.method = 'POST';
+    form.action = initData.url;
+    const input = document.createElement('input');
+    input.type = 'hidden';
+    input.name = 'token_ws';
+    input.value = initData.token;
+    form.appendChild(input);
+    document.body.appendChild(form);
+    form.submit();
   };
 
   // ── INSUMO FORM ──
@@ -725,15 +813,23 @@ export default function App() {
                 <div style={{marginTop:6,fontSize:16}}>Total: <strong>{fmt(montoArr)}</strong></div>
                 <div style={{fontSize:12,color:'#185FA5',marginTop:4}}>⚠ El horario se agenda solo al confirmar el pago</div>
               </div>
-              <div style={{background:'#E6F1FB',border:'1px solid #B5D4F4',borderRadius:8,padding:12,marginBottom:16,fontSize:13,color:'#042C53',display:'flex',gap:10,alignItems:'flex-start'}}>
-  <span style={{fontSize:20}}>💳</span>
-  <div>
-    <strong>Pago solo por transferencia bancaria</strong>
-    <div style={{marginTop:4,fontFamily:'system-ui'}}>Una vez confirmada la reserva, adjunta el comprobante de transferencia en el siguiente paso para validar tu pago.</div>
-  </div>
-</div>
-              <div style={{display:'flex',gap:10,marginTop:20}}>
-                <button style={S.btn('success')} onClick={confirmarArriendo}>✓ Confirmar pago y agendar</button>
+              {/* Selector método de pago */}
+              <div style={{fontSize:12,color:'#666',fontWeight:600,letterSpacing:'.05em',textTransform:'uppercase',marginBottom:8}}>Elige cómo pagar</div>
+              <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:10,marginBottom:16}}>
+                <div style={{background:'#E6F1FB',border:'1px solid #B5D4F4',borderRadius:8,padding:'10px 12px',fontSize:12,color:'#042C53',lineHeight:1.6}}>
+                  <strong>🏦 Transferencia bancaria</strong>
+                  <div style={{marginTop:3,fontFamily:'system-ui',fontSize:11}}>Adjunta el comprobante después. La reserva queda pendiente hasta aprobación de la admin.</div>
+                </div>
+                <div style={{background:'#F0F4FF',border:'1px solid #B5C4FA',borderRadius:8,padding:'10px 12px',fontSize:12,color:'#1A2B6B',lineHeight:1.6}}>
+                  <strong>💳 Webpay (tarjeta crédito/débito)</strong>
+                  <div style={{marginTop:3,fontFamily:'system-ui',fontSize:11}}>Pago inmediato online. La reserva queda confirmada automáticamente al aprobar el pago.{arrForm.esPlan && ' · No disponible para planes.'}</div>
+                </div>
+              </div>
+              <div style={{display:'flex',gap:10,marginTop:20,flexWrap:'wrap'}}>
+                <button style={S.btn('success')} onClick={confirmarArriendo}>🏦 Confirmar (Transferencia)</button>
+                {!arrForm.esPlan && (
+                  <button style={{...S.btn('primary'),background:'#185FA5'}} onClick={iniciarPagoWebpay}>💳 Pagar con Webpay →</button>
+                )}
                 <button style={S.btn('secondary')} onClick={()=>setArrStep(0)}>← Volver</button>
               </div>
             </div>
