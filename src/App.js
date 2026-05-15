@@ -16,6 +16,10 @@ const today = () => {
   const d = new Date();
   return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
 };
+
+// Normaliza nombre para comparar usuarios.nombre vs profesionales.nombre
+// "Dra. Katherine Büchner" → "katherine büchner"
+const normalizeNombre = n => (n||'').toLowerCase().replace(/^(dr\.?|dra\.?)\s+/i,'').trim();
 const stockSt = i => i.stock===0 ? 'critico' : i.stock<=i.stock_min ? 'bajo' : 'ok';
 
 // Permisos por rol
@@ -229,9 +233,11 @@ export default function App() {
   const [arrStep, setArrStep]   = useState(0);
 
   // Auto-asignar profesional si el user logueado tiene rol 'prof'
+  // (matching tolerante a prefijos "Dr.", "Dra." y diferencias de mayúsculas)
   useEffect(() => {
     if (user?.rol === 'prof' && profesionales.length > 0 && !arrForm.profId) {
-      const mi = profesionales.find(p => p.nombre === user.nombre);
+      const userNorm = normalizeNombre(user.nombre);
+      const mi = profesionales.find(p => normalizeNombre(p.nombre) === userNorm);
       if (mi) setArrForm(a => ({ ...a, profId: mi.id }));
     }
   }, [user, profesionales, arrForm.profId]);

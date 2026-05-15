@@ -36,6 +36,12 @@ function formatFecha(d) {
   return `${y}-${m}-${day}`;
 }
 
+// Normaliza nombre para comparar usuarios.nombre vs profesionales.nombre
+// "Dra. Katherine Büchner" → "katherine büchner"
+function normalizeNombre(nombre) {
+  return (nombre || "").toLowerCase().replace(/^(dr\.?|dra\.?)\s+/i, '').trim();
+}
+
 export default function Calendario({ user, boxes, profesionales, arriendos: arriendosProp, solicitudes = [], onNuevoArriendo }) {
   const [semana, setSemana]       = useState(0);
   const [boxSel, setBoxSel]       = useState(null);
@@ -56,7 +62,8 @@ useEffect(() => { recargarArriendos(); }, []);
   useEffect(() => { if (boxes?.length && !boxSel) setBoxSel(boxes[0]); }, [boxes]);
   useEffect(() => {
     if (user?.rol === "prof") {
-      const p = profesionales?.find(p => p.nombre === user.nombre);
+      const userNorm = normalizeNombre(user.nombre);
+      const p = profesionales?.find(p => normalizeNombre(p.nombre) === userNorm);
       if (p) setProfId(p.id);
     }
   }, [user, profesionales]);
@@ -149,9 +156,11 @@ const citaPacienteEnSlot = (fecha, hora) => {
   const confirmarReserva = async () => {
     if (!precio.valido) return;
     const pid = user?.rol === "prof"
-      ? profesionales?.find(p => p.nombre === user.nombre)?.id
+      ? profesionales?.find(p => normalizeNombre(p.nombre) === normalizeNombre(user.nombre))?.id
       : profId;
-    if (!pid) return alert("Selecciona una profesional");
+    if (!pid) return alert(user?.rol === "prof"
+      ? "Tu usuario no está vinculado a un profesional. Pide al admin que te agregue en la tabla de Profesionales con el mismo nombre."
+      : "Selecciona una profesional");
     const prof = profesionales?.find(p => p.id === pid);
     setGuardando(true);
 
