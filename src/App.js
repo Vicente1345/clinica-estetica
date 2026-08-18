@@ -7,6 +7,7 @@ import { SubirComprobante, BadgeVerificado, VerComprobante, PanelVerificacion } 
 import Calendario from './Calendario';
 import ModificarReserva from './ModificarReserva';
 import ChatBot from './ChatBot';
+import { minHorasDeBox } from './logic/disponibilidad';
 
 // ─── CONSTANTES ───────────────────────────────────────────────────
 const CATEGORIAS = ['Inyectables','Materiales descartables','Productos tópicos','Equipos/accesorios','Otros'];
@@ -157,6 +158,8 @@ export default function App() {
       showToast(`✗ Pago Webpay rechazado (motivo ${params.get('motivo') || '?'})`, 'err');
     } else if (wp === 'cancelada') {
       showToast('Pago Webpay cancelado por el usuario', 'err');
+    } else if (wp === 'conflicto') {
+      showToast('⚠ El pago fue aprobado pero el horario fue tomado por otra reserva mientras pagabas. La administración te contactará para reagendar o reembolsar.', 'err');
     } else if (wp === 'missing') {
       showToast('Sesión Webpay expirada o sin token', 'err');
     } else {
@@ -261,9 +264,31 @@ export default function App() {
 
   const [arrNuevoId, setArrNuevoId] = useState(null); // para subir comprobante tras crear
 
+  // Crea arriendos vía /api/reservar: validación final server-side de
+  // disponibilidad sobre el recurso físico compartido + mínimo de horas
+  // (Box Médico: 2h). Devuelve {ok, arriendos} o {ok:false, error, conflictos}.
+  const reservarEnServidor = async (payload) => {
+    try {
+      const r = await fetch('/api/reservar', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+      return await r.json();
+    } catch (e) {
+      return { ok: false, error: 'Error de conexión al reservar. Intenta de nuevo.' };
+    }
+  };
+
   const confirmarArriendo = async () => {
     const prof = profesionales.find(p=>p.id===arrForm.profId);
     const box  = boxes.find(b=>b.id===arrForm.boxId);
+
+    if (!box) return showToast('Selecciona un box válido', 'err');
+    const minHoras = minHorasDeBox(box);
+    if (horasArr < minHoras) {
+      return showToast(`${box.nombre}: mínimo ${minHoras} horas consecutivas (elegiste ${horasArr} hr)`, 'err');
+    }
 
     if (arrForm.esPlan && arrForm.diasJornada?.length > 0 && arrForm.planMeses) {
       // ── PLAN: bulk-create de todas las jornadas del período ──────
@@ -288,7 +313,13 @@ export default function App() {
         verificado:         'sin_pago',
       }));
 
-      await sb.from('arriendos').insert(rows);
+      const resp = await reservarEnServidor({ arriendos: rows });
+      if (!resp.ok) {
+        const det = (resp.conflictos || []).slice(0, 3)
+          .map(c => `${c.fecha} ${c.hora_inicio}–${c.hora_fin}`).join(', ');
+        showToast(`${resp.error}${det ? ` · ${det}${resp.conflictos.length > 3 ? '…' : ''}` : ''}`, 'err');
+        return;
+      }
 
       // Registrar plan con días y horario fijo
       const fechaVenc = new Date(arrForm.fecha + 'T12:00:00');
@@ -318,7 +349,7 @@ export default function App() {
       showToast(`✓ Plan creado: ${fechas.length} jornadas agendadas automáticamente`);
     } else {
       // ── JORNADA SUELTA ────────────────────────────────────────────
-      const { data } = await sb.from('arriendos').insert({
+      const resp = await reservarEnServidor({ arriendo: {
         fecha:              arrForm.fecha,
         box_id:             arrForm.boxId,
         box_nombre:         box?.nombre || '',
@@ -332,9 +363,10 @@ export default function App() {
         pagado:             false,
         estado:             'pendiente',
         verificado:         'sin_pago',
-      }).select().single();
+      }});
+      if (!resp.ok) { showToast(resp.error || 'No se pudo crear la reserva', 'err'); return; }
       await fetchAll();
-      setArrNuevoId(data?.id || null);
+      setArrNuevoId(resp.arriendos?.[0]?.id || null);
       setArrForm(emptyArr);
       setArrStep(2);
     }
@@ -353,9 +385,13 @@ export default function App() {
       showToast('Datos de arriendo incompletos', 'err');
       return;
     }
+    const minHoras = minHorasDeBox(box);
+    if (horasArr < minHoras) {
+      return showToast(`${box.nombre}: mínimo ${minHoras} horas consecutivas (elegiste ${horasArr} hr)`, 'err');
+    }
 
-    // 1. Crear arriendo (estado pendiente, metodo Webpay)
-    const { data: nuevoArr, error } = await sb.from('arriendos').insert({
+    // 1. Crear arriendo (estado pendiente, metodo Webpay) vía /api/reservar
+    const resp = await reservarEnServidor({ arriendo: {
       fecha:              arrForm.fecha,
       box_id:             arrForm.boxId,
       box_nombre:         box.nombre,
@@ -369,10 +405,11 @@ export default function App() {
       pagado:             false,
       estado:             'pendiente',
       verificado:         'pendiente',
-    }).select().single();
+    }});
 
-    if (error || !nuevoArr) {
-      showToast('No se pudo crear el arriendo previo al pago', 'err');
+    const nuevoArr = resp.ok ? resp.arriendos?.[0] : null;
+    if (!nuevoArr) {
+      showToast(resp.error || 'No se pudo crear el arriendo previo al pago', 'err');
       return;
     }
 
@@ -864,20 +901,28 @@ export default function App() {
                 </div>
               )}
 
-              {/* Selector de tipo de box */}
+              {/* Selector de tipo de box (modalidad comercial) */}
               <div style={{marginBottom:16}}>
                 <label style={S.label}>Tipo de box *</label>
-                <div style={{display:'flex',gap:10}}>
-                  {[['estetico','✨ Box Estético'],['dental','🦷 Box Dental']].map(([tipo,label])=>(
-                    <div
-                      key={tipo}
-                      onClick={()=>setArrForm(a=>({...a,tipoBox:tipo,planSel:null}))}
-                      style={{flex:1,padding:'12px',borderRadius:10,border:`2px solid ${arrForm.tipoBox===tipo?(tipo==='dental'?'#1D9E75':'#378ADD'):'#ddd'}`,background:arrForm.tipoBox===tipo?(tipo==='dental'?'#E1F5EE':'#E6F1FB'):'#fff',cursor:'pointer',textAlign:'center'}}
-                    >
-                      <div style={{fontSize:14,fontWeight:600}}>{label}</div>
-                      <div style={{fontSize:11,color:'#888',marginTop:3}}>{tipo==='dental'?'Con/sin asistente':'Por hora o plan fijo'}</div>
-                    </div>
-                  ))}
+                <div style={{display:'flex',gap:10,flexWrap:'wrap'}}>
+                  {[['estetico','✨ Box Estético'],['dental','🦷 Box Dental'],['medico','🏥 Box Médico']].map(([tipo,label])=>{
+                    const activo = arrForm.tipoBox===tipo;
+                    const borde  = tipo==='dental'?'#1D9E75':tipo==='medico'?'#C9A96E':'#378ADD';
+                    const fondo  = tipo==='dental'?'#E1F5EE':tipo==='medico'?'#FEF3E2':'#E6F1FB';
+                    return (
+                      <div
+                        key={tipo}
+                        onClick={()=>setArrForm(a=>({...a,tipoBox:tipo,planSel:null}))}
+                        style={{flex:'1 1 140px',padding:'12px',borderRadius:10,border:`2px solid ${activo?borde:'#ddd'}`,background:activo?fondo:'#fff',cursor:'pointer',textAlign:'center'}}
+                      >
+                        <div style={{fontSize:14,fontWeight:600}}>{label}</div>
+                        <div style={{fontSize:11,color:'#888',marginTop:3}}>{tipo==='dental'?'Con/sin asistente':tipo==='medico'?'Mínimo 2 horas consecutivas':'Por hora o plan fijo'}</div>
+                      </div>
+                    );
+                  })}
+                </div>
+                <div style={{fontSize:11,color:'#888',marginTop:6}}>
+                  ℹ Dental y Estético comparten el mismo espacio físico (calendario único). El Box Médico es un espacio independiente.
                 </div>
               </div>
 
@@ -957,7 +1002,7 @@ export default function App() {
           </div>
           {boxes.map(box=>{
             const res=arriendos.filter(a=>a.box_id===box.id&&a.estado==='confirmado').map(a=>({tipo:'arriendo', ...a}));
-            const cit=solicitudes.filter(s => s.box_tipo===box.tipo && s.fecha_solicitada && ['agendada','contactado','confirmada'].includes(s.estado))
+            const cit=solicitudes.filter(s => s.box_tipo===box.tipo && s.fecha_solicitada && ['agendada','agendado','contactado','confirmada'].includes(s.estado))
               .map(s=>({tipo:'cita', id:'c'+s.id, fecha:s.fecha_solicitada, hora_inicio:(s.hora_inicio||'').slice(0,5), hora_fin:(s.hora_fin||'').slice(0,5), nombre:s.nombre, tratamiento:s.tratamiento||s.motivo_consulta, estado:s.estado}));
             const todos=[...res,...cit].sort((a,b)=>(a.fecha||'').localeCompare(b.fecha||'')||(a.hora_inicio||'').localeCompare(b.hora_inicio||''));
             return (
@@ -1189,6 +1234,7 @@ export default function App() {
     arriendos={arriendos}
     boxes={boxes}
     profesionales={profesionales}
+    solicitudes={solicitudes}
     userRol={user.rol}
     onActualizar={fetchAll}
   />
@@ -1246,7 +1292,9 @@ export default function App() {
                 <h3 style={{margin:0,fontSize:14,fontWeight:500}}>Boxes</h3>
                 <button style={S.btn('primary',true)} onClick={async()=>{
                   const nombre=prompt('Nombre del box:');const tarifa=nombre?prompt('Tarifa/hora (CLP):'):null;
-                  if(nombre&&tarifa){await sb.from('boxes').insert({nombre,tipo:'Estético',tarifa_hora:+tarifa,activo:true});await fetchAll();showToast('Box agregado');}
+                  const tipo=nombre&&tarifa?(prompt('Tipo (estetico / dental / medico):','estetico')||'estetico').toLowerCase().trim():null;
+                  if(nombre&&tarifa&&['estetico','dental','medico'].includes(tipo)){await sb.from('boxes').insert({nombre,tipo,tarifa_hora:+tarifa,activo:true});await fetchAll();showToast('Box agregado');}
+                  else if(nombre&&tarifa){showToast('Tipo inválido: usa estetico, dental o medico','err');}
                 }}>+ Agregar</button>
               </div>
               {boxes.map(b=>(

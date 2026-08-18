@@ -481,10 +481,26 @@ export function SelectorPlan({ tipoBox, onSeleccionar }) {
 
   const toggleDia = d => setDiasSel(ds => ds.includes(d) ? ds.filter(x => x !== d) : [...ds, d]);
 
+  // Horas del horario fijo elegido (0 si inválido)
+  const horasHorario = (() => {
+    const [h1, m1] = (horario.inicio || "0:0").split(":").map(Number);
+    const [h2, m2] = (horario.fin || "0:0").split(":").map(Number);
+    const d = (h2 * 60 + m2) - (h1 * 60 + m1);
+    return d > 0 ? d / 60 : 0;
+  })();
+
+  // El Box Médico exige mínimo 2 horas consecutivas (regla obligatoria,
+  // también validada en el servidor). Dental/Estético no cambian.
+  const minHorasBox = tipoBox === "medico" ? 2 : 0;
+  const errorHorario = !esPlan ? null
+    : horasHorario <= 0 ? "La hora de término debe ser posterior a la de inicio"
+    : horasHorario < minHorasBox ? `El Box Médico requiere un mínimo de ${minHorasBox} horas consecutivas`
+    : null;
+
   const puedeConfirmar = () => {
     if (!opcionActual) return false;
     if (!esPlan) return true;
-    return diasSel.length >= (opcionActual.jornadas || 1) && fechaInicio;
+    return diasSel.length >= (opcionActual.jornadas || 1) && fechaInicio && !errorHorario;
   };
 
   const confirmar = () => {
@@ -588,12 +604,17 @@ export function SelectorPlan({ tipoBox, onSeleccionar }) {
 
               {/* HORARIO */}
               <div style={{ marginBottom: 12 }}>
-                <label style={S.label}>Horario fijo *</label>
+                <label style={S.label}>Horario fijo *{tipoBox === "medico" ? " (mínimo 2 horas consecutivas)" : ""}</label>
                 <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
                   <input type="time" value={horario.inicio} onChange={e => setHorario(h => ({ ...h, inicio: e.target.value }))} style={{ ...S.input, width: "auto" }} />
                   <span style={{ color: "#888" }}>a</span>
                   <input type="time" value={horario.fin} onChange={e => setHorario(h => ({ ...h, fin: e.target.value }))} style={{ ...S.input, width: "auto" }} />
                 </div>
+                {errorHorario && (
+                  <div style={{ background: "#FCEBEB", border: "1px solid #F5C2C7", borderRadius: 8, padding: "8px 12px", fontSize: 12, color: "#A32D2D", marginTop: 8 }}>
+                    ⚠ {errorHorario}
+                  </div>
+                )}
               </div>
 
               {/* FECHA INICIO */}

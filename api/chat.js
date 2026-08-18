@@ -10,6 +10,7 @@
 
 const Anthropic = require("@anthropic-ai/sdk");
 const { createClient } = require("@supabase/supabase-js");
+const { recursoDeBox, tiposDelRecurso, recursoDeTipo, ESTADOS_OCUPAN, ESTADOS_CITA_OCUPAN } = require("./_lib/disponibilidad");
 
 // ─── SYSTEM PROMPT (estable — se cachea) ───────────────────────────
 const SYSTEM_PROMPT = `Eres el asistente virtual de **Barcelona Clinic** (también conocida como Cowork Salud), una clínica estética y dental premium ubicada en Puerto Varas, Chile, inaugurada en 2023. Atiendes principalmente a **pacientes** que quieren agendar hora, consultar tratamientos o pedir información. También respondes a profesionales de la salud que evalúan arrendar un box.
@@ -147,24 +148,26 @@ Usa \`registrar_solicitud_paciente\` (la solicitud queda como pendiente y la adm
 - Si el paciente da un email, regístralo (es importante para enviarle confirmación).
 - Si hay un error técnico al guardar, da el WhatsApp +56 9 8628 4965.
 
-## Boxes de la clínica (REGLA IMPORTANTE — solo 3 boxes en total)
+## Boxes de la clínica (REGLA IMPORTANTE — 2 espacios físicos)
 
-La clínica tiene **exactamente 3 boxes**:
+La clínica tiene **2 espacios físicos**:
 
-- **Box 1 — Estético**: botox, Hydrafacial, Endymed, Sculptra, Exosomas, Profhilo, Mesoterapia, Armonización Facial, depilación láser, RF corporal, enzimas lipolíticas y todos los procedimientos estéticos faciales y corporales. (\`box_tipo: "estetico"\`)
-- **Box 2 — Dental**: limpiezas dentales, aplicación de flúor, blanqueamiento, brackets, ortodoncia, endodoncia, odontopediatría, exodoncias, tapaduras y todos los procedimientos odontológicos. **Este box es único para todos los planes dentales (Plan Flex sin asistente y Plan PRO con asistente).** Plan Flex y Plan PRO son **modalidades de arriendo del MISMO box**, no boxes distintos. (\`box_tipo: "dental"\`)
-- **Box 3 — Médico**: consultas y procedimientos médicos generales. (\`box_tipo: "medico"\`)
+- **Box Dental / Estético (UN solo espacio físico con doble función y calendario COMPARTIDO)**:
+  - Modalidad Estética (\`box_tipo: "estetico"\`): botox, Hydrafacial, Endymed, Sculptra, Exosomas, Profhilo, Mesoterapia, Armonización Facial, depilación láser, RF corporal, enzimas lipolíticas y todos los procedimientos estéticos faciales y corporales.
+  - Modalidad Dental (\`box_tipo: "dental"\`): limpiezas dentales, aplicación de flúor, blanqueamiento, brackets, ortodoncia, endodoncia, odontopediatría, exodoncias, tapaduras y todos los procedimientos odontológicos. Plan Flex (sin asistente) y Plan PRO (con asistente) son **modalidades de arriendo del MISMO box**, no boxes distintos.
+  - **Como comparten el espacio, un horario ocupado en Dental también está ocupado en Estético y viceversa.**
+- **Box Médico** (\`box_tipo: "medico"\`): consultas y procedimientos médicos generales. Espacio independiente con calendario propio (su ocupación NO afecta al Box Dental/Estético).
 
-**Nunca trates Plan Flex o Plan PRO como boxes separados.** Si te lo preguntan, aclara que son tipos de arriendo del mismo Box Dental.
+**Nunca trates Plan Flex o Plan PRO como boxes separados.** Si te lo preguntan, aclara que son tipos de arriendo del mismo Box Dental/Estético.
 
 ## Si te preguntan por arriendo de boxes (profesionales)
 
 La clínica también funciona como cowork médico:
-- **Box 1 Estético**: $10.000/h, $45.000 jornada, planes mensuales desde $170.000/mes.
-- **Box 2 Dental** (mismo box, dos modalidades de plan):
-  - Plan Flex (sin asistente): $15.000/h, $45.000 jornada, planes desde $150.000/mes anual.
-  - Plan PRO (con asistente): $18.000/h, $65.000 jornada, planes desde $230.000/mes anual, Plan Exclusivo $1.350.000/mes.
-- **Box 3 Médico**: $12.000/h, $55.000 jornada, planes desde $215.000/mes.
+- **Box Dental/Estético (espacio compartido, calendario único)**:
+  - Modalidad Estética: $10.000/h (mínimo 1 hora), $45.000 jornada, planes mensuales desde $170.000/mes.
+  - Modalidad Dental Plan Flex (sin asistente): $15.000/h (mínimo 2 horas), $45.000 jornada, planes desde $150.000/mes anual.
+  - Modalidad Dental Plan PRO (con asistente): $18.000/h (mínimo 2 horas), $65.000 jornada, planes desde $230.000/mes anual, Plan Exclusivo $1.350.000/mes.
+- **Box Médico** (espacio independiente): $12.000/h con **mínimo obligatorio de 2 horas consecutivas** (no se arrienda 1 hora), $55.000 jornada, planes desde $215.000/mes.
 
 Para info detallada redirige al sitio de profesionales o WhatsApp.`;
 
@@ -365,16 +368,38 @@ async function ejecutarHerramienta(name, input) {
   return { error: `Herramienta desconocida: ${name}` };
 }
 
-// Lee citas ocupadas de un box+fecha y devuelve [{hora_inicio_min, hora_fin_min}]
+// Ocupación por RECURSO FÍSICO: el Box Dental y el Box Estético comparten un
+// mismo espacio, así que una cita/arriendo en cualquiera de las dos modalidades
+// bloquea a la otra. El Box Médico tiene calendario independiente.
+// Considera TANTO citas de pacientes (solicitudes_paciente) COMO arriendos de
+// profesionales (arriendos) del recurso. Devuelve [{ini, fin}] en minutos.
 async function getOcupados(sb, fecha, box_tipo) {
-  const { data, error } = await sb
-    .from("solicitudes_paciente")
-    .select("hora_inicio, hora_fin")
-    .eq("fecha_solicitada", fecha)
-    .eq("box_tipo", box_tipo)
-    .in("estado", ["agendada", "contactado", "confirmada"]);
-  if (error || !data) return [];
-  return data
+  const recurso = recursoDeTipo(box_tipo);
+  const tipos   = tiposDelRecurso(recurso);
+
+  const [citasQ, boxesQ] = await Promise.all([
+    sb.from("solicitudes_paciente")
+      .select("hora_inicio, hora_fin")
+      .eq("fecha_solicitada", fecha)
+      .in("box_tipo", tipos)
+      .in("estado", ESTADOS_CITA_OCUPAN),
+    sb.from("boxes").select("id, nombre, tipo"),
+  ]);
+
+  const idsRecurso = (boxesQ.data || [])
+    .filter(b => recursoDeBox(b) === recurso)
+    .map(b => b.id);
+
+  const arrQ = idsRecurso.length
+    ? await sb.from("arriendos")
+        .select("hora_inicio, hora_fin")
+        .eq("fecha", fecha)
+        .in("box_id", idsRecurso)
+        .in("estado", ESTADOS_OCUPAN)
+    : { data: [] };
+
+  const rows = [...(citasQ.data || []), ...(arrQ.data || [])];
+  return rows
     .filter(r => r.hora_inicio && r.hora_fin)
     .map(r => ({ ini: hhmmToMin(r.hora_inicio.slice(0,5)), fin: hhmmToMin(r.hora_fin.slice(0,5)) }));
 }

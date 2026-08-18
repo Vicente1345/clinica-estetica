@@ -92,7 +92,7 @@ function PlanActivo({ plan, onReservar, onActualizar }) {
           <div>
             <div style={{fontWeight:600,fontSize:15}}>{plan.plan_label}</div>
             <div style={{fontSize:12,color:"#888",marginTop:2}}>
-              {plan.box_tipo === "estetico" ? "✨ Box Estético" : "🦷 Box Dental"}
+              {plan.box_tipo === "estetico" ? "✨ Box Estético" : plan.box_tipo === "medico" ? "🏥 Box Médico" : "🦷 Box Dental"}
               {plan.con_asistente && " · con asistente"}
             </div>
           </div>
@@ -234,7 +234,7 @@ export default function TabPlanes({ user, profesionales, boxes, onReservar }) {
               <div style={{display:"flex",justifyContent:"space-between",flexWrap:"wrap",gap:8}}>
                 <div>
                   <div style={{fontWeight:600,fontSize:14}}>{p.profesional_nombre}</div>
-                  <div style={{fontSize:12,color:"#666"}}>{p.plan_label} · {p.box_tipo==="estetico"?"✨ Estético":"🦷 Dental"}</div>
+                  <div style={{fontSize:12,color:"#666"}}>{p.plan_label} · {p.box_tipo==="estetico"?"✨ Estético":p.box_tipo==="medico"?"🏥 Médico":"🦷 Dental"}</div>
                 </div>
                 <div style={{display:"flex",gap:8,alignItems:"center",flexWrap:"wrap"}}>
                   <span style={{fontSize:13,fontWeight:600,color:"#185FA5"}}>{fmt(p.plan_precio)}/mes</span>
@@ -280,7 +280,7 @@ export default function TabPlanes({ user, profesionales, boxes, onReservar }) {
 
           {/* Selector box */}
           <div style={{display:"flex",gap:0,marginBottom:20,borderRadius:8,overflow:"hidden",border:"1px solid #ddd",width:"fit-content"}}>
-            {[["estetico","✨ Box Estético"],["dental","🦷 Box Dental"]].map(([k,l])=>(
+            {[["estetico","✨ Box Estético"],["dental","🦷 Box Dental"],["medico","🏥 Box Médico"]].map(([k,l])=>(
               <button key={k} onClick={()=>{setBoxActivo(k);setPlanSel(null);}}
                 style={{padding:"9px 24px",border:"none",cursor:"pointer",fontSize:13,fontWeight:600,
                   background:boxActivo===k?"#111":"#fff",color:boxActivo===k?"#fff":"#555"}}>

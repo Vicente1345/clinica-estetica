@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { sb } from "./supabase";
+import { recursoDeBox, tiposDelRecurso, normHora, ESTADOS_OCUPAN, ESTADOS_CITA_OCUPAN } from "./logic/disponibilidad";
 
 // ── PALETA inspirada en Barcelona Clinic Instagram ─────────────
 const C = {
@@ -82,16 +83,33 @@ export default function Landing({ onLogin }) {
   const [denFreq,   setDenFreq]     = useState(null); // "1j" | "2j" | null — qué frecuencia está expandida en el acordeón progresivo
   const [dispBoxes, setDispBoxes]         = useState([]);
   const [dispArriendos, setDispArriendos] = useState([]);
-  const [dispBoxSel, setDispBoxSel]       = useState(null);
+  const [dispCitas, setDispCitas]         = useState([]);
+  // El calendario público se muestra por RECURSO FÍSICO: Dental y Estético
+  // comparten un mismo espacio (calendario único); el Médico es independiente.
+  const [dispRecursoSel, setDispRecursoSel] = useState("dental_estetico");
   const [dispSemana, setDispSemana]       = useState(0);
 
   useEffect(() => {
     sb.from("boxes").select("id,nombre,tipo").eq("activo",true).order("nombre")
-      .then(({data})=>{ if(data){ setDispBoxes(data); setDispBoxSel(data[0]); }});
+      .then(({data})=>{ if(data) setDispBoxes(data); });
     sb.from("arriendos").select("box_id,fecha,hora_inicio,hora_fin,estado")
-      .in("estado",["confirmado","pendiente"]).order("fecha")
+      .in("estado", ESTADOS_OCUPAN).order("fecha")
       .then(({data})=>{ if(data) setDispArriendos(data); });
+    // Las citas de pacientes también ocupan el recurso físico
+    sb.from("solicitudes_paciente").select("box_tipo,fecha_solicitada,hora_inicio,hora_fin,estado")
+      .in("estado", ESTADOS_CITA_OCUPAN)
+      .then(({data})=>{ if(data) setDispCitas(data); });
   }, []);
+
+  const dispRecursos = (() => {
+    const grupos = {};
+    dispBoxes.forEach(b => {
+      const k = recursoDeBox(b);
+      if (!grupos[k]) grupos[k] = { key:k, nombre: k==="medico" ? "🏥 Box Médico" : "🦷✨ Box Dental / Estético", ids:[] };
+      grupos[k].ids.push(b.id);
+    });
+    return Object.values(grupos);
+  })();
 
   const handleLogin = async e => {
     e.preventDefault();
@@ -157,7 +175,7 @@ export default function Landing({ onLogin }) {
       {/* ── STATS ── */}
       <section style={{ background:C.lila, padding:"28px 40px" }}>
         <div style={{ maxWidth:800, margin:"0 auto", display:"grid", gridTemplateColumns:"repeat(3,1fr)", gap:20, textAlign:"center" }}>
-          {[["3","Boxes equipados"],["100%","Documentación al día"],["Flex","Horarios a tu medida"]].map(([n,t])=>(
+          {[["2","Espacios equipados"],["100%","Documentación al día"],["Flex","Horarios a tu medida"]].map(([n,t])=>(
             <div key={t}>
               <div style={{ fontSize:30, fontWeight:700, color:C.blanco }}>{n}</div>
               <div style={{ fontSize:11, letterSpacing:".15em", textTransform:"uppercase", color:C.lilaPale, marginTop:4 }}>{t}</div>
@@ -199,9 +217,8 @@ export default function Landing({ onLogin }) {
           </div>
           <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fit,minmax(260px,1fr))", gap:24 }}>
             {[
-              { icon:"✨", color:C.lila, bg:C.lilaPale, nombre:"Box 1 · Estético", desc:"Equipado para medicina estética, cosmetología y tratamientos faciales y corporales.", items:["Camilla profesional","Aro de luz profesional","Refrigerador","Alcohol y desinfección","EPP básico","Sabanilla desechable","Carpule","WiFi y climatización","Eliminación de residuos · +$2.000 adicional"] },
-              { icon:"🦷", color:C.rosa, bg:C.rosaPale, nombre:"Box 2 · Dental", desc:"Unidad dental completa con todos los equipos necesarios, con o sin asistente.", items:["Sillón dental completo","Lámpara de fotocurado","Bandeja de examen","Instrumental básico","Carpule","Rayos X · equipo portátil","Esterilización básica","Eliminación de residuos","Opción con asistente"] },
-              { icon:"🏥", color:C.dorado, bg:C.beige, nombre:"Box 3 · Médico", desc:"Espacio clínico para médicos y profesionales de la salud. Ideal para consultas, procedimientos y atención ambulatoria.", items:["Camilla","Escritorio y lavamanos","EPP incluido","Esterilización de instrumental simple","Eliminación de residuos básicos y cortopunzantes"] },
+              { icon:"🦷✨", color:C.lila, bg:C.lilaPale, nombre:"Box Dental / Estético", desc:"Un único espacio físico de doble función: unidad dental completa y equipamiento para medicina estética. Se arrienda en modalidad Dental o Estética — el calendario es compartido entre ambas.", items:["Sillón dental completo","Lámpara de fotocurado","Instrumental y bandeja de examen","Rayos X · equipo portátil","Camilla y aro de luz profesional","Refrigerador","Alcohol, desinfección y EPP básico","Carpule y sabanilla desechable","Esterilización básica · eliminación de residuos","Opción con asistente (modalidad Dental Pro)"] },
+              { icon:"🏥", color:C.dorado, bg:C.beige, nombre:"Box Médico", desc:"Espacio clínico independiente para médicos y profesionales de la salud, con calendario propio. Ideal para consultas, procedimientos y atención ambulatoria. Reserva mínima de 2 horas consecutivas.", items:["Camilla","Escritorio y lavamanos","EPP incluido","Esterilización de instrumental simple","Eliminación de residuos básicos y cortopunzantes"] },
             ].map(b=>(
               <div key={b.nombre} style={{ background:C.blanco, borderRadius:16, overflow:"hidden", boxShadow:"0 4px 24px rgba(155,142,196,0.12)" }}>
                 <div style={{ background:`linear-gradient(135deg, ${b.color}, ${b.color}bb)`, padding:"36px 28px", textAlign:"center" }}>
@@ -628,14 +645,19 @@ export default function Landing({ onLogin }) {
             <h2 style={{ fontSize:32, fontWeight:400, margin:0, color:C.cafe }}>Disponibilidad de boxes</h2>
             <p style={{ fontSize:13, color:C.gris, marginTop:10, fontFamily:"system-ui" }}>Vista general — para reservar, accede con tu cuenta.</p>
           </div>
-          <div style={{ display:"flex", gap:8, marginBottom:16, justifyContent:"center", flexWrap:"wrap" }}>
-            {dispBoxes.map(b=>(
-              <button key={b.id} onClick={()=>setDispBoxSel(b)}
-                style={{ padding:"7px 18px", borderRadius:20, border:`1px solid ${dispBoxSel?.id===b.id?C.lila:C.beigeOscuro}`, background:dispBoxSel?.id===b.id?C.lila:C.blanco, color:dispBoxSel?.id===b.id?C.blanco:C.cafeClaro, cursor:"pointer", fontSize:13, fontWeight:600 }}>
-                {b.nombre}
+          <div style={{ display:"flex", gap:8, marginBottom:8, justifyContent:"center", flexWrap:"wrap" }}>
+            {dispRecursos.map(r=>(
+              <button key={r.key} onClick={()=>setDispRecursoSel(r.key)}
+                style={{ padding:"7px 18px", borderRadius:20, border:`1px solid ${dispRecursoSel===r.key?C.lila:C.beigeOscuro}`, background:dispRecursoSel===r.key?C.lila:C.blanco, color:dispRecursoSel===r.key?C.blanco:C.cafeClaro, cursor:"pointer", fontSize:13, fontWeight:600 }}>
+                {r.nombre}
               </button>
             ))}
           </div>
+          <p style={{ textAlign:"center", fontSize:11, color:C.gris, fontFamily:"system-ui", margin:"0 0 16px" }}>
+            {dispRecursoSel==="medico"
+              ? "Calendario independiente · reserva mínima de 2 horas consecutivas"
+              : "Dental y Estético comparten el mismo espacio físico: el calendario es único para ambas modalidades"}
+          </p>
           {(() => {
             const getLunesP = (off=0) => {
               const d=new Date(); const day=d.getDay();
@@ -648,7 +670,11 @@ export default function Landing({ onLogin }) {
               return { label:l, fecha:f.toISOString().split("T")[0] };
             });
             const horas = ["08:00","09:00","10:00","11:00","12:00","13:00","14:00","15:00","16:00","17:00","18:00","19:00"];
-            const ocupado = (fecha,hora) => dispArriendos.some(a=>a.box_id===dispBoxSel?.id&&a.fecha===fecha&&hora>=a.hora_inicio&&hora<a.hora_fin);
+            const idsSel   = dispRecursos.find(r=>r.key===dispRecursoSel)?.ids || [];
+            const tiposSel = tiposDelRecurso(dispRecursoSel);
+            const ocupado  = (fecha,hora) =>
+              dispArriendos.some(a=>idsSel.includes(a.box_id)&&a.fecha===fecha&&hora>=normHora(a.hora_inicio)&&hora<normHora(a.hora_fin)) ||
+              dispCitas.some(s=>tiposSel.includes(s.box_tipo)&&s.fecha_solicitada===fecha&&s.hora_inicio&&s.hora_fin&&hora>=normHora(s.hora_inicio)&&hora<normHora(s.hora_fin));
             const pasado  = (fecha,hora) => new Date(`${fecha}T${hora}:00`) < new Date();
             return (
               <div style={{ background:C.blanco, borderRadius:16, padding:20, boxShadow:"0 4px 24px rgba(155,142,196,0.1)" }}>

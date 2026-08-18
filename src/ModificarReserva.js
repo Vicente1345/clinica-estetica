@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { sb } from "./supabase";
+import { conflictosArriendo, conflictosCita, minHorasDeBox, normHora } from "./logic/disponibilidad";
 
 const HORAS = ["08:00","09:00","10:00","11:00","12:00","13:00","14:00","15:00","16:00","17:00","18:00","19:00","20:00"];
 const fmt = n => (n||0).toLocaleString("es-CL",{style:"currency",currency:"CLP",maximumFractionDigits:0});
@@ -26,7 +27,7 @@ const S = {
   card: { background:"#f8f8f8", borderRadius:12, padding:16, marginBottom:10 },
 };
 
-export default function ModificarReserva({ arriendos, boxes, profesionales, userRol, onActualizar }) {
+export default function ModificarReserva({ arriendos, boxes, profesionales, solicitudes = [], userRol, onActualizar }) {
   const [selId, setSelId]             = useState(null);
   const [form, setForm]               = useState({});
   const [guardando, setGuardando]     = useState(false);
@@ -62,26 +63,62 @@ export default function ModificarReserva({ arriendos, boxes, profesionales, user
     if (!form.motivo.trim()) {
       showToast("Debes ingresar el motivo del cambio.", "err"); return;
     }
-    const conflicto = arriendos.find(a =>
-      a.id !== selId && a.box_id === form.boxId && a.fecha === form.fecha &&
-      a.estado !== "cancelado" &&
-      !(form.horaFin <= a.hora_inicio || form.horaInicio >= a.hora_fin)
-    );
-    if (conflicto) {
-      showToast(`Conflicto: ese horario está ocupado (${conflicto.hora_inicio}–${conflicto.hora_fin})`, "err"); return;
-    }
     const box = boxes.find(b => b.id === form.boxId);
+    if (!box) { showToast("Selecciona un box válido", "err"); return; }
+
+    // Conflictos sobre el RECURSO FÍSICO compartido (Dental+Estético comparten
+    // calendario; Médico independiente), excluyendo la propia reserva
+    const [conflicto] = conflictosArriendo({
+      boxes, arriendos, box,
+      fecha: form.fecha, horaInicio: form.horaInicio, horaFin: form.horaFin,
+      ignorarId: selId,
+    });
+    if (conflicto) {
+      showToast(`Conflicto: ese horario está ocupado (${normHora(conflicto.hora_inicio)}–${normHora(conflicto.hora_fin)} · ${conflicto.box_nombre})`, "err"); return;
+    }
+    const [cita] = conflictosCita({
+      solicitudes, box,
+      fecha: form.fecha, horaInicio: form.horaInicio, horaFin: form.horaFin,
+    });
+    if (cita) {
+      showToast(`Conflicto: hay una cita de paciente ${normHora(cita.hora_inicio)}–${normHora(cita.hora_fin)} en ese espacio`, "err"); return;
+    }
     const [h1,m1] = form.horaInicio.split(":").map(Number);
     const [h2,m2] = form.horaFin.split(":").map(Number);
     const horas = ((h2*60+m2)-(h1*60+m1))/60;
+    const minHoras = minHorasDeBox(box);
+    if (horas < minHoras) {
+      showToast(`${box.nombre}: mínimo ${minHoras} horas consecutivas`, "err"); return;
+    }
     const monto = box ? box.tarifa_hora * horas : arr.monto;
     setGuardando(true);
-    await sb.from("arriendos").update({
-      fecha: form.fecha, hora_inicio: form.horaInicio, hora_fin: form.horaFin,
-      box_id: form.boxId, box_nombre: box?.nombre || arr.box_nombre,
-      horas, monto,
-      obs_modificacion: `Modificado por admin: ${form.motivo}`,
-    }).eq("id", selId);
+    // La escritura pasa por /api/reservar (modo modificación): re-valida en el
+    // servidor contra datos frescos del recurso compartido y revierte si otra
+    // reserva simultánea gana el horario.
+    try {
+      const r = await fetch("/api/reservar", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ modificar: {
+          id: selId,
+          fecha: form.fecha, hora_inicio: form.horaInicio, hora_fin: form.horaFin,
+          box_id: form.boxId, box_nombre: box?.nombre || arr.box_nombre,
+          horas, monto,
+          obs_modificacion: `Modificado por admin: ${form.motivo}`,
+        }}),
+      });
+      const data = await r.json();
+      if (!r.ok || !data.ok) {
+        const det = (data.conflictos || []).slice(0, 2).map(c => `${c.hora_inicio}–${c.hora_fin} (${c.origen})`).join(", ");
+        showToast(`${data.error || "No se pudo modificar"}${det ? ` · ${det}` : ""}`, "err");
+        setGuardando(false);
+        return;
+      }
+    } catch (e) {
+      showToast("Error de conexión al modificar. Intenta de nuevo.", "err");
+      setGuardando(false);
+      return;
+    }
     setGuardando(false);
     setSelId(null);
     showToast("Reserva modificada correctamente.");

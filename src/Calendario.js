@@ -1,25 +1,14 @@
 import { useState, useEffect } from "react";
 import { sb } from "./supabase";
+import {
+  calcularPrecio, boxIdsDelRecurso, tiposDelRecurso, recursoDeBox,
+  minHorasDeBox, normTipoBox, seSolapan, normHora,
+  ESTADOS_OCUPAN, ESTADOS_CITA_OCUPAN,
+} from "./logic/disponibilidad";
 
 const HORAS = ["08:00","09:00","10:00","11:00","12:00","13:00","14:00","15:00","16:00","17:00","18:00","19:00","20:00"];
 const DIAS  = ["Lun","Mar","Mié","Jue","Vie","Sáb"];
 const fmt   = n => (n||0).toLocaleString("es-CL",{style:"currency",currency:"CLP",maximumFractionDigits:0});
-
-function calcularPrecio(tipoBox, horas) {
-  const esDental = tipoBox?.toLowerCase().includes("dental");
-  if (!esDental) {
-    if (horas < 1)  return { monto:0,     label:"Mínimo 1 hora",              valido:false };
-    if (horas === 1) return { monto:10000, label:"1 hora · $10.000",           valido:true };
-    if (horas === 2) return { monto:18000, label:"Bloque 2 horas · $18.000",   valido:true };
-    if (horas < 5)  return { monto:horas*10000, label:`${horas} horas · $10.000/hr`, valido:true };
-    return           { monto:45000, label:"Jornada (5h) · $45.000",            valido:true };
-  } else {
-    if (horas < 2)  return { monto:0,     label:"Mínimo 2 horas en box dental", valido:false };
-    if (horas === 2) return { monto:18000, label:"2 horas · $9.000/hr",          valido:true };
-    if (horas < 5)  return { monto:horas*9000, label:`${horas} horas · $9.000/hr`, valido:true };
-    return           { monto:45000, label:"Jornada (5h) · $45.000",             valido:true };
-  }
-}
 
 function getLunes(offset=0) {
   const d = new Date();
@@ -75,20 +64,25 @@ useEffect(() => { recargarArriendos(); }, []);
     return { label:d, fecha:formatFecha(fecha) };
   });
 
+  // Ocupación sobre el RECURSO FÍSICO: Dental y Estético comparten un mismo
+  // espacio, así que una reserva en cualquiera de las dos modalidades bloquea
+  // a la otra. El Box Médico tiene su propio recurso independiente.
+  const idsRecursoSel = boxSel ? boxIdsDelRecurso(boxes || [], boxSel) : [];
+
   const estaOcupado = (fecha, hora) => {
   if (!boxSel) return false;
   return arriendos.some(a =>
-    a.box_id === boxSel.id &&
+    idsRecursoSel.includes(a.box_id) &&
     a.fecha === fecha &&
-    (a.estado === "confirmado" || a.estado === "pendiente") &&
-    hora >= a.hora_inicio &&
-    hora < a.hora_fin
+    ESTADOS_OCUPAN.includes(a.estado) &&
+    hora >= normHora(a.hora_inicio) &&
+    hora < normHora(a.hora_fin)
   );
 };
 
-// Detecta si un slot de la grilla (1 hora completa) está bloqueado por una cita de paciente
-// del mismo tipo de box (ej: si el box seleccionado es "dental" y hay una cita de paciente
-// dental ese día y hora, queda bloqueado para todos los profesionales)
+// Detecta si un slot de la grilla (1 hora completa) está bloqueado por una cita
+// de paciente en el mismo RECURSO físico (una cita dental bloquea también la
+// vista estética y viceversa; las citas médicas solo bloquean el Box Médico)
 const cellEnd = (hora) => {
   const [h] = hora.split(":").map(Number);
   return (h+1).toString().padStart(2,"0") + ":00";
@@ -96,39 +90,35 @@ const cellEnd = (hora) => {
 
 const citaPacienteEnSlot = (fecha, hora) => {
   if (!boxSel || !solicitudes?.length) return null;
-  const tipoBox = (boxSel.tipo || boxSel.nombre || "").toLowerCase();
-  const tipoNorm = tipoBox.includes("dental") ? "dental"
-                 : tipoBox.includes("medic")  ? "medico"
-                 : "estetico";
+  const tipos = tiposDelRecurso(recursoDeBox(boxSel));
   const cellIni = hora;
   const cellFin = cellEnd(hora);
   return solicitudes.find(s =>
-    s.box_tipo === tipoNorm &&
+    tipos.includes(s.box_tipo) &&
     s.fecha_solicitada === fecha &&
-    ["agendada","contactado","confirmada"].includes(s.estado) &&
+    ESTADOS_CITA_OCUPAN.includes(s.estado) &&
     s.hora_inicio && s.hora_fin &&
-    cellIni < s.hora_fin.slice(0,5) &&
-    cellFin > s.hora_inicio.slice(0,5)
+    cellIni < normHora(s.hora_fin) &&
+    cellFin > normHora(s.hora_inicio)
   ) || null;
 };
 
   const esMiReserva = (fecha, hora) => {
   if (!boxSel || !user) return false;
   return arriendos.some(a =>
-    a.box_id === boxSel.id &&
+    idsRecursoSel.includes(a.box_id) &&
     a.fecha === fecha &&
     (a.profesional_nombre === user.nombre || a.profesional_id === profId) &&
-    (a.estado === "confirmado" || a.estado === "pendiente") &&
-    hora >= a.hora_inicio &&
-    hora < a.hora_fin
+    ESTADOS_OCUPAN.includes(a.estado) &&
+    hora >= normHora(a.hora_inicio) &&
+    hora < normHora(a.hora_fin)
   );
 };
   const esPasado = (fecha, hora) => new Date(`${fecha}T${hora}:00`) < new Date();
 
   const handleClickSlot = (fecha, hora) => {
     if (!boxSel || estaOcupado(fecha,hora) || esPasado(fecha,hora) || citaPacienteEnSlot(fecha,hora)) return;
-    const esDental = boxSel.nombre?.toLowerCase().includes("dental") || boxSel.tipo?.toLowerCase().includes("dental");
-    const minHoras = esDental ? 2 : 1;
+    const minHoras = minHorasDeBox(boxSel);
     const idxInicio = HORAS.indexOf(hora);
     const horaFinDef = HORAS[Math.min(idxInicio+minHoras, HORAS.length-1)];
     setHoraFin(horaFinDef);
@@ -146,41 +136,90 @@ const citaPacienteEnSlot = (fecha, hora) => {
   const tipoBox = reserva?.box?.tipo || reserva?.box?.nombre || "";
   const precio  = calcularPrecio(tipoBox, horas);
 
+  // Valida el RANGO COMPLETO elegido (no solo la primera hora): choques con
+  // arriendos activos del recurso compartido y con citas de pacientes
+  const conflictoRango = (() => {
+    if (!reserva || !horaFin || horas <= 0) return null;
+    const arr = arriendos.find(a =>
+      idsRecursoSel.includes(a.box_id) &&
+      a.fecha === reserva.fecha &&
+      ESTADOS_OCUPAN.includes(a.estado) &&
+      seSolapan(reserva.horaInicio, horaFin, a.hora_inicio, a.hora_fin)
+    );
+    if (arr) return `Choca con una reserva ${normHora(arr.hora_inicio)}–${normHora(arr.hora_fin)} (${arr.box_nombre})`;
+    const tipos = tiposDelRecurso(recursoDeBox(reserva.box));
+    const cita = (solicitudes || []).find(s =>
+      tipos.includes(s.box_tipo) &&
+      s.fecha_solicitada === reserva.fecha &&
+      ESTADOS_CITA_OCUPAN.includes(s.estado) &&
+      s.hora_inicio && s.hora_fin &&
+      seSolapan(reserva.horaInicio, horaFin, s.hora_inicio, s.hora_fin)
+    );
+    if (cita) return `Choca con una cita de paciente ${normHora(cita.hora_inicio)}–${normHora(cita.hora_fin)}`;
+    return null;
+  })();
+
+  const puedeReservar = precio.valido && !conflictoRango;
+
   const opcionesHoraFin = () => {
     if (!reserva) return [];
     const idx = HORAS.indexOf(reserva.horaInicio);
-    const esDental = tipoBox.toLowerCase().includes("dental");
-    return HORAS.slice(idx + (esDental ? 2 : 1));
+    return HORAS.slice(idx + minHorasDeBox(reserva.box));
   };
 
-  const confirmarReserva = async () => {
-    if (!precio.valido) return;
+  // Crea el arriendo vía /api/reservar (validación final server-side contra
+  // dobles reservas en el recurso compartido). Devuelve el arriendo o null.
+  const crearArriendoServidor = async (extra) => {
     const pid = user?.rol === "prof"
       ? profesionales?.find(p => normalizeNombre(p.nombre) === normalizeNombre(user.nombre))?.id
       : profId;
-    if (!pid) return alert(user?.rol === "prof"
-      ? "Tu usuario no está vinculado a un profesional. Pide al admin que te agregue en la tabla de Profesionales con el mismo nombre."
-      : "Selecciona una profesional");
+    if (!pid) {
+      alert(user?.rol === "prof"
+        ? "Tu usuario no está vinculado a un profesional. Pide al admin que te agregue en la tabla de Profesionales con el mismo nombre."
+        : "Selecciona una profesional");
+      return null;
+    }
     const prof = profesionales?.find(p => p.id === pid);
+    try {
+      const r = await fetch("/api/reservar", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ arriendo: {
+          fecha:              reserva.fecha,
+          box_id:             reserva.box.id,
+          box_nombre:         reserva.box.nombre,
+          profesional_id:     pid,
+          profesional_nombre: prof?.nombre || "",
+          hora_inicio:        reserva.horaInicio,
+          hora_fin:           horaFin,
+          horas,
+          monto:              precio.monto,
+          pagado:             false,
+          estado:             "pendiente",
+          ...extra,
+        }}),
+      });
+      const data = await r.json();
+      if (!r.ok || !data.ok) {
+        alert(data.error || "No se pudo crear la reserva");
+        await recargarArriendos();
+        return null;
+      }
+      return { arriendo: data.arriendos[0], pid };
+    } catch (e) {
+      alert("Error de conexión al reservar. Intenta de nuevo.");
+      return null;
+    }
+  };
+
+  const confirmarReserva = async () => {
+    if (!puedeReservar) return;
     setGuardando(true);
+    const creado = await crearArriendoServidor({ metodo: "Transferencia", verificado: "sin_pago" });
+    if (!creado) { setGuardando(false); return; }
+    const pid = creado.pid;
 
-    const { data } = await sb.from("arriendos").insert({
-      fecha:             reserva.fecha,
-      box_id:            reserva.box.id,
-      box_nombre:        reserva.box.nombre,
-      profesional_id:    pid,
-      profesional_nombre: prof?.nombre || "",
-      hora_inicio:       reserva.horaInicio,
-      hora_fin:          horaFin,
-      horas,
-      monto:             precio.monto,
-      metodo:            "Transferencia",
-      pagado:            false,
-      estado:            "pendiente",
-      verificado:        "sin_pago",
-    }).select().single();
-
-    const tipoBoxNorm = reserva.box.tipo?.toLowerCase().includes("dental") ? "dental" : "estetico";
+    const tipoBoxNorm = normTipoBox(reserva.box);
     const { data: planActivo } = await sb
       .from("planes_profesional")
       .select("id, jornadas_stock")
@@ -205,38 +244,13 @@ const citaPacienteEnSlot = (fecha, hora) => {
 
   // ── Pagar con Webpay desde el modal de reserva ──
   const iniciarPagoWebpay = async () => {
-    if (!precio.valido) return;
-    const pid = user?.rol === "prof"
-      ? profesionales?.find(p => normalizeNombre(p.nombre) === normalizeNombre(user.nombre))?.id
-      : profId;
-    if (!pid) return alert(user?.rol === "prof"
-      ? "Tu usuario no está vinculado a un profesional. Pide al admin que te agregue en la tabla de Profesionales."
-      : "Selecciona una profesional");
-    const prof = profesionales?.find(p => p.id === pid);
+    if (!puedeReservar) return;
     setGuardando(true);
 
-    // 1. Crear arriendo pendiente con metodo='Webpay'
-    const { data: nuevoArr, error } = await sb.from("arriendos").insert({
-      fecha:              reserva.fecha,
-      box_id:             reserva.box.id,
-      box_nombre:         reserva.box.nombre,
-      profesional_id:     pid,
-      profesional_nombre: prof?.nombre || "",
-      hora_inicio:        reserva.horaInicio,
-      hora_fin:           horaFin,
-      horas,
-      monto:              precio.monto,
-      metodo:             "Webpay",
-      pagado:             false,
-      estado:             "pendiente",
-      verificado:         "pendiente",
-    }).select().single();
-
-    if (error || !nuevoArr) {
-      setGuardando(false);
-      alert("No se pudo crear el arriendo previo al pago");
-      return;
-    }
+    // 1. Crear arriendo pendiente vía /api/reservar (validación server-side)
+    const creado = await crearArriendoServidor({ metodo: "Webpay", verificado: "pendiente" });
+    if (!creado) { setGuardando(false); return; }
+    const nuevoArr = creado.arriendo;
 
     // 2. Iniciar transacción Webpay
     let initData;
@@ -273,13 +287,18 @@ const citaPacienteEnSlot = (fecha, hora) => {
     <div style={{ fontFamily:"system-ui,sans-serif" }}>
 
       {/* Selector boxes */}
-      <div style={{ display:"flex", gap:8, marginBottom:16, flexWrap:"wrap" }}>
+      <div style={{ display:"flex", gap:8, marginBottom:6, flexWrap:"wrap" }}>
         {boxes?.map(b=>(
           <button key={b.id} onClick={()=>setBoxSel(b)}
             style={{ padding:"6px 16px", borderRadius:20, border:`1px solid ${boxSel?.id===b.id?"#111":"#ccc"}`, background:boxSel?.id===b.id?"#111":"#fff", color:boxSel?.id===b.id?"#fff":"#444", cursor:"pointer", fontSize:13, fontWeight:boxSel?.id===b.id?600:400 }}>
             {b.nombre}
           </button>
         ))}
+      </div>
+      <div style={{ fontSize:11, color:"#888", marginBottom:14 }}>
+        {boxSel && recursoDeBox(boxSel) === "dental_estetico"
+          ? "ℹ Dental y Estético comparten el mismo espacio físico: una reserva en cualquiera de las dos modalidades bloquea el horario en ambas."
+          : boxSel ? "ℹ El Box Médico tiene calendario propio · reserva mínima de 2 horas consecutivas." : ""}
       </div>
 
       {/* Navegación semana */}
@@ -378,6 +397,11 @@ const citaPacienteEnSlot = (fecha, hora) => {
                 {precio.label} — <strong>{precio.valido?fmt(precio.monto):"—"}</strong>
               </div>
             )}
+            {precio.valido && conflictoRango && (
+              <div style={{ background:"#FCEBEB", border:"1px solid #F5C2C7", borderRadius:8, padding:10, marginBottom:14, fontSize:12, fontWeight:500, color:"#721C24" }}>
+                ⚠ {conflictoRango}. Elige otro bloque u otra hora de término.
+              </div>
+            )}
             {user?.rol !== "prof" && (
               <>
                 <label style={{ display:"block", fontSize:12, color:"#666", marginBottom:4 }}>Profesional *</label>
@@ -400,12 +424,12 @@ const citaPacienteEnSlot = (fecha, hora) => {
               </div>
             </div>
             <div style={{ display:"flex", gap:8, flexWrap:"wrap" }}>
-              <button onClick={confirmarReserva} disabled={!precio.valido||guardando}
-                style={{ flex:"1 1 0", padding:"11px", borderRadius:8, border:"none", background:precio.valido?"#1D9E75":"#ccc", color:"#fff", cursor:precio.valido?"pointer":"default", fontSize:13, fontWeight:600 }}>
+              <button onClick={confirmarReserva} disabled={!puedeReservar||guardando}
+                style={{ flex:"1 1 0", padding:"11px", borderRadius:8, border:"none", background:puedeReservar?"#1D9E75":"#ccc", color:"#fff", cursor:puedeReservar?"pointer":"default", fontSize:13, fontWeight:600 }}>
                 {guardando?"Guardando…":"🏦 Transferencia"}
               </button>
-              <button onClick={iniciarPagoWebpay} disabled={!precio.valido||guardando}
-                style={{ flex:"1 1 0", padding:"11px", borderRadius:8, border:"none", background:precio.valido?"#185FA5":"#ccc", color:"#fff", cursor:precio.valido?"pointer":"default", fontSize:13, fontWeight:600 }}>
+              <button onClick={iniciarPagoWebpay} disabled={!puedeReservar||guardando}
+                style={{ flex:"1 1 0", padding:"11px", borderRadius:8, border:"none", background:puedeReservar?"#185FA5":"#ccc", color:"#fff", cursor:puedeReservar?"pointer":"default", fontSize:13, fontWeight:600 }}>
                 💳 Webpay →
               </button>
               <button onClick={()=>setReserva(null)}
