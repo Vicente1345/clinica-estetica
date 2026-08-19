@@ -1,6 +1,5 @@
 {
   "routes": [
-    { "src": "^/$", "dest": "/barcelona-clinic.html" },
     { "src": "^/cowork(?:/.*)?$", "dest": "/index.html" },
     { "handle": "filesystem" }
   ],
