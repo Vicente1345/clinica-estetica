@@ -1,8 +1,8 @@
 {
-  "rewrites": [
-    { "source": "/", "destination": "/barcelona-clinic.html" },
-    { "source": "/cowork", "destination": "/index.html" },
-    { "source": "/cowork/(.*)", "destination": "/index.html" }
+  "routes": [
+    { "src": "^/$", "dest": "/barcelona-clinic.html" },
+    { "src": "^/cowork(?:/.*)?$", "dest": "/index.html" },
+    { "handle": "filesystem" }
   ],
   "crons": [
     {
