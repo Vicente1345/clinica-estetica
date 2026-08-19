@@ -263,6 +263,10 @@ export default function App() {
     const d=(h2*60+m2)-(h1*60+m1); return d>0?+(d/60).toFixed(1):0;
   },[arrForm.horaInicio,arrForm.horaFin]);
   const montoArr = boxArr ? boxArr.tarifa_hora * horasArr : 0;
+  // Monto real a cobrar en arriendos sueltos: el del catálogo elegido en
+  // SelectorPlan (p.ej. Flex $15.000/hr, jornada $45.000). La tarifa rack
+  // (montoArr) queda solo como respaldo y para las jornadas de planes.
+  const montoCobro = arrForm.esPlan ? montoArr : (arrForm.monto || montoArr);
 
   const handleArrNext = () => {
     if (!arrForm.boxId)  return showToast('Selecciona un box','err');
@@ -369,7 +373,7 @@ export default function App() {
         hora_inicio:        arrForm.horaInicio,
         hora_fin:           arrForm.horaFin,
         horas:              horasArr,
-        monto:              montoArr,
+        monto:              montoCobro,
         metodo:             arrForm.metodo,
         pagado:             false,
         estado:             'pendiente',
@@ -392,7 +396,7 @@ export default function App() {
     }
     const prof = profesionales.find(p=>p.id===arrForm.profId);
     const box  = boxes.find(b=>b.id===arrForm.boxId);
-    if (!box || !prof || montoArr <= 0) {
+    if (!box || !prof || montoCobro <= 0) {
       showToast('Datos de arriendo incompletos', 'err');
       return;
     }
@@ -411,7 +415,7 @@ export default function App() {
       hora_inicio:        arrForm.horaInicio,
       hora_fin:           arrForm.horaFin,
       horas:              horasArr,
-      monto:              montoArr,
+      monto:              montoCobro,
       metodo:             'Webpay',
       pagado:             false,
       estado:             'pendiente',
@@ -430,7 +434,7 @@ export default function App() {
       const r = await fetch('/api/webpay-init', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ arriendoId: nuevoArr.id, monto: montoArr }),
+        body: JSON.stringify({ arriendoId: nuevoArr.id, monto: montoCobro }),
       });
       if (!r.ok) throw new Error(await r.text());
       initData = await r.json();
@@ -865,7 +869,7 @@ export default function App() {
                 <div><strong>{boxArr?.nombre}</strong> · {arrForm.fecha}</div>
                 <div>{arrForm.horaInicio} → {arrForm.horaFin} ({horasArr} hr)</div>
                 <div>Profesional: <strong>{profesionales.find(p=>p.id===arrForm.profId)?.nombre}</strong></div>
-                <div style={{marginTop:6,fontSize:16}}>Total: <strong>{fmt(montoArr)}</strong></div>
+                <div style={{marginTop:6,fontSize:16}}>Total: <strong>{arrForm.esPlan ? `${fmt(arrForm.monto)}/mes` : fmt(montoCobro)}</strong></div>
                 <div style={{fontSize:12,color:'#185FA5',marginTop:4}}>⚠ El horario se agenda solo al confirmar el pago</div>
               </div>
               {/* Selector método de pago */}
