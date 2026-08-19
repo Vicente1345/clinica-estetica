@@ -118,8 +118,17 @@ export default function App() {
   const showToast = (msg, tipo='ok') => { setToast({msg,tipo}); setTimeout(()=>setToast(null),3200); };
 
   // ── LOGIN / LOGOUT ──
-  const handleLogin = u => { sessionStorage.setItem('cli_user', JSON.stringify(u)); setUser(u); };
-  const handleLogout = () => { sessionStorage.removeItem('cli_user'); setUser(null); };
+  // La app no se desmonta al cambiar de sesión, así que todo estado de
+  // formulario ligado al usuario anterior debe limpiarse aquí (si no, una
+  // profesional podría heredar el arriendo a medio confirmar de otra).
+  const resetFormulariosDeUsuario = () => {
+    setArrForm(emptyArr);
+    setArrStep(0);
+    setArrNuevoId(null);
+    setTab('dashboard');
+  };
+  const handleLogin = u => { sessionStorage.setItem('cli_user', JSON.stringify(u)); setUser(u); resetFormulariosDeUsuario(); };
+  const handleLogout = () => { sessionStorage.removeItem('cli_user'); setUser(null); resetFormulariosDeUsuario(); };
 
   // ── FETCH DATA ──
   const fetchAll = useCallback(async () => {
@@ -237,12 +246,14 @@ export default function App() {
   const [arrStep, setArrStep]   = useState(0);
 
   // Auto-asignar profesional si el user logueado tiene rol 'prof'
-  // (matching tolerante a prefijos "Dr.", "Dra." y diferencias de mayúsculas)
+  // (matching tolerante a prefijos "Dr.", "Dra." y diferencias de mayúsculas).
+  // Se fuerza SIEMPRE que difiera — una profesional jamás debe quedar con el
+  // profId de otra, aunque el formulario traiga estado previo.
   useEffect(() => {
-    if (user?.rol === 'prof' && profesionales.length > 0 && !arrForm.profId) {
+    if (user?.rol === 'prof' && profesionales.length > 0) {
       const userNorm = normalizeNombre(user.nombre);
       const mi = profesionales.find(p => normalizeNombre(p.nombre) === userNorm);
-      if (mi) setArrForm(a => ({ ...a, profId: mi.id }));
+      if (mi && arrForm.profId !== mi.id) setArrForm(a => ({ ...a, profId: mi.id }));
     }
   }, [user, profesionales, arrForm.profId]);
   const boxArr = boxes.find(b=>b.id===arrForm.boxId);
