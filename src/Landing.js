@@ -20,8 +20,9 @@ const C = {
 
 // ── BOX ESTÉTICO ────────────────────────────────────────────────
 const EST_BASE = [
-  { titulo:"1 hora",                precio:10000, detalle:"Tarifa base · mínimo 1 hora" },
+  { titulo:"1 hora",                precio:10000, detalle:"Tarifa base" },
   { titulo:"2 horas consecutivas",  precio:18000, detalle:"Bloque continuo de 2 horas", popular:true },
+  { titulo:"3 horas consecutivas",  precio:30000, detalle:"Bloque continuo de 3 horas" },
   { titulo:"Jornada completa (5h)", precio:45000, detalle:"Sin compromiso · horario flexible" },
 ];
 const EST_MENSUAL = [
@@ -32,7 +33,7 @@ const EST_MENSUAL = [
 
 // ── BOX DENTAL – PLAN FLEX (sin asistente) ───────────────────────
 const FLEX_BASE = [
-  { titulo:"Por hora",              precio:15000, detalle:"Mínimo 2 horas consecutivas" },
+  { titulo:"Por hora",              precio:15000, detalle:"Elige 1, 2 o 3 horas" },
   { titulo:"Jornada suelta (5h)",   precio:45000, detalle:"Sin compromiso · sin asistente" },
 ];
 const FLEX_MENSUAL = [
@@ -46,7 +47,7 @@ const FLEX_MENSUAL = [
 
 // ── BOX DENTAL – PLAN PRO (con asistente) ───────────────────────
 const PRO_BASE = [
-  { titulo:"Por hora Pro",          precio:18000, detalle:"Mínimo 2 horas · con asistente" },
+  { titulo:"Por hora Pro",          precio:18000, detalle:"Elige 1, 2 o 3 horas · con asistente" },
   { titulo:"Jornada suelta Pro",    precio:65000, detalle:"Con asistente incluido" },
 ];
 const PRO_MENSUAL = [

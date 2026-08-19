@@ -12,9 +12,9 @@
 export const RECURSO_DENTAL_ESTETICO = "dental_estetico";
 export const RECURSO_MEDICO          = "medico";
 
-// Horas mínimas por modalidad. La regla de 2h del médico es obligatoria
-// (frontend + backend); la del dental es condición comercial preexistente.
-export const MIN_HORAS = { estetico: 1, dental: 2, medico: 2 };
+// Horas mínimas por modalidad. La regla de 2h es EXCLUSIVA del Box Médico
+// (obligatoria en frontend + backend); Dental y Estético no tienen mínimo.
+export const MIN_HORAS = { estetico: 1, dental: 1, medico: 2 };
 
 // "09:00:00" (time de Postgres) → "09:00"
 export const normHora = h => (h || "").slice(0, 5);
@@ -90,14 +90,13 @@ export function validarDuracionMinima(box, horas) {
 
 // Precios por modalidad (catálogo comercial vigente de la landing/planes):
 //   Estético: mín 1h · $10.000/hr · bloque 2h $18.000 · jornada 5h $45.000
-//   Dental:   mín 2h · $9.000/hr  · jornada 5h $45.000
+//   Dental:   mín 1h · $9.000/hr  · jornada 5h $45.000
 //   Médico:   mín 2h · $12.000/hr · jornada 5h $55.000
 export function calcularPrecio(tipoBox, horas) {
   const tipo = normTipoBox({ tipo: tipoBox });
   if (tipo === "dental") {
-    if (horas < 2)   return { monto: 0,           label: "Mínimo 2 horas en box dental",  valido: false };
-    if (horas === 2) return { monto: 18000,       label: "2 horas · $9.000/hr",           valido: true };
-    if (horas < 5)   return { monto: horas * 9000, label: `${horas} horas · $9.000/hr`,   valido: true };
+    if (horas < 1)   return { monto: 0,           label: "Mínimo 1 hora",                 valido: false };
+    if (horas < 5)   return { monto: horas * 9000, label: `${horas} hora${horas > 1 ? "s" : ""} · $9.000/hr`, valido: true };
     return             { monto: 45000,            label: "Jornada (5h) · $45.000",        valido: true };
   }
   if (tipo === "medico") {

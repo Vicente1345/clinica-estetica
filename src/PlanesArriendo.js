@@ -24,20 +24,14 @@ export const PLANES = {
         tipo: "suelta",
         opciones: [
           {
-            id: "est_1h", horasFijas: 1,
-            label: "1 hora",
-            detalle: "Uso libre del box por 1 hora",
+            id: "est_hora_sel",
+            label: "Por hora",
+            detalle: "Elige 1, 2 o 3 horas · el bloque de 2h tiene precio rebajado",
             precio: 10000,
+            horasOpciones: [1, 2, 3],
+            precios: { 1: 10000, 2: 18000, 3: 30000 },
             jornadas: null, meses: null, asistente: false,
-            tag: null,
-          },
-          {
-            id: "est_2h", horasFijas: 2,
-            label: "2 horas consecutivas",
-            detalle: "Bloque de 2 horas seguidas",
-            precio: 18000,
-            jornadas: null, meses: null, asistente: false,
-            tag: "Más conveniente",
+            tag: "Desde $10.000",
             tagColor: "#1D9E75",
           },
           {
@@ -129,13 +123,12 @@ export const PLANES = {
         tipo: "suelta",
         opciones: [
           {
-            id: "den_hora_flex", porHora: true, minHoras: 2,
+            id: "den_hora_flex", horasOpciones: [1, 2, 3],
             label: "Por hora (Plan Flex)",
-            detalle: "Mínimo 2 horas consecutivas · sin asistente",
+            detalle: "Elige 1, 2 o 3 horas · sin asistente",
             precio: 15000,
             jornadas: null, meses: null, asistente: false,
-            tag: "Mín. 2h",
-            tagColor: "#1D9E75",
+            tag: null,
           },
           {
             id: "den_js", horasFijas: 5,
@@ -231,9 +224,9 @@ export const PLANES = {
         descripcion: "Incluye asistente durante toda la jornada",
         opciones: [
           {
-            id: "den_hora_pro", porHora: true, minHoras: 2,
+            id: "den_hora_pro", horasOpciones: [1, 2, 3],
             label: "Por hora Pro",
-            detalle: "Mínimo 2 horas consecutivas · con asistente",
+            detalle: "Elige 1, 2 o 3 horas · con asistente",
             precio: 18000,
             jornadas: null, meses: null, asistente: true,
             tag: "Con asistente",
@@ -364,7 +357,7 @@ export const PLANES = {
         tipo: "suelta",
         opciones: [
           {
-            id: "med_hora", porHora: true, minHoras: 2,
+            id: "med_hora", horasOpciones: [2, 3], minHoras: 2,
             label: "Hora suelta",
             detalle: "Mínimo 2 horas consecutivas",
             precio: 12000,
@@ -469,6 +462,7 @@ export function SelectorPlan({ tipoBox, onSeleccionar }) {
   const [horario,     setHorario]     = useState({ inicio: "09:00", fin: "14:00" });
   const [fechaInicio, setFechaInicio] = useState("");
   const [seccionOpen, setSeccionOpen] = useState(null);
+  const [cantHoras,   setCantHoras]   = useState(null); // opciones "por hora": 1-3 (médico 2-3)
 
   const estructura  = PLANES[tipoBox] || PLANES.estetico;
   const opcionActual = planSel
@@ -491,10 +485,13 @@ export function SelectorPlan({ tipoBox, onSeleccionar }) {
     return `${String(Math.floor(t / 60)).padStart(2, "0")}:${String(t % 60).padStart(2, "0")}`;
   };
 
-  // Para opciones sueltas de bloque fijo (1h, 2h, jornada 5h) la hora de
-  // término se deriva de la de inicio; para las "por hora" la elige el usuario
-  const finEfectivo = !esPlan && opcionActual?.horasFijas
-    ? sumaHoras(horario.inicio, opcionActual.horasFijas)
+  // Duración de una opción suelta: bloque fijo (jornada 5h) o cantidad de
+  // horas elegida por la profesional (1-3; el Box Médico parte en 2)
+  const horasSuelta = !esPlan && opcionActual
+    ? (opcionActual.horasFijas || cantHoras || 0)
+    : 0;
+  const finEfectivo = !esPlan && opcionActual
+    ? sumaHoras(horario.inicio, horasSuelta)
     : horario.fin;
 
   // Horas del horario elegido (0 si inválido)
@@ -505,14 +502,16 @@ export function SelectorPlan({ tipoBox, onSeleccionar }) {
     return d > 0 ? d / 60 : 0;
   })();
 
-  // Monto real de una opción suelta: bloque fijo = precio del catálogo;
-  // por hora = precio/hora × horas elegidas
+  // Monto real de una opción suelta: tabla de precios por cantidad (estético),
+  // precio/hora × horas (dental/médico) o precio fijo del bloque (jornadas)
   const montoSuelto = !esPlan && opcionActual
-    ? (opcionActual.porHora ? opcionActual.precio * horasHorario : opcionActual.precio)
+    ? (opcionActual.horasOpciones
+        ? (opcionActual.precios ? (opcionActual.precios[horasSuelta] || 0) : opcionActual.precio * horasSuelta)
+        : opcionActual.precio)
     : 0;
 
   // El Box Médico exige mínimo 2 horas consecutivas (regla obligatoria,
-  // también validada en el servidor). Dental/Estético no cambian.
+  // también validada en el servidor). Dental/Estético no tienen mínimo.
   const minHorasBox = tipoBox === "medico" ? 2 : 0;
   const errorHorario = !opcionActual ? null
     : esPlan
@@ -521,9 +520,8 @@ export function SelectorPlan({ tipoBox, onSeleccionar }) {
         : null)
       : (!fechaInicio ? "Elige la fecha de tu reserva"
         : fechaInicio < hoyLocal() ? "La fecha no puede ser pasada"
+        : opcionActual.horasOpciones && !cantHoras ? "Elige cuántas horas quieres arrendar"
         : horasHorario <= 0 ? "La hora de término debe ser posterior a la de inicio"
-        : opcionActual.porHora && horasHorario % 1 !== 0 ? "Solo se arriendan horas completas (sin bloques de 30 o 45 min)"
-        : horasHorario < Math.max(opcionActual.minHoras || 0, minHorasBox) ? `Esta modalidad requiere un mínimo de ${Math.max(opcionActual.minHoras || 0, minHorasBox)} horas consecutivas`
         : null);
 
   const puedeConfirmar = () => {
@@ -589,7 +587,7 @@ export function SelectorPlan({ tipoBox, onSeleccionar }) {
                 return (
                   <div
                     key={op.id}
-                    onClick={() => { setPlanSel(op.id); setDiasSel([]); }}
+                    onClick={() => { setPlanSel(op.id); setDiasSel([]); setCantHoras(op.horasOpciones ? op.horasOpciones[0] : null); }}
                     style={{ flex: "1 1 130px", maxWidth: 180, border: `2px solid ${sel ? estructura.borde : "#ddd"}`, borderRadius: 10, padding: "12px 10px", cursor: "pointer", background: sel ? estructura.color : "#fff", position: "relative", transition: "all .15s" }}
                   >
                     {op.tag && (
@@ -617,7 +615,7 @@ export function SelectorPlan({ tipoBox, onSeleccionar }) {
           <div style={{ fontWeight: 700, fontSize: 13, marginBottom: 12 }}>
             {esPlan
               ? `Configurar plan — ${fmt(opcionActual.precio)}/mes`
-              : `Confirmar sesión — ${opcionActual.porHora ? `${fmt(opcionActual.precio)}/hora` : fmt(opcionActual.precio)}`}
+              : `Confirmar sesión — ${opcionActual.horasOpciones && !opcionActual.precios ? `${fmt(opcionActual.precio)}/hora` : opcionActual.horasOpciones ? `desde ${fmt(opcionActual.precios[opcionActual.horasOpciones[0]])}` : fmt(opcionActual.precio)}`}
           </div>
 
           {!esPlan && (
@@ -630,21 +628,37 @@ export function SelectorPlan({ tipoBox, onSeleccionar }) {
                   💡 Puedes revisar los horarios libres en la pestaña <strong>Disponibilidad</strong> antes de elegir.
                 </div>
               </div>
+              {/* CANTIDAD DE HORAS (opciones por hora) */}
+              {opcionActual.horasOpciones && (
+                <div style={{ marginBottom: 12 }}>
+                  <label style={S.label}>¿Cuántas horas quieres arrendar? *{tipoBox === "medico" ? " (mínimo 2 horas consecutivas)" : ""}</label>
+                  <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                    {opcionActual.horasOpciones.map(n => {
+                      const sel = cantHoras === n;
+                      const precioN = opcionActual.precios ? opcionActual.precios[n] : opcionActual.precio * n;
+                      return (
+                        <button key={n} onClick={() => setCantHoras(n)}
+                          style={{ padding: "10px 16px", borderRadius: 10, border: `2px solid ${sel ? estructura.borde : "#ddd"}`, background: sel ? estructura.color : "#fff", color: sel ? estructura.texto : "#555", fontSize: 13, fontWeight: sel ? 700 : 500, cursor: "pointer", textAlign: "center", minWidth: 90 }}>
+                          {n} hora{n > 1 ? "s" : ""}<br/>
+                          <span style={{ fontSize: 12 }}>{fmt(precioN)}</span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                  <div style={{ fontSize: 11, color: "#888", marginTop: 6 }}>
+                    ¿Necesitas más de {opcionActual.horasOpciones[opcionActual.horasOpciones.length - 1]} horas? Te conviene la <strong>jornada (5 horas)</strong>.
+                  </div>
+                </div>
+              )}
+
               <div style={{ marginBottom: 12 }}>
                 <label style={S.label}>
-                  Horario *{opcionActual.horasFijas ? ` (bloque de ${opcionActual.horasFijas} hora${opcionActual.horasFijas > 1 ? "s" : ""})` : ` (mínimo ${Math.max(opcionActual.minHoras || 1, minHorasBox || 1)} horas consecutivas)`}
+                  Hora de inicio *{opcionActual.horasFijas ? ` (bloque de ${opcionActual.horasFijas} horas)` : ""}
                 </label>
                 <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
                   <input type="time" step="3600" value={horario.inicio} onChange={e => setHorario(h => ({ ...h, inicio: e.target.value }))} style={{ ...S.input, width: "auto" }} />
                   <span style={{ color: "#888" }}>a</span>
-                  {opcionActual.porHora ? (
-                    <input type="time" step="3600" value={horario.fin} onChange={e => setHorario(h => ({ ...h, fin: e.target.value }))} style={{ ...S.input, width: "auto" }} />
-                  ) : (
-                    <span style={{ ...S.input, width: "auto", background: "#f0f0ec", color: "#555" }}>{finEfectivo}</span>
-                  )}
-                  {opcionActual.porHora && horasHorario > 0 && !errorHorario && (
-                    <span style={{ fontSize: 12, color: "#555" }}>{horasHorario} hr × {fmt(opcionActual.precio)}</span>
-                  )}
+                  <span style={{ ...S.input, width: "auto", background: "#f0f0ec", color: "#555" }}>{horasSuelta > 0 ? finEfectivo : "—"}</span>
                 </div>
                 {errorHorario && (
                   <div style={{ background: "#FCEBEB", border: "1px solid #F5C2C7", borderRadius: 8, padding: "8px 12px", fontSize: 12, color: "#A32D2D", marginTop: 8 }}>
@@ -719,7 +733,7 @@ export function SelectorPlan({ tipoBox, onSeleccionar }) {
               <div style={{ marginTop: 6, fontSize: 15, fontWeight: 700, color: estructura.borde }}>
                 {esPlan
                   ? `Cobro mensual: ${fmt(opcionActual.precio)}`
-                  : `Total a pagar: ${errorHorario ? "—" : fmt(montoSuelto)}${opcionActual.porHora && !errorHorario ? ` (${horasHorario} hr × ${fmt(opcionActual.precio)})` : ""}`}
+                  : `Total a pagar: ${errorHorario ? "—" : fmt(montoSuelto)}${opcionActual.horasOpciones && !opcionActual.precios && !errorHorario ? ` (${horasSuelta} hr × ${fmt(opcionActual.precio)})` : ""}`}
               </div>
             </div>
           </div>

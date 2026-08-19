@@ -77,8 +77,8 @@ describe.each([["frontend (src/logic)", esm], ["serverless (api/_lib)", cjs]])("
       expect(d.calcularPrecio("estetico", 1)).toMatchObject({ monto: 10000, valido: true });
     });
 
-    test("dental mantiene su propia condición comercial de 2 horas", () => {
-      expect(d.validarDuracionMinima(DEN, 1).valido).toBe(false);
+    test("no afecta a Dental (sin mínimo: 1 hora es válida)", () => {
+      expect(d.validarDuracionMinima(DEN, 1).valido).toBe(true);
       expect(d.validarDuracionMinima(DEN, 2).valido).toBe(true);
     });
   });
@@ -179,8 +179,8 @@ describe.each([["frontend (src/logic)", esm], ["serverless (api/_lib)", cjs]])("
       expect(d.calcularPrecio("estetico", 5).monto).toBe(45000);
     });
 
-    test("dental: mínimo 2h · 2h $18.000 · 3h $27.000 · jornada $45.000", () => {
-      expect(d.calcularPrecio("dental", 1).valido).toBe(false);
+    test("dental: sin mínimo · 1h $9.000 · 2h $18.000 · 3h $27.000 · jornada $45.000", () => {
+      expect(d.calcularPrecio("dental", 1)).toMatchObject({ monto: 9000, valido: true });
       expect(d.calcularPrecio("dental", 2).monto).toBe(18000);
       expect(d.calcularPrecio("dental", 3).monto).toBe(27000);
       expect(d.calcularPrecio("dental", 5).monto).toBe(45000);

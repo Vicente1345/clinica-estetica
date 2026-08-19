@@ -6,7 +6,7 @@
 const RECURSO_DENTAL_ESTETICO = "dental_estetico";
 const RECURSO_MEDICO          = "medico";
 
-const MIN_HORAS = { estetico: 1, dental: 2, medico: 2 };
+const MIN_HORAS = { estetico: 1, dental: 1, medico: 2 };
 
 const normHora = h => (h || "").slice(0, 5);
 
@@ -71,9 +71,8 @@ function validarDuracionMinima(box, horas) {
 function calcularPrecio(tipoBox, horas) {
   const tipo = normTipoBox({ tipo: tipoBox });
   if (tipo === "dental") {
-    if (horas < 2)   return { monto: 0,           label: "Mínimo 2 horas en box dental",  valido: false };
-    if (horas === 2) return { monto: 18000,       label: "2 horas · $9.000/hr",           valido: true };
-    if (horas < 5)   return { monto: horas * 9000, label: `${horas} horas · $9.000/hr`,   valido: true };
+    if (horas < 1)   return { monto: 0,           label: "Mínimo 1 hora",                 valido: false };
+    if (horas < 5)   return { monto: horas * 9000, label: `${horas} hora${horas > 1 ? "s" : ""} · $9.000/hr`, valido: true };
     return             { monto: 45000,            label: "Jornada (5h) · $45.000",        valido: true };
   }
   if (tipo === "medico") {

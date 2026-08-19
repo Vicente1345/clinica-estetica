@@ -165,8 +165,8 @@ La clínica tiene **2 espacios físicos**:
 La clínica también funciona como cowork médico:
 - **Box Dental/Estético (espacio compartido, calendario único)**:
   - Modalidad Estética: $10.000/h (mínimo 1 hora), $45.000 jornada, planes mensuales desde $170.000/mes.
-  - Modalidad Dental Plan Flex (sin asistente): $15.000/h (mínimo 2 horas), $45.000 jornada, planes desde $150.000/mes anual.
-  - Modalidad Dental Plan PRO (con asistente): $18.000/h (mínimo 2 horas), $65.000 jornada, planes desde $230.000/mes anual, Plan Exclusivo $1.350.000/mes.
+  - Modalidad Dental Plan Flex (sin asistente): $15.000/h (de 1 a 3 horas, sin mínimo), $45.000 jornada, planes desde $150.000/mes anual.
+  - Modalidad Dental Plan PRO (con asistente): $18.000/h (de 1 a 3 horas, sin mínimo), $65.000 jornada, planes desde $230.000/mes anual, Plan Exclusivo $1.350.000/mes.
 - **Box Médico** (espacio independiente): $12.000/h con **mínimo obligatorio de 2 horas consecutivas** (no se arrienda 1 hora), $55.000 jornada, planes desde $215.000/mes.
 
 Para info detallada redirige al sitio de profesionales o WhatsApp.`;
