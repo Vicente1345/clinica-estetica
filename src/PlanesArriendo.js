@@ -468,7 +468,8 @@ export function SelectorPlan({ tipoBox, onSeleccionar, boxes = [], arriendos = [
   const [seccionOpen, setSeccionOpen] = useState(null);
   const [cantHoras,   setCantHoras]   = useState(null); // opciones "por hora": 1-3 (médico 2-3)
   const [consecutivas, setConsecutivas] = useState(true);   // "Si" = bloque continuo
-  const [horasSel,     setHorasSel]     = useState([]);      // horas sueltas elegidas (no consecutivas)
+  const [horasSel,     setHorasSel]     = useState([]);
+  const [mediasHoras,  setMediasHoras]  = useState(false); // permite inicios a la :30 en el modo distribuido      // horas sueltas elegidas (no consecutivas)
 
   const estructura  = PLANES[tipoBox] || PLANES.estetico;
   const opcionActual = planSel
@@ -494,7 +495,19 @@ export function SelectorPlan({ tipoBox, onSeleccionar, boxes = [], arriendos = [
   // ── Disponibilidad real de la fecha elegida sobre el recurso físico ──
   // (Dental y Estético comparten espacio: una hora tomada en cualquiera de
   // las dos modalidades bloquea la otra; el Médico es independiente)
-  const HORAS_GRILLA = ["08:00","09:00","10:00","11:00","12:00","13:00","14:00","15:00","16:00","17:00","18:00","19:00"];
+  // Inicios posibles de cada tramo de 1 hora (termino maximo 20:00).
+  // Con "medias horas" activo, la grilla ofrece tambien inicios a la :30.
+  const HORAS_GRILLA = (() => {
+    const out = [];
+    for (let m = 8 * 60; m + 60 <= 20 * 60; m += (mediasHoras ? 30 : 60)) {
+      out.push(`${String(Math.floor(m / 60)).padStart(2, "0")}:${String(m % 60).padStart(2, "0")}`);
+    }
+    return out;
+  })();
+  // Dos tramos elegidos no pueden solaparse entre si (relevante con :30:
+  // elegir 09:00 y 09:30 seria el mismo espacio fisico media hora encimado)
+  const chocaConSeleccion = h =>
+    horasSel.some(x => x !== h && seSolapan(h, sumaHoras(h, 1), x, sumaHoras(x, 1)));
   const boxDeTipo = boxes.find(b => normTipoBox(b) === tipoBox && b.activo !== false);
   const idsRecursoSel = boxDeTipo
     ? boxes.filter(b => recursoDeBox(b) === recursoDeBox(boxDeTipo)).map(b => b.id)
@@ -560,6 +573,7 @@ export function SelectorPlan({ tipoBox, onSeleccionar, boxes = [], arriendos = [
         : opcionActual.horasOpciones && !cantHoras ? "Elige cuántas horas quieres arrendar"
         : modoSueltas
           ? (horasSel.length !== cantHoras ? `Selecciona ${cantHoras} horas en la grilla (llevas ${horasSel.length})`
+            : horasSel.some(h => chocaConSeleccion(h)) ? "Dos de las horas elegidas se solapan entre sí"
             : horasSel.some(h => horaOcupada(fechaInicio, h)) ? "Una de las horas elegidas acaba de ocuparse: elige otra"
             : null)
           : (horasHorario <= 0 ? "La hora de término debe ser posterior a la de inicio"
@@ -717,6 +731,11 @@ export function SelectorPlan({ tipoBox, onSeleccionar, boxes = [], arriendos = [
               {modoSueltas ? (
                 <div style={{ marginBottom: 12 }}>
                   <label style={S.label}>Elige tus {cantHoras} horas del día * ({horasSel.length}/{cantHoras} seleccionadas)</label>
+                  <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 12, color: "#555", margin: "2px 0 10px", cursor: "pointer", width: "fit-content" }}>
+                    <input type="checkbox" checked={mediasHoras}
+                      onChange={e => { setMediasHoras(e.target.checked); if (!e.target.checked) setHorasSel(hs => hs.filter(h => h.endsWith(":00"))); }} />
+                    Permitir inicios a la media hora (ej: 09:30, 13:30)
+                  </label>
                   {!fechaInicio ? (
                     <div style={{ fontSize: 12, color: "#888" }}>Primero elige la fecha para ver la disponibilidad.</div>
                   ) : (
@@ -725,11 +744,12 @@ export function SelectorPlan({ tipoBox, onSeleccionar, boxes = [], arriendos = [
                         const ocupada = horaOcupada(fechaInicio, h);
                         const pasada  = horaPasada(fechaInicio, h);
                         const sel     = horasSel.includes(h);
-                        const bloq    = ocupada || pasada;
+                        const choca   = !sel && chocaConSeleccion(h);
+                        const bloq    = ocupada || pasada || choca;
                         return (
                           <button key={h} disabled={bloq}
                             onClick={() => setHorasSel(hs => sel ? hs.filter(x => x !== h) : (hs.length < cantHoras ? [...hs, h] : hs))}
-                            title={ocupada ? "Ocupado" : pasada ? "Hora pasada" : ""}
+                            title={ocupada ? "Ocupado" : pasada ? "Hora pasada" : choca ? "Se solapa con otra hora que ya elegiste" : ""}
                             style={{ padding: "8px 12px", borderRadius: 8, fontSize: 12, cursor: bloq ? "not-allowed" : "pointer",
                               border: `2px solid ${sel ? estructura.borde : bloq ? "#eee" : "#ddd"}`,
                               background: sel ? estructura.color : bloq ? "#f5f5f5" : "#fff",
@@ -742,7 +762,7 @@ export function SelectorPlan({ tipoBox, onSeleccionar, boxes = [], arriendos = [
                     </div>
                   )}
                   <div style={{ fontSize: 11, color: "#888", marginTop: 6 }}>
-                    Cada hora elegida se reserva como un tramo independiente ({"08:00"} a {"20:00"}). Las tachadas ya están ocupadas en el box.
+                    Cada hora elegida se reserva como un tramo independiente de 60 minutos entre 08:00 y 20:00 — no necesitan ser horas cerradas: activa las medias horas para partir, por ejemplo, a las 09:30. Las tachadas ya están ocupadas en el box.
                   </div>
                   {errorHorario && (
                     <div style={{ background: "#FCEBEB", border: "1px solid #F5C2C7", borderRadius: 8, padding: "8px 12px", fontSize: 12, color: "#A32D2D", marginTop: 8 }}>

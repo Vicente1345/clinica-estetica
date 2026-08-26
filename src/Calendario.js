@@ -75,8 +75,7 @@ useEffect(() => { recargarArriendos(); }, []);
     idsRecursoSel.includes(a.box_id) &&
     a.fecha === fecha &&
     ESTADOS_OCUPAN.includes(a.estado) &&
-    hora >= normHora(a.hora_inicio) &&
-    hora < normHora(a.hora_fin)
+    seSolapan(hora, cellEnd(hora), a.hora_inicio, a.hora_fin)
   );
 };
 
@@ -110,8 +109,7 @@ const citaPacienteEnSlot = (fecha, hora) => {
     a.fecha === fecha &&
     (a.profesional_nombre === user.nombre || a.profesional_id === profId) &&
     ESTADOS_OCUPAN.includes(a.estado) &&
-    hora >= normHora(a.hora_inicio) &&
-    hora < normHora(a.hora_fin)
+    seSolapan(hora, cellEnd(hora), a.hora_inicio, a.hora_fin)
   );
 };
   const esPasado = (fecha, hora) => new Date(`${fecha}T${hora}:00`) < new Date();

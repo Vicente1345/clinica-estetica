@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { sb } from "./supabase";
-import { recursoDeBox, tiposDelRecurso, normHora, ESTADOS_OCUPAN, ESTADOS_CITA_OCUPAN } from "./logic/disponibilidad";
+import { recursoDeBox, tiposDelRecurso, normHora, seSolapan, ESTADOS_OCUPAN, ESTADOS_CITA_OCUPAN } from "./logic/disponibilidad";
 
 // ── PALETA inspirada en Barcelona Clinic Instagram ─────────────
 const C = {
@@ -670,9 +670,12 @@ export default function Landing({ onLogin }) {
             const horas = ["08:00","09:00","10:00","11:00","12:00","13:00","14:00","15:00","16:00","17:00","18:00","19:00"];
             const idsSel   = dispRecursos.find(r=>r.key===dispRecursoSel)?.ids || [];
             const tiposSel = tiposDelRecurso(dispRecursoSel);
+            // La celda se marca ocupada si cualquier tramo de su hora se solapa
+            // con una reserva (cubre reservas que parten a la media hora)
+            const finCelda = h => { const [H]=h.split(":").map(Number); return String(H+1).padStart(2,"0")+":00"; };
             const ocupado  = (fecha,hora) =>
-              dispArriendos.some(a=>idsSel.includes(a.box_id)&&a.fecha===fecha&&hora>=normHora(a.hora_inicio)&&hora<normHora(a.hora_fin)) ||
-              dispCitas.some(s=>tiposSel.includes(s.box_tipo)&&s.fecha_solicitada===fecha&&s.hora_inicio&&s.hora_fin&&hora>=normHora(s.hora_inicio)&&hora<normHora(s.hora_fin));
+              dispArriendos.some(a=>idsSel.includes(a.box_id)&&a.fecha===fecha&&seSolapan(hora,finCelda(hora),a.hora_inicio,a.hora_fin)) ||
+              dispCitas.some(s=>tiposSel.includes(s.box_tipo)&&s.fecha_solicitada===fecha&&s.hora_inicio&&s.hora_fin&&seSolapan(hora,finCelda(hora),s.hora_inicio,s.hora_fin));
             const pasado  = (fecha,hora) => new Date(`${fecha}T${hora}:00`) < new Date();
             return (
               <div style={{ background:C.blanco, borderRadius:16, padding:20, boxShadow:"0 4px 24px rgba(155,142,196,0.1)" }}>
