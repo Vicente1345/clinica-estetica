@@ -382,6 +382,38 @@ export default function App() {
       showToast(`✓ Plan creado: ${fechas.length} jornadas agendadas automáticamente`);
     } else {
       // ── JORNADA SUELTA ────────────────────────────────────────────
+      // Horas NO consecutivas: cada tramo es un arriendo independiente que
+      // se valida y crea junto (bulk) en /api/reservar, bloqueando cada hora.
+      const tramos = (!arrForm.esPlan && arrForm.tramos && arrForm.tramos.length > 1) ? arrForm.tramos : null;
+      if (tramos) {
+        const montoTramo = Math.round(montoCobro / tramos.length);
+        const rows = tramos.map(tr => ({
+          fecha:              arrForm.fecha,
+          box_id:             arrForm.boxId,
+          box_nombre:         box?.nombre || '',
+          profesional_id:     arrForm.profId,
+          profesional_nombre: prof?.nombre || '',
+          hora_inicio:        tr.inicio,
+          hora_fin:           tr.fin,
+          horas:              1,
+          monto:              montoTramo,
+          metodo:             arrForm.metodo,
+          pagado:             false,
+          estado:             'pendiente',
+          verificado:         'sin_pago',
+        }));
+        const respB = await reservarEnServidor({ arriendos: rows });
+        if (!respB.ok) {
+          const det = (respB.conflictos || []).slice(0, 3).map(c => `${c.hora_inicio}–${c.hora_fin}`).join(', ');
+          showToast(`${respB.error}${det ? ` · ${det}` : ''}`, 'err');
+          return;
+        }
+        await fetchAll();
+        setArrNuevoId(respB.arriendos?.[0]?.id || null);
+        setArrForm(emptyArr);
+        setArrStep(2);
+        return;
+      }
       const resp = await reservarEnServidor({ arriendo: {
         fecha:              arrForm.fecha,
         box_id:             arrForm.boxId,
@@ -408,6 +440,10 @@ export default function App() {
   // ── INICIAR PAGO CON WEBPAY ──
   // Crea el arriendo en Supabase (pendiente) y redirige al usuario a Webpay
   const iniciarPagoWebpay = async () => {
+    if (arrForm.tramos && arrForm.tramos.length > 1) {
+      showToast('Webpay está disponible solo para bloques continuos. Para horas distribuidas usa transferencia.', 'err');
+      return;
+    }
     if (arrForm.esPlan) {
       showToast('Webpay disponible solo para arriendos sueltos. Para planes usa transferencia.', 'err');
       return;
@@ -935,7 +971,9 @@ export default function App() {
               <h3 style={{margin:'0 0 14px',fontSize:15,fontWeight:500}}>Paso 2 — Confirmar pago</h3>
               <div style={{background:'#E6F1FB',border:'1px solid #B5D4F4',borderRadius:8,padding:14,marginBottom:16,fontSize:13,color:'#042C53',lineHeight:1.8}}>
                 <div><strong>{boxArr?.nombre}</strong> · {arrForm.fecha}</div>
-                <div>{arrForm.horaInicio} → {arrForm.horaFin} ({horasArr} hr)</div>
+                <div>{arrForm.tramos && arrForm.tramos.length > 1
+                  ? `Horas: ${arrForm.tramos.map(t=>`${t.inicio}–${t.fin}`).join(' · ')} (${arrForm.tramos.length} hr no consecutivas)`
+                  : `${arrForm.horaInicio} → ${arrForm.horaFin} (${horasArr} hr)`}</div>
                 <div>Profesional: <strong>{profesionales.find(p=>p.id===arrForm.profId)?.nombre}</strong></div>
                 <div style={{marginTop:6,fontSize:16}}>Total: <strong>{arrForm.esPlan ? `${fmt(arrForm.monto)}/mes` : fmt(montoCobro)}</strong></div>
                 <div style={{fontSize:12,color:'#185FA5',marginTop:4}}>⚠ El horario se agenda solo al confirmar el pago</div>
@@ -1019,6 +1057,9 @@ export default function App() {
               {arrForm.tipoBox && (
                 <SelectorPlan
                   tipoBox={arrForm.tipoBox}
+                  boxes={boxes}
+                  arriendos={arriendos}
+                  solicitudes={solicitudes}
                   onSeleccionar={(seleccion)=>{
                     setArrForm(a=>({
                       ...a,
@@ -1034,6 +1075,7 @@ export default function App() {
                       fecha:        seleccion.fechaInicio || arrForm.fecha,
                       monto:        seleccion.monto,
                       esPlan:       seleccion.esPlan,
+                      tramos:       seleccion.tramos || null,
                     }));
                     setArrStep(1);
                   }}

@@ -1,4 +1,8 @@
 import { useState } from "react";
+import {
+  normTipoBox, recursoDeBox, tiposDelRecurso, normHora,
+  ESTADOS_OCUPAN, ESTADOS_CITA_OCUPAN, seSolapan,
+} from "./logic/disponibilidad";
 
 const fmt = n => (n||0).toLocaleString("es-CL", { style: "currency", currency: "CLP", maximumFractionDigits: 0 });
 const DIAS = ["Lun","Mar","Mié","Jue","Vie","Sáb","Dom"];
@@ -456,13 +460,15 @@ export const PLANES = {
 };
 
 // ─── COMPONENTE SELECTOR DE PLAN ──────────────────────────────────
-export function SelectorPlan({ tipoBox, onSeleccionar }) {
+export function SelectorPlan({ tipoBox, onSeleccionar, boxes = [], arriendos = [], solicitudes = [] }) {
   const [planSel,     setPlanSel]     = useState(null);
   const [diasSel,     setDiasSel]     = useState([]);
   const [horario,     setHorario]     = useState({ inicio: "09:00", fin: "14:00" });
   const [fechaInicio, setFechaInicio] = useState("");
   const [seccionOpen, setSeccionOpen] = useState(null);
   const [cantHoras,   setCantHoras]   = useState(null); // opciones "por hora": 1-3 (médico 2-3)
+  const [consecutivas, setConsecutivas] = useState(true);   // "Si" = bloque continuo
+  const [horasSel,     setHorasSel]     = useState([]);      // horas sueltas elegidas (no consecutivas)
 
   const estructura  = PLANES[tipoBox] || PLANES.estetico;
   const opcionActual = planSel
@@ -484,6 +490,37 @@ export function SelectorPlan({ tipoBox, onSeleccionar }) {
     const t = h * 60 + (m || 0) + Math.round(horas * 60);
     return `${String(Math.floor(t / 60)).padStart(2, "0")}:${String(t % 60).padStart(2, "0")}`;
   };
+
+  // ── Disponibilidad real de la fecha elegida sobre el recurso físico ──
+  // (Dental y Estético comparten espacio: una hora tomada en cualquiera de
+  // las dos modalidades bloquea la otra; el Médico es independiente)
+  const HORAS_GRILLA = ["08:00","09:00","10:00","11:00","12:00","13:00","14:00","15:00","16:00","17:00","18:00","19:00"];
+  const boxDeTipo = boxes.find(b => normTipoBox(b) === tipoBox && b.activo !== false);
+  const idsRecursoSel = boxDeTipo
+    ? boxes.filter(b => recursoDeBox(b) === recursoDeBox(boxDeTipo)).map(b => b.id)
+    : [];
+  const tiposCita = tiposDelRecurso(tipoBox === "medico" ? "medico" : "dental_estetico");
+
+  const horaOcupada = (fecha, hora) => {
+    if (!fecha) return false;
+    const fin = sumaHoras(hora, 1);
+    return arriendos.some(a =>
+      idsRecursoSel.includes(a.box_id) && a.fecha === fecha &&
+      ESTADOS_OCUPAN.includes(a.estado) &&
+      seSolapan(hora, fin, a.hora_inicio, a.hora_fin)
+    ) || solicitudes.some(x =>
+      tiposCita.includes(x.box_tipo) && x.fecha_solicitada === fecha &&
+      ESTADOS_CITA_OCUPAN.includes(x.estado) && x.hora_inicio && x.hora_fin &&
+      seSolapan(hora, fin, x.hora_inicio, x.hora_fin)
+    );
+  };
+  const horaPasada = (fecha, hora) => fecha && new Date(fecha + "T" + hora + ":00") < new Date();
+
+  // ¿Aplica el modo no-consecutivo? Solo opciones por hora de 2+ horas y
+  // nunca en el Box Médico (su regla exige horas consecutivas)
+  const permiteNoConsecutivas = !esPlan && opcionActual?.horasOpciones &&
+    (cantHoras || 0) >= 2 && tipoBox !== "medico";
+  const modoSueltas = permiteNoConsecutivas && !consecutivas;
 
   // Duración de una opción suelta: bloque fijo (jornada 5h) o cantidad de
   // horas elegida por la profesional (1-3; el Box Médico parte en 2)
@@ -521,8 +558,13 @@ export function SelectorPlan({ tipoBox, onSeleccionar }) {
       : (!fechaInicio ? "Elige la fecha de tu reserva"
         : fechaInicio < hoyLocal() ? "La fecha no puede ser pasada"
         : opcionActual.horasOpciones && !cantHoras ? "Elige cuántas horas quieres arrendar"
-        : horasHorario <= 0 ? "La hora de término debe ser posterior a la de inicio"
-        : null);
+        : modoSueltas
+          ? (horasSel.length !== cantHoras ? `Selecciona ${cantHoras} horas en la grilla (llevas ${horasSel.length})`
+            : horasSel.some(h => horaOcupada(fechaInicio, h)) ? "Una de las horas elegidas acaba de ocuparse: elige otra"
+            : null)
+          : (horasHorario <= 0 ? "La hora de término debe ser posterior a la de inicio"
+            : HORAS_GRILLA.filter(h => h >= horario.inicio && h < finEfectivo).some(h => horaOcupada(fechaInicio, h)) ? "El bloque elegido choca con un horario ya ocupado"
+            : null));
 
   const puedeConfirmar = () => {
     if (!opcionActual) return false;
@@ -535,9 +577,14 @@ export function SelectorPlan({ tipoBox, onSeleccionar }) {
     const fechaFin = esPlan && opcionActual.meses
       ? (() => { const d = new Date(fechaInicio); d.setMonth(d.getMonth() + opcionActual.meses); return d.toISOString().split("T")[0]; })()
       : null;
+    // En modo no consecutivo cada hora elegida es un tramo independiente
+    const tramos = modoSueltas
+      ? [...horasSel].sort().map(h => ({ inicio: h, fin: sumaHoras(h, 1) }))
+      : [{ inicio: horario.inicio, fin: finEfectivo }];
     onSeleccionar({
       plan: opcionActual, tipoBox, boxNombre: estructura.nombre, dias: diasSel,
-      horario: { inicio: horario.inicio, fin: finEfectivo },
+      horario: tramos[0],
+      tramos,
       fechaInicio, fechaFin,
       monto: esPlan ? opcionActual.precio : montoSuelto,
       esPlan,
@@ -652,6 +699,59 @@ export function SelectorPlan({ tipoBox, onSeleccionar }) {
               )}
 
               <div style={{ marginBottom: 12 }}>
+              {/* ¿CONSECUTIVAS O DISTRIBUIDAS? (solo por-hora de 2+ y no médico) */}
+              {permiteNoConsecutivas && (
+                <div style={{ marginBottom: 12 }}>
+                  <label style={S.label}>¿Deseas reservar las horas de forma consecutiva? *</label>
+                  <div style={{ display: "flex", gap: 8 }}>
+                    {[[true, "Sí, en un bloque continuo"], [false, "No, distribuirlas en el día"]].map(([val, lbl]) => (
+                      <button key={String(val)} onClick={() => { setConsecutivas(val); setHorasSel([]); }}
+                        style={{ padding: "9px 14px", borderRadius: 10, border: `2px solid ${consecutivas === val ? estructura.borde : "#ddd"}`, background: consecutivas === val ? estructura.color : "#fff", color: consecutivas === val ? estructura.texto : "#555", fontSize: 12, fontWeight: consecutivas === val ? 700 : 500, cursor: "pointer" }}>
+                        {lbl}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {modoSueltas ? (
+                <div style={{ marginBottom: 12 }}>
+                  <label style={S.label}>Elige tus {cantHoras} horas del día * ({horasSel.length}/{cantHoras} seleccionadas)</label>
+                  {!fechaInicio ? (
+                    <div style={{ fontSize: 12, color: "#888" }}>Primero elige la fecha para ver la disponibilidad.</div>
+                  ) : (
+                    <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+                      {HORAS_GRILLA.map(h => {
+                        const ocupada = horaOcupada(fechaInicio, h);
+                        const pasada  = horaPasada(fechaInicio, h);
+                        const sel     = horasSel.includes(h);
+                        const bloq    = ocupada || pasada;
+                        return (
+                          <button key={h} disabled={bloq}
+                            onClick={() => setHorasSel(hs => sel ? hs.filter(x => x !== h) : (hs.length < cantHoras ? [...hs, h] : hs))}
+                            title={ocupada ? "Ocupado" : pasada ? "Hora pasada" : ""}
+                            style={{ padding: "8px 12px", borderRadius: 8, fontSize: 12, cursor: bloq ? "not-allowed" : "pointer",
+                              border: `2px solid ${sel ? estructura.borde : bloq ? "#eee" : "#ddd"}`,
+                              background: sel ? estructura.color : bloq ? "#f5f5f5" : "#fff",
+                              color: sel ? estructura.texto : bloq ? "#bbb" : "#555",
+                              fontWeight: sel ? 700 : 500, textDecoration: ocupada ? "line-through" : "none" }}>
+                            {h}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  )}
+                  <div style={{ fontSize: 11, color: "#888", marginTop: 6 }}>
+                    Cada hora elegida se reserva como un tramo independiente ({"08:00"} a {"20:00"}). Las tachadas ya están ocupadas en el box.
+                  </div>
+                  {errorHorario && (
+                    <div style={{ background: "#FCEBEB", border: "1px solid #F5C2C7", borderRadius: 8, padding: "8px 12px", fontSize: 12, color: "#A32D2D", marginTop: 8 }}>
+                      ⚠ {errorHorario}
+                    </div>
+                  )}
+                </div>
+              ) : (
+              <div style={{ marginBottom: 12 }}>
                 <label style={S.label}>
                   Hora de inicio *{opcionActual.horasFijas ? ` (bloque de ${opcionActual.horasFijas} horas)` : ""}
                 </label>
@@ -664,6 +764,9 @@ export function SelectorPlan({ tipoBox, onSeleccionar }) {
                   <div style={{ background: "#FCEBEB", border: "1px solid #F5C2C7", borderRadius: 8, padding: "8px 12px", fontSize: 12, color: "#A32D2D", marginTop: 8 }}>
                     ⚠ {errorHorario}
                   </div>
+                )}
+              </div>
+              )}
                 )}
               </div>
             </>
@@ -729,7 +832,9 @@ export function SelectorPlan({ tipoBox, onSeleccionar }) {
               {opcionActual.asistente && <div style={{ color: "#1D9E75", fontWeight: 600 }}>✓ Incluye asistente</div>}
               {diasSel.length > 0 && <div>Días: <strong>{diasSel.join(", ")}</strong></div>}
               {!esPlan && fechaInicio && <div>Fecha: <strong>{fechaInicio}</strong></div>}
-              <div>Horario: <strong>{horario.inicio} – {finEfectivo}</strong>{!esPlan && horasHorario > 0 ? ` (${horasHorario} hr)` : ""}</div>
+              <div>Horario: <strong>{modoSueltas
+                ? ([...horasSel].sort().map(h => `${h}–${sumaHoras(h, 1)}`).join(" · ") || "—")
+                : `${horario.inicio} – ${finEfectivo}`}</strong>{!esPlan && horasHorario > 0 && !modoSueltas ? ` (${horasHorario} hr)` : modoSueltas && horasSel.length ? ` (${horasSel.length} tramo${horasSel.length > 1 ? "s" : ""} de 1 hr)` : ""}</div>
               <div style={{ marginTop: 6, fontSize: 15, fontWeight: 700, color: estructura.borde }}>
                 {esPlan
                   ? `Cobro mensual: ${fmt(opcionActual.precio)}`
