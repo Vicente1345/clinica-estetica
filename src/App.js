@@ -111,6 +111,8 @@ export default function App() {
   const [movimientos, setMovimientos]   = useState([]);
   const [arriendos, setArriendos]       = useState([]);
   const [profesionales, setProfesionales] = useState([]);
+  // Todos los profesionales, incluidos los desactivados (solo para la vista Config)
+  const [profesionalesAll, setProfesionalesAll] = useState([]);
   const [boxes, setBoxes]               = useState([]);
   const [usuarios, setUsuarios]         = useState([]);
   const [solicitudes, setSolicitudes]   = useState([]);
@@ -137,7 +139,7 @@ export default function App() {
       sb.from('insumos').select('*').eq('activo',true).order('nombre'),
       sb.from('movimientos').select('*').order('created_at',{ascending:false}).limit(200),
       sb.from('arriendos').select('*').order('fecha',{ascending:false}).limit(200),
-      sb.from('profesionales').select('*').eq('activo',true).order('nombre'),
+      sb.from('profesionales').select('*').order('nombre'),
       sb.from('boxes').select('*').order('nombre'),
       sb.from('usuarios').select('id,nombre,email,rol,activo').order('nombre'),
       sb.from('solicitudes_paciente').select('*').order('created_at',{ascending:false}).limit(200),
@@ -145,7 +147,7 @@ export default function App() {
     if (ins.data)  setInsumos(ins.data);
     if (mov.data)  setMovimientos(mov.data);
     if (arr.data)  setArriendos(arr.data);
-    if (prof.data) setProfesionales(prof.data);
+    if (prof.data) { setProfesionalesAll(prof.data); setProfesionales(prof.data.filter(x => x.activo !== false)); }
     if (bx.data)   setBoxes(bx.data);
     if (usr.data)  setUsuarios(usr.data);
     if (sol.data)  setSolicitudes(sol.data);
@@ -468,6 +470,29 @@ export default function App() {
 
   // ── USUARIO FORM ──
   const emptyUsr = { nombre:'', email:'', password_hash:'', rol:'recep', activo:true };
+
+  // ── PROFESIONALES (alta / edición / baja) ──
+  const emptyProf = { nombre:'', especialidad:'' };
+  const [profForm, setProfForm] = useState(emptyProf);
+
+  // Elimina definitivamente solo si la profesional no tiene historial;
+  // si lo tiene, se conserva para no romper reservas y planes ya registrados.
+  const eliminarProfesional = async (prof) => {
+    const [arrRes, planRes] = await Promise.all([
+      sb.from('arriendos').select('id', { count:'exact', head:true }).eq('profesional_id', prof.id),
+      sb.from('planes_profesional').select('id', { count:'exact', head:true }).eq('profesional_id', prof.id),
+    ]);
+    const nArr = arrRes.count || 0, nPlan = planRes.count || 0;
+    if (nArr + nPlan > 0) {
+      showToast(`${prof.nombre} tiene ${nArr} arriendo(s) y ${nPlan} plan(es) registrados: no se puede eliminar. Usa "Desactivar" para ocultarla de las reservas.`, 'err');
+      return;
+    }
+    if (!window.confirm(`¿Eliminar definitivamente a ${prof.nombre}? Esta acción no se puede deshacer.`)) return;
+    const { error } = await sb.from('profesionales').delete().eq('id', prof.id);
+    if (error) return showToast('No se pudo eliminar: ' + error.message, 'err');
+    await fetchAll();
+    showToast('Profesional eliminada');
+  };
   const [usrForm, setUsrForm] = useState(emptyUsr);
 
   // ── STATS ──
@@ -551,6 +576,31 @@ export default function App() {
               setIngSel('');setIngQty(1);setIngResp('');setIngObs('');
               showToast('Stock actualizado'); setModal(null);
             }}>Registrar ingreso</button>
+            <button style={S.btn('secondary')} onClick={()=>setModal(null)}>Cancelar</button>
+          </div>
+        </Modal>
+      )}
+
+      {/* MODAL PROFESIONAL */}
+      {modal?.tipo==='profesional' && (
+        <Modal title={modal.id?'Editar profesional':'Nueva profesional'} onClose={()=>setModal(null)}>
+          <div><label style={S.label}>Nombre *</label>
+            <input style={S.input} value={profForm.nombre} onChange={e=>setProfForm(f=>({...f,nombre:e.target.value}))} placeholder="Ej: Dra. Carla Soto"/></div>
+          <div><label style={S.label}>Especialidad *</label>
+            <input style={S.input} value={profForm.especialidad} onChange={e=>setProfForm(f=>({...f,especialidad:e.target.value}))} placeholder="Ej: Medicina estética"/></div>
+          <div style={{fontSize:11,color:'#888',marginTop:8,lineHeight:1.6}}>
+            El nombre debe coincidir con el del usuario del sistema para que la profesional vea sus propias reservas (se ignoran los prefijos "Dr." y "Dra.").
+          </div>
+          <div style={{display:'flex',gap:10,marginTop:20}}>
+            <button style={S.btn('primary')} onClick={async()=>{
+              const nombre = profForm.nombre.trim(), especialidad = profForm.especialidad.trim();
+              if(!nombre||!especialidad) return showToast('Nombre y especialidad requeridos','err');
+              const { error } = modal.id
+                ? await sb.from('profesionales').update({nombre,especialidad}).eq('id',modal.id)
+                : await sb.from('profesionales').insert({nombre,especialidad,activo:true});
+              if(error) return showToast('No se pudo guardar: '+error.message,'err');
+              await fetchAll(); showToast(modal.id?'Profesional actualizada':'Profesional agregada'); setModal(null);
+            }}>Guardar</button>
             <button style={S.btn('secondary')} onClick={()=>setModal(null)}>Cancelar</button>
           </div>
         </Modal>
@@ -1289,17 +1339,34 @@ export default function App() {
             <div>
               <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:10}}>
                 <h3 style={{margin:0,fontSize:14,fontWeight:500}}>Profesionales</h3>
-                <button style={S.btn('primary',true)} onClick={async()=>{
-                  const nombre=prompt('Nombre:');const esp=nombre?prompt('Especialidad:'):null;
-                  if(nombre&&esp){await sb.from('profesionales').insert({nombre,especialidad:esp});await fetchAll();showToast('Profesional agregada');}
-                }}>+ Agregar</button>
+                <button style={S.btn('primary',true)} onClick={()=>{setProfForm(emptyProf);setModal({tipo:'profesional'});}}>+ Agregar</button>
               </div>
-              {profesionales.map(p=>(
-                <div key={p.id} style={{...S.card(),padding:12}}>
-                  <div style={{fontWeight:500,fontSize:14}}>{p.nombre}</div>
-                  <div style={{fontSize:12,color:'#666'}}>{p.especialidad}</div>
+              {profesionalesAll.map(p=>(
+                <div key={p.id} style={{...S.card(),padding:12,opacity:p.activo===false?.6:1}}>
+                  <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',gap:8}}>
+                    <div>
+                      <div style={{fontWeight:500,fontSize:14}}>{p.nombre}</div>
+                      <div style={{fontSize:12,color:'#666'}}>{p.especialidad}</div>
+                    </div>
+                    {p.activo===false && <span style={S.badge('bajo')}>Inactiva</span>}
+                  </div>
+                  <div style={{marginTop:8,display:'flex',gap:6,flexWrap:'wrap'}}>
+                    <button style={S.btn('secondary',true)} onClick={()=>{setProfForm({nombre:p.nombre,especialidad:p.especialidad||''});setModal({tipo:'profesional',id:p.id});}}>Editar</button>
+                    <button style={{...S.btn('secondary',true),background:p.activo===false?'#EAF3DE':'#FAEEDA',color:p.activo===false?'#3B6D11':'#854F0B'}}
+                      onClick={async()=>{
+                        const { error } = await sb.from('profesionales').update({activo:p.activo===false}).eq('id',p.id);
+                        if(error) return showToast('No se pudo cambiar el estado: '+error.message,'err');
+                        await fetchAll(); showToast(p.activo===false?'Profesional activada':'Profesional desactivada');
+                      }}>
+                      {p.activo===false?'Activar':'Desactivar'}
+                    </button>
+                    <button style={{...S.btn('secondary',true),background:'#FCEBEB',color:'#A32D2D'}} onClick={()=>eliminarProfesional(p)}>Eliminar</button>
+                  </div>
                 </div>
               ))}
+              <div style={{fontSize:11,color:'#888',marginTop:8,lineHeight:1.6}}>
+                <strong>Desactivar</strong> la oculta de las reservas y conserva su historial. <strong>Eliminar</strong> solo está disponible si no tiene arriendos ni planes registrados.
+              </div>
             </div>
             {/* BOXES */}
             <div>
