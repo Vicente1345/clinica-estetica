@@ -33,6 +33,7 @@ function getSb() {
 }
 
 const HORA_RE = /^\d{2}:\d{2}(:\d{2})?$/;
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 const horasDe = (ini, fin) => {
   if (!HORA_RE.test(ini || '') || !HORA_RE.test(fin || '')) return NaN;
@@ -104,6 +105,11 @@ module.exports = async (req, res) => {
 
     // ── Formato, duración y mínimo por modalidad (médico: 2h consecutivas) ──
     const minHoras = minHorasDeBox(box);
+    // La reserva debe pertenecer a una profesional existente: un id vacio
+    // llegaba a Postgres como uuid invalido y devolvia un error cripitico.
+    if (!esModificacion && rows.some(r => !UUID_RE.test(r.profesional_id || '')))
+      return res.status(400).json({ ok: false, error: 'La reserva no tiene una profesional valida asociada. Verifica que la cuenta este vinculada en Configuracion > Profesionales.' });
+
     for (const r of rows) {
       if (!r.fecha || !/^\d{4}-\d{2}-\d{2}$/.test(r.fecha))
         return res.status(400).json({ ok: false, error: `Fecha inválida: ${r.fecha || '(vacía)'}` });

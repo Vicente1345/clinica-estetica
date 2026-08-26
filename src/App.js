@@ -280,6 +280,7 @@ export default function App() {
   };
 
   const [arrNuevoId, setArrNuevoId] = useState(null); // para subir comprobante tras crear
+  const [comprobanteAbierto, setComprobanteAbierto] = useState(null); // id del arriendo cuyo uploader esta abierto
 
   // Crea arriendos vía /api/reservar: validación final server-side de
   // disponibilidad sobre el recurso físico compartido + mínimo de horas
@@ -297,9 +298,24 @@ export default function App() {
     }
   };
 
+  // Una cuenta con rol 'prof' debe estar vinculada a un registro de
+  // Profesionales (se calzan por nombre). Sin ese vinculo no hay
+  // profesional_id valido y la reserva no puede crearse.
+  const errorVinculoProf = () => {
+    if (!arrForm.profId) {
+      return user.rol === 'prof'
+        ? `Tu cuenta (${user.nombre}) no esta vinculada a una profesional. Pide a la administracion que te agregue en Configuracion -> Profesionales con el mismo nombre.`
+        : 'Selecciona la profesional';
+    }
+    return null;
+  };
+
   const confirmarArriendo = async () => {
     const prof = profesionales.find(p=>p.id===arrForm.profId);
     const box  = boxes.find(b=>b.id===arrForm.boxId);
+
+    const eVinculo = errorVinculoProf();
+    if (eVinculo) return showToast(eVinculo, 'err');
 
     if (!box) return showToast('Selecciona un box válido', 'err');
     const minHoras = minHorasDeBox(box);
@@ -396,6 +412,8 @@ export default function App() {
       showToast('Webpay disponible solo para arriendos sueltos. Para planes usa transferencia.', 'err');
       return;
     }
+    const eVinculoWp = errorVinculoProf();
+    if (eVinculoWp) { showToast(eVinculoWp, 'err'); return; }
     const prof = profesionales.find(p=>p.id===arrForm.profId);
     const box  = boxes.find(b=>b.id===arrForm.boxId);
     if (!box || !prof || montoCobro <= 0) {
@@ -659,7 +677,7 @@ export default function App() {
         <button style={{...S.btn('secondary',true),fontSize:13}} onClick={handleLogout}>Cerrar sesión</button>
       </div>
 
-      {alertas.length>0 && (
+      {alertas.length>0 && user.rol!=='prof' && (
         <div style={{background:'#FAEEDA',border:'1px solid #FAC775',borderRadius:10,padding:'9px 14px',marginBottom:14,fontSize:13,color:'#633806'}}>
           ⚠ Stock bajo/agotado: {alertas.map((a,i)=><span key={a.id}>{i>0&&', '}<strong>{a.nombre}</strong></span>)}
         </div>
@@ -955,6 +973,12 @@ export default function App() {
                     <span style={{fontWeight:500}}>{user.nombre}</span>
                     <span style={{fontSize:11, color:'#888'}}>(asignado automáticamente)</span>
                   </div>
+                  {!arrForm.profId && (
+                    <div style={{background:'#FCEBEB',border:'1px solid #F5C2C7',borderRadius:8,padding:'9px 12px',fontSize:12,color:'#A32D2D',marginTop:8,lineHeight:1.6}}>
+                      Tu cuenta no esta vinculada a una profesional, por lo que aun no puedes reservar.
+                      Pide a la administracion que te agregue en <strong>Configuracion -> Profesionales</strong> con el mismo nombre de tu usuario (<strong>{user.nombre}</strong>).
+                    </div>
+                  )}
                 </div>
               ) : (
                 <div style={{marginBottom:14}}>
@@ -1023,9 +1047,32 @@ export default function App() {
             <div key={a.id} style={S.card('#1D9E75')}>
               <div style={{display:'flex',justifyContent:'space-between',flexWrap:'wrap',gap:6}}>
                 <strong style={{fontSize:15}}>{a.box_nombre}</strong>
-                <span style={S.badge(a.pagado?'teal':'bajo')}>{a.pagado?'✓ Pagado':'Pendiente'}</span>
+                <div style={{display:'flex',gap:6,alignItems:'center',flexWrap:'wrap'}}>
+                  <BadgeVerificado estado={a.verificado}/>
+                  <span style={S.badge(a.pagado?'teal':'bajo')}>{a.pagado?'✓ Pagado':'Pendiente'}</span>
+                </div>
               </div>
               <div style={{fontSize:13,marginTop:6}}>{a.profesional_nombre} · {a.fecha} · {a.hora_inicio}–{a.hora_fin} ({a.horas}h) · {fmt(a.monto)} · {a.metodo}</div>
+              {/* Comprobante: se puede adjuntar mientras no este aprobado */}
+              {a.estado!=='cancelado' && a.metodo!=='Webpay' && (a.verificado==='sin_pago' || a.verificado==='rechazado') && (
+                comprobanteAbierto===a.id ? (
+                  <div style={{marginTop:10}}>
+                    <SubirComprobante
+                      tabla="arriendos"
+                      registroId={a.id}
+                      onSubido={async()=>{ setComprobanteAbierto(null); await fetchAll(); showToast('Comprobante enviado — esperando verificación'); }}
+                    />
+                    <button style={{...S.btn('secondary',true),marginTop:8}} onClick={()=>setComprobanteAbierto(null)}>Cancelar</button>
+                  </div>
+                ) : (
+                  <button style={{...S.btn('primary',true),marginTop:10}} onClick={()=>setComprobanteAbierto(a.id)}>
+                    {a.verificado==='rechazado'?'📎 Volver a subir comprobante':'📎 Subir comprobante'}
+                  </button>
+                )
+              )}
+              {a.comprobante_url && (
+                <div style={{marginTop:8}}><VerComprobante path={a.comprobante_url} nombre={a.comprobante_nombre}/></div>
+              )}
             </div>
           ))}
         </div>
