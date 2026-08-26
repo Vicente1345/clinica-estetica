@@ -29,7 +29,7 @@ export const PLANES = {
             detalle: "Elige 1, 2 o 3 horas · el bloque de 2h tiene precio rebajado",
             precio: 10000,
             horasOpciones: [1, 2, 3],
-            precios: { 1: 10000, 2: 18000, 3: 30000 },
+            precios: { 1: 10000, 2: 18000, 3: 27000 },
             jornadas: null, meses: null, asistente: false,
             tag: "Desde $10.000",
             tagColor: "#1D9E75",

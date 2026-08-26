@@ -172,24 +172,27 @@ describe.each([["frontend (src/logic)", esm], ["serverless (api/_lib)", cjs]])("
   });
 
   describe("precios por modalidad (catálogo comercial)", () => {
-    test("estético: 1h $10.000 · 2h $18.000 · 3h $30.000 · jornada 5h $45.000", () => {
+    test("estético: 1h $10.000 · 2h $18.000 · 3h $27.000 · más de 3h = jornada $45.000", () => {
       expect(d.calcularPrecio("estetico", 1).monto).toBe(10000);
       expect(d.calcularPrecio("estetico", 2).monto).toBe(18000);
-      expect(d.calcularPrecio("estetico", 3).monto).toBe(30000);
+      expect(d.calcularPrecio("estetico", 3).monto).toBe(27000);
+      expect(d.calcularPrecio("estetico", 4).monto).toBe(45000);
       expect(d.calcularPrecio("estetico", 5).monto).toBe(45000);
     });
 
-    test("dental: sin mínimo · 1h $9.000 · 2h $18.000 · 3h $27.000 · jornada $45.000", () => {
+    test("dental: sin mínimo · 1h $9.000 · 2h $18.000 · 3h $27.000 · más de 3h = jornada $45.000", () => {
       expect(d.calcularPrecio("dental", 1)).toMatchObject({ monto: 9000, valido: true });
       expect(d.calcularPrecio("dental", 2).monto).toBe(18000);
       expect(d.calcularPrecio("dental", 3).monto).toBe(27000);
+      expect(d.calcularPrecio("dental", 4).monto).toBe(45000);
       expect(d.calcularPrecio("dental", 5).monto).toBe(45000);
     });
 
-    test("médico: mínimo 2h · $12.000/hr · jornada 5h $55.000", () => {
+    test("médico: mínimo 2h · $12.000/hr hasta 3h · más de 3h = jornada $55.000", () => {
       expect(d.calcularPrecio("medico", 1).valido).toBe(false);
       expect(d.calcularPrecio("medico", 2).monto).toBe(24000);
-      expect(d.calcularPrecio("medico", 4).monto).toBe(48000);
+      expect(d.calcularPrecio("medico", 3).monto).toBe(36000);
+      expect(d.calcularPrecio("medico", 4).monto).toBe(55000);
       expect(d.calcularPrecio("medico", 5).monto).toBe(55000);
     });
 

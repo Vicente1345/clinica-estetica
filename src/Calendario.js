@@ -7,7 +7,7 @@ import {
 } from "./logic/disponibilidad";
 
 const HORAS = ["08:00","09:00","10:00","11:00","12:00","13:00","14:00","15:00","16:00","17:00","18:00","19:00","20:00"];
-const DIAS  = ["Lun","Mar","Mié","Jue","Vie","Sáb"];
+const DIAS  = ["Lun","Mar","Mié","Jue","Vie","Sáb","Dom"];
 const fmt   = n => (n||0).toLocaleString("es-CL",{style:"currency",currency:"CLP",maximumFractionDigits:0});
 
 function getLunes(offset=0) {
@@ -309,7 +309,7 @@ const citaPacienteEnSlot = (fecha, hora) => {
         </button>
         <div style={{ textAlign:"center" }}>
           <div style={{ fontWeight:600, fontSize:14 }}>
-            {diasSemana[0].fecha} — {diasSemana[5].fecha}
+            {diasSemana[0].fecha} — {diasSemana[diasSemana.length - 1].fecha}
           </div>
           {boxSel && <div style={{ fontSize:12, color:"#888" }}>{boxSel.nombre} · {fmt(boxSel.tarifa_hora)}/hr</div>}
         </div>

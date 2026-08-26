@@ -22,7 +22,7 @@ const C = {
 const EST_BASE = [
   { titulo:"1 hora",                precio:10000, detalle:"Tarifa base" },
   { titulo:"2 horas consecutivas",  precio:18000, detalle:"Bloque continuo de 2 horas", popular:true },
-  { titulo:"3 horas consecutivas",  precio:30000, detalle:"Bloque continuo de 3 horas" },
+  { titulo:"3 horas consecutivas",  precio:27000, detalle:"Bloque continuo de 3 horas" },
   { titulo:"Jornada completa (5h)", precio:45000, detalle:"Sin compromiso · horario flexible" },
 ];
 const EST_MENSUAL = [
@@ -611,7 +611,7 @@ export default function Landing({ onLogin }) {
               {
                 icon:"🏥", titulo:"Arriendo por hora", acento:C.rosa,
                 items:[
-                  "El valor por hora aplica hasta un máximo de 2 horas.",
+                  "El valor por hora aplica hasta un máximo de 3 horas.",
                   "A partir de ese tiempo, el arriendo se considera como jornada completa."
                 ]
               },
@@ -663,7 +663,7 @@ export default function Landing({ onLogin }) {
               return new Date(new Date().setDate(diff));
             };
             const lunes = getLunesP(dispSemana);
-            const dias = ["Lun","Mar","Mié","Jue","Vie","Sáb"].map((l,i)=>{
+            const dias = ["Lun","Mar","Mié","Jue","Vie","Sáb","Dom"].map((l,i)=>{
               const f=new Date(lunes); f.setDate(lunes.getDate()+i);
               return { label:l, fecha:f.toISOString().split("T")[0] };
             });
@@ -681,7 +681,7 @@ export default function Landing({ onLogin }) {
                     style={{ padding:"6px 14px", borderRadius:20, border:`1px solid ${C.beigeOscuro}`, background:dispSemana===0?"#f5f5f5":C.blanco, cursor:dispSemana===0?"default":"pointer", fontSize:12, color:C.cafeClaro }}>
                     ← Anterior
                   </button>
-                  <span style={{ fontSize:13, fontWeight:600, color:C.cafe }}>{dias[0].fecha.slice(5)} — {dias[5].fecha.slice(5)}</span>
+                  <span style={{ fontSize:13, fontWeight:600, color:C.cafe }}>{dias[0].fecha.slice(5)} — {dias[dias.length-1].fecha.slice(5)}</span>
                   <button onClick={()=>setDispSemana(s=>s+1)}
                     style={{ padding:"6px 14px", borderRadius:20, border:`1px solid ${C.beigeOscuro}`, background:C.blanco, cursor:"pointer", fontSize:12, color:C.cafeClaro }}>
                     Siguiente →

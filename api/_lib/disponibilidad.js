@@ -71,20 +71,20 @@ function validarDuracionMinima(box, horas) {
 function calcularPrecio(tipoBox, horas) {
   const tipo = normTipoBox({ tipo: tipoBox });
   if (tipo === "dental") {
-    if (horas < 1)   return { monto: 0,           label: "Mínimo 1 hora",                 valido: false };
-    if (horas < 5)   return { monto: horas * 9000, label: `${horas} hora${horas > 1 ? "s" : ""} · $9.000/hr`, valido: true };
-    return             { monto: 45000,            label: "Jornada (5h) · $45.000",        valido: true };
+    if (horas < 1)   return { monto: 0,            label: "Mínimo 1 hora",                 valido: false };
+    if (horas <= 3)  return { monto: horas * 9000, label: `${horas} hora${horas > 1 ? "s" : ""} · $9.000/hr`, valido: true };
+    return             { monto: 45000,             label: "Jornada · $45.000",             valido: true };
   }
   if (tipo === "medico") {
-    if (horas < 2)   return { monto: 0,            label: "Mínimo 2 horas consecutivas en box médico", valido: false };
-    if (horas < 5)   return { monto: horas * 12000, label: `${horas} horas · $12.000/hr`,  valido: true };
-    return             { monto: 55000,             label: "Jornada (5h) · $55.000",        valido: true };
+    if (horas < 2)   return { monto: 0,             label: "Mínimo 2 horas consecutivas en box médico", valido: false };
+    if (horas <= 3)  return { monto: horas * 12000, label: `${horas} horas · $12.000/hr`,   valido: true };
+    return             { monto: 55000,              label: "Jornada · $55.000",             valido: true };
   }
-  if (horas < 1)   return { monto: 0,             label: "Mínimo 1 hora",                 valido: false };
-  if (horas === 1) return { monto: 10000,         label: "1 hora · $10.000",              valido: true };
-  if (horas === 2) return { monto: 18000,         label: "Bloque 2 horas · $18.000",      valido: true };
-  if (horas < 5)   return { monto: horas * 10000, label: `${horas} horas · $10.000/hr`,   valido: true };
-  return             { monto: 45000,              label: "Jornada (5h) · $45.000",        valido: true };
+  if (horas < 1)   return { monto: 0,     label: "Mínimo 1 hora",              valido: false };
+  if (horas === 1) return { monto: 10000, label: "1 hora · $10.000",           valido: true };
+  if (horas === 2) return { monto: 18000, label: "Bloque 2 horas · $18.000",   valido: true };
+  if (horas === 3) return { monto: 27000, label: "Bloque 3 horas · $27.000",   valido: true };
+  return             { monto: 45000,      label: "Jornada · $45.000",          valido: true };
 }
 
 function ganaCarrera(mio, otro) {
