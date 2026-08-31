@@ -128,7 +128,7 @@ export default function Landing({ onLogin }) {
 
       {/* ── TOPBAR ── */}
       <div style={{ background:C.lila, color:C.blanco, padding:"8px 40px", display:"flex", justifyContent:"space-between", alignItems:"center", fontSize:12, letterSpacing:".1em", flexWrap:"wrap", gap:10 }}>
-        <span>+56 9 8628 4965 · San Ignacio 1263, Puerto Varas</span>
+        <span>+56 9 3774 2182 · San Ignacio 1263, Puerto Varas</span>
         <div style={{ display:"flex", gap:10, alignItems:"center", flexWrap:"wrap" }}>
           <button onClick={()=>setModalLogin(true)} style={{ background:"none", border:`1px solid rgba(255,255,255,0.6)`, color:C.blanco, padding:"4px 16px", borderRadius:20, cursor:"pointer", fontSize:11, letterSpacing:".1em" }}>
             ACCESO EQUIPO
@@ -751,12 +751,12 @@ export default function Landing({ onLogin }) {
           <p style={{ fontSize:13, color:C.cafeClaro, lineHeight:1.8, marginBottom:32, fontFamily:"system-ui" }}>
             Escríbenos por WhatsApp y te respondemos a la brevedad.
           </p>
-          <a href="https://wa.me/56986284965?text=Hola! Me interesa arrendar un box en Cowork Salud. ¿Podrían darme más información?" target="_blank" rel="noreferrer"
+          <a href="https://wa.me/56937742182?text=Hola! Me interesa arrendar un box en Cowork Salud. ¿Podrían darme más información?" target="_blank" rel="noreferrer"
             style={{ display:"inline-block", background:"#25D366", color:C.blanco, padding:"15px 36px", textDecoration:"none", fontSize:13, fontWeight:700, letterSpacing:".1em", textTransform:"uppercase", borderRadius:30, marginBottom:32, boxShadow:"0 4px 16px rgba(37,211,102,0.3)" }}>
             💬 ESCRIBIR POR WHATSAPP
           </a>
           <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:14 }}>
-            {[["📍","Dirección","San Ignacio 1263, Puerto Varas"],["📞","Teléfono","+56 9 8628 4965"],["📱","Instagram","@barcelonaclinic.pv"],["🕐","Horario","Lun–Vie 9:00–19:00"]].map(([icon,t,v])=>(
+            {[["📍","Dirección","San Ignacio 1263, Puerto Varas"],["📞","Teléfono","+56 9 3774 2182"],["📱","Instagram","@barcelonaclinic.pv"],["🕐","Horario","Lun–Vie 9:00–19:00"]].map(([icon,t,v])=>(
               <div key={t} style={{ background:C.lilaPale, padding:"16px 18px", borderRadius:12, textAlign:"left" }}>
                 <div style={{ fontSize:20, marginBottom:6 }}>{icon}</div>
                 <div style={{ fontSize:10, letterSpacing:".15em", textTransform:"uppercase", color:C.lila, marginBottom:4 }}>{t}</div>

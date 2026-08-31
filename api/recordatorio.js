@@ -104,7 +104,7 @@ module.exports = async (req, res) => {
           <p style="margin:0 0 8px;font-size:14px;color:#555">
             Si necesitas cancelar o modificar tu cita, escríbenos por WhatsApp:
           </p>
-          <a href="https://wa.me/56988284965" style="display:inline-block;background:#25D366;color:#fff;padding:10px 20px;border-radius:8px;text-decoration:none;font-weight:600;font-size:14px">
+          <a href="https://wa.me/56937742182" style="display:inline-block;background:#25D366;color:#fff;padding:10px 20px;border-radius:8px;text-decoration:none;font-weight:600;font-size:14px">
             💬 Escribir por WhatsApp
           </a>
           <p style="margin:20px 0 0;font-size:11px;color:#aaa">

@@ -84,7 +84,7 @@ export default function ChatBot({ variante = "publico", usuario = null }) {
         {
           role: "assistant",
           content:
-            "😕 Disculpa, tuve un problema técnico. Por favor escríbenos directo por WhatsApp al +56 9 8628 4965.",
+            "😕 Disculpa, tuve un problema técnico. Por favor escríbenos directo por WhatsApp al +56 9 3774 2182.",
         },
       ]);
     } finally {

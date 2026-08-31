@@ -28,13 +28,13 @@ Cuando un paciente quiere agendar una hora:
 Responde preguntas sobre tratamientos, precios, equipo profesional, ubicación y horarios.
 
 ## Estilo
-Español chileno cordial, cálido y profesional. Conciso (2-4 párrafos máximo). Emojis con moderación (💜 ✨ 🦷). Si no sabes algo con certeza, sé honesto y sugiere WhatsApp +56 9 8628 4965.
+Español chileno cordial, cálido y profesional. Conciso (2-4 párrafos máximo). Emojis con moderación (💜 ✨ 🦷). Si no sabes algo con certeza, sé honesto y sugiere WhatsApp +56 9 3774 2182.
 
 ## Información de la clínica
 
 **Nombre**: Barcelona Clinic — Clínica Estética & Dental Premium
 **Ubicación**: Ruta 225, Tanpu, 5550000 Puerto Varas, Los Lagos, Chile
-**Teléfono / WhatsApp**: +56 9 8628 4965
+**Teléfono / WhatsApp**: +56 9 3774 2182
 **Instagram**: @barcelonaclinic.pv
 **Horario**:
 - Lunes a Viernes: 09:00 — 19:30
@@ -146,7 +146,7 @@ Usa \`registrar_solicitud_paciente\` (la solicitud queda como pendiente y la adm
 - **Horario de atención**: Lun-Vie 09:00–19:30, Sáb 09:00–14:00, Dom cerrado. Solo agenda dentro de esos rangos.
 - **No agendes citas en el pasado.** Si el paciente pide una fecha pasada, ofrece la próxima fecha disponible.
 - Si el paciente da un email, regístralo (es importante para enviarle confirmación).
-- Si hay un error técnico al guardar, da el WhatsApp +56 9 8628 4965.
+- Si hay un error técnico al guardar, da el WhatsApp +56 9 3774 2182.
 
 ## Boxes de la clínica (REGLA IMPORTANTE — 2 espacios físicos)
 
@@ -331,7 +331,7 @@ async function enviarEmailPaciente(detalles) {
       <li><strong>Tratamiento:</strong> ${detalles.tratamiento || "—"}</li>
       <li><strong>Fecha:</strong> ${detalles.fecha} · ${detalles.hora_inicio} – ${detalles.hora_fin}</li>
     </ul>
-    <p>Una persona del equipo te confirmará por <strong>WhatsApp</strong> dentro de las próximas 2 horas hábiles. Si necesitas modificar o cancelar, escribe al +56 9 8628 4965.</p>
+    <p>Una persona del equipo te confirmará por <strong>WhatsApp</strong> dentro de las próximas 2 horas hábiles. Si necesitas modificar o cancelar, escribe al +56 9 3774 2182.</p>
     <p style="font-size:12px;color:#888">Barcelona Clinic · Ruta 225, Tanpu, Puerto Varas · @barcelonaclinic.pv</p>
   `;
 
@@ -354,7 +354,7 @@ async function enviarEmailPaciente(detalles) {
 // ─── EJECUCIÓN DE HERRAMIENTAS ─────────────────────────────────────
 async function ejecutarHerramienta(name, input) {
   const sb = getSupabase();
-  if (!sb) return { error: "Servicio temporalmente no disponible. Escribe a +56 9 8628 4965." };
+  if (!sb) return { error: "Servicio temporalmente no disponible. Escribe a +56 9 3774 2182." };
 
   if (name === "consultar_disponibilidad") {
     return await toolConsultar(sb, input);
@@ -505,7 +505,7 @@ async function toolAgendar(sb, input) {
 
   if (error) {
     console.error("Supabase insert agendar:", error);
-    return { error: "No pude guardar la cita. Por favor escribe a +56 9 8628 4965." };
+    return { error: "No pude guardar la cita. Por favor escribe a +56 9 3774 2182." };
   }
 
   // Enviar emails (no bloqueante)
@@ -545,7 +545,7 @@ async function toolRegistrar(sb, input) {
 
   if (error) {
     console.error("Supabase insert registrar:", error);
-    return { error: "No pude guardar tu solicitud. Por favor escribe a +56 9 8628 4965." };
+    return { error: "No pude guardar tu solicitud. Por favor escribe a +56 9 3774 2182." };
   }
 
   enviarEmailAdmin({ ...payload, codigo: data.id, tipo: "solicitud" }).catch(() => {});
@@ -681,7 +681,7 @@ module.exports = async (req, res) => {
       return res.status(200).json({
         text: textBlock
           ? textBlock.text
-          : "Lo siento, hubo un problema. Por favor escribe a +56 9 8628 4965.",
+          : "Lo siento, hubo un problema. Por favor escribe a +56 9 3774 2182.",
         usage: response.usage,
         codigo_solicitud: solicitudCodigo,
       });
@@ -689,7 +689,7 @@ module.exports = async (req, res) => {
 
     // Si llegamos aquí, hicimos demasiadas iteraciones
     return res.status(200).json({
-      text: "Lo siento, no pude procesar completamente tu solicitud. Por favor escribe a +56 9 8628 4965.",
+      text: "Lo siento, no pude procesar completamente tu solicitud. Por favor escribe a +56 9 3774 2182.",
       codigo_solicitud: solicitudCodigo,
     });
   } catch (err) {
