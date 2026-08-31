@@ -115,12 +115,22 @@ export default function Landing({ onLogin }) {
   const handleLogin = async e => {
     e.preventDefault();
     setLoading(true); setError("");
-    const { data } = await sb.from("usuarios")
-      .select("*").eq("email", email.trim().toLowerCase())
-      .eq("password_hash", pass).eq("activo", true).single();
+    // Verificación en el servidor (/api/login); el navegador no toca `usuarios`.
+    let data = null;
+    try {
+      const r = await fetch("/api/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: email.trim().toLowerCase(), password: pass }),
+      });
+      const resp = await r.json();
+      if (r.ok && resp.ok) data = { ...resp.usuario, _token: resp.token };
+      else setError(resp.error || "Email o contraseña incorrectos");
+    } catch {
+      setError("Error de conexión. Intenta de nuevo.");
+    }
     setLoading(false);
     if (data) { onLogin(data); setModalLogin(false); }
-    else setError("Email o contraseña incorrectos");
   };
 
   return (

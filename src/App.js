@@ -98,6 +98,22 @@ function Toast({ t }) {
 
 function Spin() { return <div style={{textAlign:'center',padding:40,color:'#888',fontSize:14}}>Cargando…</div>; }
 
+// ─── API de usuarios (servidor) ───────────────────────────────────
+// La tabla `usuarios` ya no se toca desde el navegador: listado y escritura
+// pasan por /api/usuarios con el token de sesión (rol admin). El servidor
+// hashea las contraseñas; aquí nunca se ven hashes.
+const tokenSesion = () => { try { return JSON.parse(sessionStorage.getItem('cli_user') || '{}')._token || ''; } catch { return ''; } };
+const apiUsuarios = async (payload) => {
+  try {
+    const r = await fetch('/api/usuarios', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${tokenSesion()}` },
+      body: JSON.stringify(payload),
+    });
+    return await r.json();
+  } catch { return { ok: false, error: 'Error de conexión' }; }
+};
+
 // ─── APP ──────────────────────────────────────────────────────────
 export default function App() {
   const [user, setUser]   = useState(() => { try { return JSON.parse(sessionStorage.getItem('cli_user')); } catch { return null; } });
@@ -141,7 +157,7 @@ export default function App() {
       sb.from('arriendos').select('*').order('fecha',{ascending:false}).limit(200),
       sb.from('profesionales').select('*').order('nombre'),
       sb.from('boxes').select('*').order('nombre'),
-      sb.from('usuarios').select('id,nombre,email,rol,activo').order('nombre'),
+      apiUsuarios({ accion: 'listar' }).then(d => ({ data: d.ok ? d.usuarios : null })),
       sb.from('solicitudes_paciente').select('*').order('created_at',{ascending:false}).limit(200),
     ]);
     if (ins.data)  setInsumos(ins.data);
@@ -683,20 +699,18 @@ export default function App() {
               if(!usrForm.nombre.trim()||!usrForm.email.trim()) return showToast('Nombre y email requeridos','err');
               const emailNorm = usrForm.email.trim().toLowerCase();
               const passNorm  = (usrForm.password_hash||'').trim();
+              let resp;
               if(modal.id){
-                const upd = {nombre:usrForm.nombre.trim(), email:emailNorm, rol:usrForm.rol};
-                if(passNorm) upd.password_hash = passNorm;
-                await sb.from('usuarios').update(upd).eq('id',modal.id);
+                const cambios = {nombre:usrForm.nombre.trim(), email:emailNorm, rol:usrForm.rol};
+                if(passNorm) cambios.password = passNorm;
+                resp = await apiUsuarios({ accion:'actualizar', id: modal.id, cambios });
               } else {
                 if(!passNorm) return showToast('Contraseña requerida','err');
-                await sb.from('usuarios').insert({
-                  ...usrForm,
-                  nombre: usrForm.nombre.trim(),
-                  email: emailNorm,
-                  password_hash: passNorm,
-                  activo: true,
-                });
+                resp = await apiUsuarios({ accion:'crear', usuario:{
+                  nombre: usrForm.nombre.trim(), email: emailNorm, rol: usrForm.rol, password: passNorm,
+                }});
               }
+              if(!resp.ok) return showToast(resp.error||'No se pudo guardar el usuario','err');
               await fetchAll(); showToast(modal.id?'Usuario actualizado':'Usuario creado'); setModal(null);
             }}>Guardar</button>
             <button style={S.btn('secondary')} onClick={()=>setModal(null)}>Cancelar</button>
@@ -1414,7 +1428,7 @@ export default function App() {
                   </div>
                   <div style={{marginTop:8,display:'flex',gap:6}}>
                     <button style={S.btn('secondary',true)} onClick={()=>{setUsrForm({...u,password_hash:''});setModal({tipo:'usuario',id:u.id});}}>Editar</button>
-                    {u.id!==user.id&&<button style={{...S.btn('secondary',true),background:'#FCEBEB',color:'#A32D2D'}} onClick={async()=>{await sb.from('usuarios').update({activo:!u.activo}).eq('id',u.id);fetchAll();showToast(u.activo?'Usuario desactivado':'Usuario activado');}}>
+                    {u.id!==user.id&&<button style={{...S.btn('secondary',true),background:'#FCEBEB',color:'#A32D2D'}} onClick={async()=>{const r=await apiUsuarios({accion:'activo',id:u.id,activo:!u.activo});if(!r.ok)return showToast(r.error||'No se pudo cambiar el estado','err');fetchAll();showToast(u.activo?'Usuario desactivado':'Usuario activado');}}>
                       {u.activo?'Desactivar':'Activar'}
                     </button>}
                   </div>

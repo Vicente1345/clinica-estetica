@@ -30,18 +30,14 @@ async function enviarEmail(to, subject, html) {
   }
 }
 
-// Fecha de mañana en hora de Santiago (UTC-3)
+// Fecha de mañana en hora de Chile continental (America/Santiago).
+// Usa Intl para respetar el horario de invierno/verano — el cálculo anterior
+// fijaba UTC-3 y se desviaba en invierno cerca de la medianoche.
 function mañanaChile() {
-  const ahora = new Date();
-  // Sumar 1 día en UTC y luego ajustar a CLT (UTC-3)
-  const clOffset = -3 * 60; // minutos
-  const localMs  = ahora.getTime() + clOffset * 60000;
-  const local     = new Date(localMs);
-  local.setUTCDate(local.getUTCDate() + 1);
-  const y = local.getUTCFullYear();
-  const m = String(local.getUTCMonth() + 1).padStart(2, '0');
-  const d = String(local.getUTCDate()).padStart(2, '0');
-  return `${y}-${m}-${d}`;
+  const hoy = new Intl.DateTimeFormat('sv-SE', { timeZone: 'America/Santiago' }).format(new Date()); // YYYY-MM-DD
+  const [y, m, d] = hoy.split('-').map(Number);
+  const t = new Date(Date.UTC(y, m - 1, d + 1));
+  return `${t.getUTCFullYear()}-${String(t.getUTCMonth() + 1).padStart(2, '0')}-${String(t.getUTCDate()).padStart(2, '0')}`;
 }
 
 module.exports = async (req, res) => {

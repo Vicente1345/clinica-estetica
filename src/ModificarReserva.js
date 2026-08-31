@@ -1,5 +1,4 @@
 import { useState } from "react";
-import { sb } from "./supabase";
 import { conflictosArriendo, conflictosCita, minHorasDeBox, normHora } from "./logic/disponibilidad";
 
 const HORAS = ["08:00","09:00","10:00","11:00","12:00","13:00","14:00","15:00","16:00","17:00","18:00","19:00","20:00"];
@@ -136,10 +135,27 @@ export default function ModificarReserva({ arriendos, boxes, profesionales, soli
       showToast("Debes ingresar el motivo de la cancelación.", "err"); return;
     }
     setGuardando(true);
-    await sb.from("arriendos").update({
-      estado: "cancelado",
-      obs_modificacion: `Cancelado por admin: ${form.motivo}`,
-    }).eq("id", selId);
+    // La cancelación pasa por el servidor (/api/cancelar-arriendo): exige
+    // sesión de admin y re-aplica la regla de 48 h en hora de Chile.
+    try {
+      let token = "";
+      try { token = JSON.parse(sessionStorage.getItem("cli_user") || "{}")._token || ""; } catch {}
+      const r = await fetch("/api/cancelar-arriendo", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ id: selId, motivo: form.motivo }),
+      });
+      const data = await r.json();
+      if (!r.ok || !data.ok) {
+        showToast(data.error || "No se pudo cancelar la reserva.", "err");
+        setGuardando(false);
+        return;
+      }
+    } catch {
+      showToast("Error de conexión al cancelar. Intenta de nuevo.", "err");
+      setGuardando(false);
+      return;
+    }
     setGuardando(false);
     setSelId(null);
     setConfirmarCancelar(false);

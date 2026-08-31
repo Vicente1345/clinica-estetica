@@ -1,5 +1,4 @@
 import { useState } from 'react';
-import { sb } from './supabase';
 
 const S = {
   wrap: { minHeight:'100vh', display:'flex', alignItems:'center', justifyContent:'center', background:'#f5f5f3', fontFamily:'system-ui,sans-serif' },
@@ -19,16 +18,22 @@ export default function Login({ onLogin }) {
   const handleLogin = async e => {
     e.preventDefault();
     setError(''); setLoading(true);
-    const { data, error: err } = await sb
-      .from('usuarios')
-      .select('*')
-      .eq('email', email.trim().toLowerCase())
-      .eq('password_hash', pass)
-      .eq('activo', true)
-      .single();
-    setLoading(false);
-    if (err || !data) { setError('Email o contraseña incorrectos'); return; }
-    onLogin(data);
+    // La verificación de contraseña vive en el servidor (/api/login): el
+    // navegador nunca consulta la tabla usuarios ni ve hashes.
+    try {
+      const r = await fetch('/api/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: email.trim().toLowerCase(), password: pass }),
+      });
+      const data = await r.json();
+      setLoading(false);
+      if (!r.ok || !data.ok) { setError(data.error || 'Email o contraseña incorrectos'); return; }
+      onLogin({ ...data.usuario, _token: data.token });
+    } catch {
+      setLoading(false);
+      setError('Error de conexión. Intenta de nuevo.');
+    }
   };
 
   return (

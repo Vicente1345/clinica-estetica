@@ -558,14 +558,36 @@ async function toolRegistrar(sb, input) {
 }
 
 // ─── HANDLER PRINCIPAL ─────────────────────────────────────────────
+const { rateLimitOk, ipDeReq } = require("./_lib/seguridad");
+
 module.exports = async (req, res) => {
-  res.setHeader("Access-Control-Allow-Origin", "*");
+  // CORS restringido (S5): si ALLOWED_ORIGINS está configurada (lista separada
+  // por comas), solo esos orígenes pueden llamar desde un navegador; sin la
+  // env var se mantiene el comportamiento abierto para no romper el deploy
+  // actual antes de configurarla.
+  const origin = req.headers.origin || "";
+  const permitidos = (process.env.ALLOWED_ORIGINS || "")
+    .split(",").map(s => s.trim()).filter(Boolean);
+  if (permitidos.length === 0) {
+    res.setHeader("Access-Control-Allow-Origin", "*");
+  } else if (permitidos.includes(origin)) {
+    res.setHeader("Access-Control-Allow-Origin", origin);
+    res.setHeader("Vary", "Origin");
+  } else if (origin) {
+    return res.status(403).json({ error: "Origen no permitido" });
+  }
   res.setHeader("Access-Control-Allow-Methods", "POST, OPTIONS");
   res.setHeader("Access-Control-Allow-Headers", "Content-Type");
 
   if (req.method === "OPTIONS") return res.status(200).end();
   if (req.method !== "POST") {
     return res.status(405).json({ error: "Method not allowed" });
+  }
+
+  // Rate limit por IP (best-effort por instancia): frena ráfagas de abuso
+  // sobre un endpoint que agenda citas y consume tokens de modelo.
+  if (!rateLimitOk(`chat:${ipDeReq(req)}`, 20, 60000)) {
+    return res.status(429).json({ error: "Demasiados mensajes seguidos. Espera un momento e intenta de nuevo." });
   }
 
   try {
@@ -587,7 +609,9 @@ module.exports = async (req, res) => {
           (m.role === "user" || m.role === "assistant") &&
           typeof m.content === "string" &&
           m.content.trim().length > 0
-      );
+      )
+      // Tope de tamaño por mensaje: limita abuso de tokens y payloads hostiles
+      .map((m) => ({ role: m.role, content: m.content.slice(0, 2000) }));
 
     if (safeMessages.length === 0) {
       return res.status(400).json({ error: "Mensajes inválidos" });
