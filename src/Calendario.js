@@ -64,9 +64,9 @@ useEffect(() => { recargarArriendos(); }, []);
     return { label:d, fecha:formatFecha(fecha) };
   });
 
-  // Ocupación sobre el RECURSO FÍSICO: Dental y Estético comparten un mismo
-  // espacio, así que una reserva en cualquiera de las dos modalidades bloquea
-  // a la otra. El Box Médico tiene su propio recurso independiente.
+  // Ocupación sobre el RECURSO FÍSICO: Médico y Estético comparten un mismo
+  // espacio (Box Mixto), así que una reserva en cualquiera de las dos
+  // modalidades bloquea a la otra. Dental y Pabellón son independientes.
   const idsRecursoSel = boxSel ? boxIdsDelRecurso(boxes || [], boxSel) : [];
 
   const estaOcupado = (fecha, hora) => {
@@ -80,8 +80,8 @@ useEffect(() => { recargarArriendos(); }, []);
 };
 
 // Detecta si un slot de la grilla (1 hora completa) está bloqueado por una cita
-// de paciente en el mismo RECURSO físico (una cita dental bloquea también la
-// vista estética y viceversa; las citas médicas solo bloquean el Box Médico)
+// de paciente en el mismo RECURSO físico (una cita médica bloquea también la
+// vista estética y viceversa; las citas dentales solo bloquean el Box Dental)
 const cellEnd = (hora) => {
   const [h] = hora.split(":").map(Number);
   return (h+1).toString().padStart(2,"0") + ":00";
@@ -162,6 +162,10 @@ const citaPacienteEnSlot = (fecha, hora) => {
   const opcionesHoraFin = () => {
     if (!reserva) return [];
     const idx = HORAS.indexOf(reserva.horaInicio);
+    // El Pabellón solo se arrienda en bloques de 1, 2, 4 u 8 horas
+    if (normTipoBox(reserva.box) === "pabellon") {
+      return [1, 2, 4, 8].map(d => HORAS[idx + d]).filter(Boolean);
+    }
     return HORAS.slice(idx + minHorasDeBox(reserva.box));
   };
 
@@ -294,9 +298,12 @@ const citaPacienteEnSlot = (fecha, hora) => {
         ))}
       </div>
       <div style={{ fontSize:11, color:"#888", marginBottom:14 }}>
-        {boxSel && recursoDeBox(boxSel) === "dental_estetico"
-          ? "ℹ Dental y Estético comparten el mismo espacio físico: una reserva en cualquiera de las dos modalidades bloquea el horario en ambas."
-          : boxSel ? "ℹ El Box Médico tiene calendario propio · reserva mínima de 2 horas consecutivas." : ""}
+        {!boxSel ? "" :
+          recursoDeBox(boxSel) === "medico_estetico"
+            ? "ℹ Médico y Estético comparten el mismo espacio físico (Box Mixto): una reserva en cualquiera de las dos modalidades bloquea el horario en ambas." + (normTipoBox(boxSel) === "medico" ? " Médico exige mínimo 2 horas consecutivas." : "")
+          : recursoDeBox(boxSel) === "pabellon"
+            ? "ℹ El Pabellón tiene agenda propia · se arrienda en bloques de 1, 2, 4 u 8 horas."
+            : "ℹ El Box Dental tiene calendario propio e independiente."}
       </div>
 
       {/* Navegación semana */}

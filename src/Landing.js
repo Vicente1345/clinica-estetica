@@ -69,6 +69,13 @@ const PLANES_MEDICO = [
   { titulo:"5 jornadas/semana ⭐",   precio:1050000,detalle:"Plan mensual · lunes a viernes" },
 ];
 
+const PLANES_PABELLON = [
+  { titulo:"1 hora",                    precio:55000,  detalle:"Bloque de 1 hora" },
+  { titulo:"2 horas",                   precio:100000, detalle:"Bloque continuo de 2 horas" },
+  { titulo:"Media jornada (4 h)",       precio:200000, detalle:"Bloque continuo de 4 horas", popular:true },
+  { titulo:"Jornada completa (8 h)",    precio:360000, detalle:"Bloque continuo de 8 horas" },
+];
+
 const fmt = n => n.toLocaleString("es-CL", { style:"currency", currency:"CLP", maximumFractionDigits:0 });
 
 export default function Landing({ onLogin }) {
@@ -85,9 +92,9 @@ export default function Landing({ onLogin }) {
   const [dispBoxes, setDispBoxes]         = useState([]);
   const [dispArriendos, setDispArriendos] = useState([]);
   const [dispCitas, setDispCitas]         = useState([]);
-  // El calendario público se muestra por RECURSO FÍSICO: Dental y Estético
-  // comparten un mismo espacio (calendario único); el Médico es independiente.
-  const [dispRecursoSel, setDispRecursoSel] = useState("dental_estetico");
+  // El calendario público se muestra por RECURSO FÍSICO: Médico y Estético
+  // comparten un mismo espacio (Box Mixto); Dental y Pabellón son independientes.
+  const [dispRecursoSel, setDispRecursoSel] = useState("medico_estetico");
   const [dispSemana, setDispSemana]       = useState(0);
 
   useEffect(() => {
@@ -106,7 +113,7 @@ export default function Landing({ onLogin }) {
     const grupos = {};
     dispBoxes.forEach(b => {
       const k = recursoDeBox(b);
-      if (!grupos[k]) grupos[k] = { key:k, nombre: k==="medico" ? "🏥 Box Médico" : "🦷✨ Box Dental / Estético", ids:[] };
+      if (!grupos[k]) grupos[k] = { key:k, nombre: k==="dental" ? "🦷 Box Dental" : k==="pabellon" ? "⚕️ Pabellón" : "🏥✨ Box Mixto Médico / Estético", ids:[] };
       grupos[k].ids.push(b.id);
     });
     return Object.values(grupos);
@@ -183,7 +190,7 @@ export default function Landing({ onLogin }) {
       {/* ── STATS ── */}
       <section style={{ background:C.lila, padding:"28px 40px" }}>
         <div style={{ maxWidth:800, margin:"0 auto", display:"grid", gridTemplateColumns:"repeat(3,1fr)", gap:20, textAlign:"center" }}>
-          {[["2","Espacios equipados"],["100%","Documentación al día"],["Flex","Horarios a tu medida"]].map(([n,t])=>(
+          {[["3","Espacios equipados"],["100%","Documentación al día"],["Flex","Horarios a tu medida"]].map(([n,t])=>(
             <div key={t}>
               <div style={{ fontSize:30, fontWeight:700, color:C.blanco }}>{n}</div>
               <div style={{ fontSize:11, letterSpacing:".15em", textTransform:"uppercase", color:C.lilaPale, marginTop:4 }}>{t}</div>
@@ -225,8 +232,9 @@ export default function Landing({ onLogin }) {
           </div>
           <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fit,minmax(260px,1fr))", gap:24 }}>
             {[
-              { icon:"🦷✨", color:C.lila, bg:C.lilaPale, nombre:"Box Dental / Estético", desc:"Un único espacio físico de doble función: unidad dental completa y equipamiento para medicina estética. Se arrienda en modalidad Dental o Estética — el calendario es compartido entre ambas.", items:["Sillón dental completo","Lámpara de fotocurado","Instrumental y bandeja de examen","Rayos X · equipo portátil","Camilla y aro de luz profesional","Refrigerador","Alcohol, desinfección y EPP básico","Carpule y sabanilla desechable","Esterilización básica · eliminación de residuos","Opción con asistente (modalidad Dental Pro)"] },
-              { icon:"🏥", color:C.dorado, bg:C.beige, nombre:"Box Médico", desc:"Espacio clínico independiente para médicos y profesionales de la salud, con calendario propio. Ideal para consultas, procedimientos y atención ambulatoria. Reserva mínima de 2 horas consecutivas.", items:["Camilla","Escritorio y lavamanos","EPP incluido","Esterilización de instrumental simple","Eliminación de residuos básicos y cortopunzantes"] },
+              { icon:"🦷", color:C.rosa, bg:C.rosaPale, nombre:"Box Dental", desc:"Espacio dental independiente con unidad completa. Su agenda no se cruza con la de los demás espacios. Modalidades Flex (sin asistente) y Pro (con asistente).", items:["Sillón dental completo","Lámpara de fotocurado","Instrumental y bandeja de examen","Rayos X · equipo portátil","Carpule","Esterilización básica","Eliminación de residuos","Opción con asistente (Pro)"] },
+              { icon:"🏥✨", color:C.lila, bg:C.lilaPale, nombre:"Box Mixto Médico / Estético", desc:"Un único espacio físico de doble función: consultas y procedimientos médicos, o tratamientos estéticos. Se arrienda en modalidad Médico o Estético — el calendario es compartido entre ambas. Médico exige mínimo 2 horas consecutivas.", items:["Camilla y aro de luz profesional","Escritorio y lavamanos","Refrigerador","Alcohol, desinfección y EPP","Sabanilla desechable","Esterilización de instrumental simple","Eliminación de residuos básicos y cortopunzantes"] },
+              { icon:"⚕️", color:C.dorado, bg:C.beige, nombre:"Pabellón", desc:"Pabellón independiente con agenda propia, para procedimientos que requieren un recinto dedicado. Se arrienda en bloques de 1, 2, 4 u 8 horas.", items:["Recinto exclusivo por bloque","Agenda y valores propios","Bloques de 1, 2, 4 u 8 horas","Coordinación de aseo entre bloques"] },
             ].map(b=>(
               <div key={b.nombre} style={{ background:C.blanco, borderRadius:16, overflow:"hidden", boxShadow:"0 4px 24px rgba(155,142,196,0.12)" }}>
                 <div style={{ background:`linear-gradient(135deg, ${b.color}, ${b.color}bb)`, padding:"36px 28px", textAlign:"center" }}>
@@ -262,7 +270,7 @@ export default function Landing({ onLogin }) {
           </div>
           {/* Tab selector boxes */}
           <div style={{ display:"flex", gap:0, marginBottom:32, borderRadius:30, overflow:"hidden", border:`2px solid ${C.lila}`, width:"fit-content", margin:"0 auto 32px" }}>
-            {[["estetico","✨ Estético"],["dental","🦷 Dental"],["medico","🏥 Médico"]].map(([k,l])=>(
+            {[["estetico","✨ Estético"],["dental","🦷 Dental"],["medico","🏥 Médico"],["pabellon","⚕️ Pabellón"]].map(([k,l])=>(
               <button key={k} onClick={()=>setBoxActivo(k)} style={{ padding:"11px 24px", border:"none", cursor:"pointer", fontSize:13, fontWeight:600, background:boxActivo===k?C.lila:C.blanco, color:boxActivo===k?C.blanco:C.lila, letterSpacing:".05em", transition:"all .2s" }}>
                 {l}
               </button>
@@ -571,6 +579,27 @@ export default function Landing({ onLogin }) {
               </div>
             </div>
           )}
+          {/* ─── PABELLÓN ─── */}
+          {boxActivo==="pabellon" && (
+            <div>
+              <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fit,minmax(200px,1fr))", gap:12, marginBottom:16 }}>
+                {PLANES_PABELLON.map((p,i)=>(
+                  <div key={i} style={{ position:"relative", background:p.popular?C.dorado:C.beige, borderRadius:14, padding:"22px 18px", border:`2px solid ${p.popular?C.dorado:C.beigeOscuro}`, boxShadow:p.popular?"0 4px 18px rgba(201,169,110,0.35)":"none" }}>
+                    {p.popular && <div style={{ position:"absolute", top:-10, right:12, background:C.cafe, color:C.blanco, fontSize:10, fontWeight:700, padding:"3px 10px", borderRadius:20, letterSpacing:".08em" }}>MÁS ELEGIDO</div>}
+                    <div style={{ fontSize:24, fontWeight:700, color:p.popular?C.blanco:C.cafe, marginBottom:4 }}>{fmt(p.precio)}</div>
+                    <div style={{ fontSize:13, fontWeight:600, color:p.popular?C.blanco:C.cafe, marginBottom:4 }}>{p.titulo}</div>
+                    <div style={{ fontSize:11, color:p.popular?C.beige:C.gris, fontFamily:"system-ui", lineHeight:1.5 }}>{p.detalle}</div>
+                  </div>
+                ))}
+              </div>
+              <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fit,minmax(240px,1fr))", gap:12 }}>
+                <div style={{ padding:"14px 18px", background:C.blanco, borderRadius:10, border:`1px solid ${C.beigeOscuro}`, fontSize:12, color:C.cafeClaro, fontFamily:"system-ui", lineHeight:1.9 }}>
+                  <strong style={{ display:"block", marginBottom:6, color:C.cafe }}>📋 Condiciones</strong>
+                  Se arrienda exclusivamente en bloques de 1, 2, 4 u 8 horas · Agenda independiente del Box Dental y del Box Mixto
+                </div>
+              </div>
+            </div>
+          )}
           <div style={{ marginTop:20, padding:"14px 18px", background:C.lilaPale, borderRadius:10, fontSize:12, color:C.cafeClaro, fontFamily:"system-ui", lineHeight:1.8 }}>
             💳 <strong>Forma de pago:</strong> Transferencia bancaria únicamente. Adjunta el comprobante en la plataforma para confirmar tu reserva.
           </div>
@@ -662,9 +691,11 @@ export default function Landing({ onLogin }) {
             ))}
           </div>
           <p style={{ textAlign:"center", fontSize:11, color:C.gris, fontFamily:"system-ui", margin:"0 0 16px" }}>
-            {dispRecursoSel==="medico"
-              ? "Calendario independiente · reserva mínima de 2 horas consecutivas"
-              : "Dental y Estético comparten el mismo espacio físico: el calendario es único para ambas modalidades"}
+            {dispRecursoSel==="medico_estetico"
+              ? "Médico y Estético comparten el mismo espacio físico (Box Mixto): el calendario es único para ambas modalidades · Médico mínimo 2 horas consecutivas"
+              : dispRecursoSel==="pabellon"
+              ? "Agenda independiente · bloques de 1, 2, 4 u 8 horas"
+              : "Calendario propio e independiente del resto de los espacios"}
           </p>
           {(() => {
             const getLunesP = (off=0) => {

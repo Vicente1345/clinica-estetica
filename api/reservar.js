@@ -8,7 +8,7 @@
 //      (Box Médico: 2 horas consecutivas obligatorias).
 //   3. Sin solapamiento interno entre las filas del propio payload (bulk).
 //   4. Sin solapamiento con OTROS arriendos activos del mismo RECURSO FÍSICO
-//      (Dental y Estético comparten calendario; Médico es independiente).
+//      (Médico y Estético comparten el Box Mixto; Dental y Pabellón son independientes).
 //   5. Sin solapamiento con citas de pacientes del mismo recurso.
 //   6. Anti-carrera: tras insertar se re-verifica (arriendos Y citas); si otra
 //      reserva simultánea ganó (desempate determinístico por created_at/id),
@@ -22,7 +22,7 @@
 
 const { createClient } = require('@supabase/supabase-js');
 const {
-  boxIdsDelRecurso, tiposDelRecurso, recursoDeBox, minHorasDeBox,
+  boxIdsDelRecurso, tiposDelRecurso, recursoDeBox, minHorasDeBox, normTipoBox,
   seSolapan, normHora, ESTADOS_OCUPAN, ESTADOS_CITA_OCUPAN, ganaCarrera,
 } = require('./_lib/disponibilidad');
 
@@ -123,6 +123,12 @@ module.exports = async (req, res) => {
           ok: false,
           error: `La reserva del ${box.nombre} requiere un mínimo de ${minHoras} horas consecutivas (${r.fecha}: ${horas} hr)`,
         });
+      // El Pabellón SOLO se arrienda en bloques de 1, 2, 4 u 8 horas
+      if (normTipoBox(box) === 'pabellon' && ![1, 2, 4, 8].includes(horas))
+        return res.status(400).json({ ok: false, error: `El Pabellón se arrienda solo en bloques de 1, 2, 4 u 8 horas (${r.fecha}: ${horas} hr)` });
+      // Horario de funcionamiento de los espacios: 08:00 a 20:00
+      if (normHora(r.hora_inicio) < '08:00' || normHora(r.hora_fin) > '20:00')
+        return res.status(400).json({ ok: false, error: `El horario de arriendo es de 08:00 a 20:00 (${r.fecha}: ${normHora(r.hora_inicio)}–${normHora(r.hora_fin)})` });
     }
 
     // ── Solapamientos internos del propio payload (bulk de plan) ──

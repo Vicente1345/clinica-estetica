@@ -3,10 +3,11 @@
 // de paridad en src/logic/disponibilidad.test.js compara los dos.
 // (Los archivos api/_* no se exponen como endpoints en Vercel.)
 
-const RECURSO_DENTAL_ESTETICO = "dental_estetico";
-const RECURSO_MEDICO          = "medico";
+const RECURSO_DENTAL          = "dental";
+const RECURSO_MEDICO_ESTETICO = "medico_estetico";
+const RECURSO_PABELLON        = "pabellon";
 
-const MIN_HORAS = { estetico: 1, dental: 1, medico: 2 };
+const MIN_HORAS = { estetico: 1, dental: 1, medico: 2, pabellon: 1 };
 
 const normHora = h => (h || "").slice(0, 5);
 
@@ -14,18 +15,23 @@ function normTipoBox(box) {
   const t = ((box?.tipo || box?.nombre) || "")
     .toLowerCase()
     .normalize("NFD").replace(/[̀-ͯ]/g, "");
+  if (t.includes("pabell")) return "pabellon";
   if (t.includes("dental")) return "dental";
   if (t.includes("medic"))  return "medico";
   return "estetico";
 }
 
 const recursoDeTipo = tipo =>
-  tipo === "medico" ? RECURSO_MEDICO : RECURSO_DENTAL_ESTETICO;
+  tipo === "dental"   ? RECURSO_DENTAL
+  : tipo === "pabellon" ? RECURSO_PABELLON
+  : RECURSO_MEDICO_ESTETICO;
 
 const recursoDeBox = box => recursoDeTipo(normTipoBox(box));
 
 const tiposDelRecurso = recurso =>
-  recurso === RECURSO_MEDICO ? ["medico"] : ["dental", "estetico"];
+  recurso === RECURSO_DENTAL   ? ["dental"]
+  : recurso === RECURSO_PABELLON ? ["pabellon"]
+  : ["medico", "estetico"];
 
 function boxIdsDelRecurso(boxes, box) {
   const recurso = recursoDeBox(box);
@@ -71,9 +77,15 @@ function validarDuracionMinima(box, horas) {
 function calcularPrecio(tipoBox, horas) {
   const tipo = normTipoBox({ tipo: tipoBox });
   if (tipo === "dental") {
-    if (horas < 1)   return { monto: 0,            label: "Mínimo 1 hora",                 valido: false };
-    if (horas <= 3)  return { monto: horas * 9000, label: `${horas} hora${horas > 1 ? "s" : ""} · $9.000/hr`, valido: true };
-    return             { monto: 45000,             label: "Jornada · $45.000",             valido: true };
+    if (horas < 1)   return { monto: 0,             label: "Mínimo 1 hora",                 valido: false };
+    if (horas <= 3)  return { monto: horas * 15000, label: `${horas} hora${horas > 1 ? "s" : ""} · $15.000/hr`, valido: true };
+    return             { monto: 45000,              label: "Jornada · $45.000",             valido: true };
+  }
+  if (tipo === "pabellon") {
+    const tarifas = { 1: [55000, "1 hora · $55.000"], 2: [100000, "2 horas · $100.000"], 4: [200000, "Media jornada (4h) · $200.000"], 8: [360000, "Jornada completa (8h) · $360.000"] };
+    const t = tarifas[horas];
+    if (t) return { monto: t[0], label: t[1], valido: true };
+    return { monto: 0, label: "El Pabellón se arrienda en bloques de 1, 2, 4 u 8 horas", valido: false };
   }
   if (tipo === "medico") {
     if (horas < 2)   return { monto: 0,             label: "Mínimo 2 horas consecutivas en box médico", valido: false };
@@ -94,7 +106,7 @@ function ganaCarrera(mio, otro) {
 }
 
 module.exports = {
-  RECURSO_DENTAL_ESTETICO, RECURSO_MEDICO, MIN_HORAS,
+  RECURSO_DENTAL, RECURSO_MEDICO_ESTETICO, RECURSO_PABELLON, MIN_HORAS,
   normHora, normTipoBox, recursoDeTipo, recursoDeBox, tiposDelRecurso,
   boxIdsDelRecurso, minHorasDeBox, seSolapan,
   ESTADOS_OCUPAN, ESTADOS_CITA_OCUPAN,

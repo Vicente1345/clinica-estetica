@@ -1,6 +1,6 @@
 import { useState } from "react";
 import {
-  normTipoBox, recursoDeBox, tiposDelRecurso, normHora,
+  normTipoBox, recursoDeBox, recursoDeTipo, tiposDelRecurso, normHora,
   ESTADOS_OCUPAN, ESTADOS_CITA_OCUPAN, seSolapan,
 } from "./logic/disponibilidad";
 
@@ -456,7 +456,31 @@ export const PLANES = {
         ]
       },
     ]
-  }
+  },
+
+  // ═══ PABELLÓN (espacio independiente, tarifas por bloque) ═══
+  pabellon: {
+    nombre: "Pabellón",
+    emoji: "⚕️",
+    color:  "#FCE4EC",
+    borde:  "#9C2960",
+    texto:  "#4A0E28",
+    secciones: [
+      {
+        id: "pab_bloques",
+        titulo: "Arriendo por bloque",
+        icono: "⏱",
+        tipo: "suelta",
+        descripcion: "El Pabellón se arrienda en bloques de 1, 2, 4 u 8 horas",
+        opciones: [
+          { id: "pab_1h", horasFijas: 1, label: "1 hora", detalle: "Bloque de 1 hora", precio: 55000, jornadas: null, meses: null, asistente: false, tag: null },
+          { id: "pab_2h", horasFijas: 2, label: "2 horas", detalle: "Bloque continuo de 2 horas", precio: 100000, jornadas: null, meses: null, asistente: false, tag: "Ahorra $10.000", tagColor: "#1D9E75" },
+          { id: "pab_4h", horasFijas: 4, label: "Media jornada (4 horas)", detalle: "Bloque continuo de 4 horas", precio: 200000, jornadas: null, meses: null, asistente: false, tag: null },
+          { id: "pab_8h", horasFijas: 8, label: "Jornada completa (8 horas)", detalle: "Bloque continuo de 8 horas", precio: 360000, jornadas: null, meses: null, asistente: false, tag: "Mejor valor hora", tagColor: "#854F0B" },
+        ]
+      },
+    ]
+  },
 };
 
 // ─── COMPONENTE SELECTOR DE PLAN ──────────────────────────────────
@@ -493,7 +517,7 @@ export function SelectorPlan({ tipoBox, onSeleccionar, boxes = [], arriendos = [
   };
 
   // ── Disponibilidad real de la fecha elegida sobre el recurso físico ──
-  // (Dental y Estético comparten espacio: una hora tomada en cualquiera de
+  // (Médico y Estético comparten el Box Mixto; Dental y Pabellón van aparte)
   // las dos modalidades bloquea la otra; el Médico es independiente)
   // Inicios posibles de cada tramo de 1 hora (termino maximo 20:00).
   // Con "medias horas" activo, la grilla ofrece tambien inicios a la :30.
@@ -512,7 +536,7 @@ export function SelectorPlan({ tipoBox, onSeleccionar, boxes = [], arriendos = [
   const idsRecursoSel = boxDeTipo
     ? boxes.filter(b => recursoDeBox(b) === recursoDeBox(boxDeTipo)).map(b => b.id)
     : [];
-  const tiposCita = tiposDelRecurso(tipoBox === "medico" ? "medico" : "dental_estetico");
+  const tiposCita = tiposDelRecurso(recursoDeTipo(tipoBox));
 
   const horaOcupada = (fecha, hora) => {
     if (!fecha) return false;
@@ -577,6 +601,7 @@ export function SelectorPlan({ tipoBox, onSeleccionar, boxes = [], arriendos = [
             : horasSel.some(h => horaOcupada(fechaInicio, h)) ? "Una de las horas elegidas acaba de ocuparse: elige otra"
             : null)
           : (horasHorario <= 0 ? "La hora de término debe ser posterior a la de inicio"
+        : (horario.inicio < "08:00" || finEfectivo > "20:00") ? "El horario de arriendo es de 08:00 a 20:00 (tu bloque termina a las " + finEfectivo + ")"
             : HORAS_GRILLA.filter(h => h >= horario.inicio && h < finEfectivo).some(h => horaOcupada(fechaInicio, h)) ? "El bloque elegido choca con un horario ya ocupado"
             : null));
 

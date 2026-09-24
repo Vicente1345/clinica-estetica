@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { conflictosArriendo, conflictosCita, minHorasDeBox, normHora } from "./logic/disponibilidad";
+import { conflictosArriendo, conflictosCita, minHorasDeBox, normHora, calcularPrecio } from "./logic/disponibilidad";
 
 const HORAS = ["08:00","09:00","10:00","11:00","12:00","13:00","14:00","15:00","16:00","17:00","18:00","19:00","20:00"];
 const fmt = n => (n||0).toLocaleString("es-CL",{style:"currency",currency:"CLP",maximumFractionDigits:0});
@@ -65,8 +65,8 @@ export default function ModificarReserva({ arriendos, boxes, profesionales, soli
     const box = boxes.find(b => b.id === form.boxId);
     if (!box) { showToast("Selecciona un box válido", "err"); return; }
 
-    // Conflictos sobre el RECURSO FÍSICO compartido (Dental+Estético comparten
-    // calendario; Médico independiente), excluyendo la propia reserva
+    // Conflictos sobre el RECURSO FÍSICO compartido (Médico+Estético comparten
+    // el Box Mixto; Dental y Pabellón son independientes), excluyendo la propia reserva
     const [conflicto] = conflictosArriendo({
       boxes, arriendos, box,
       fecha: form.fecha, horaInicio: form.horaInicio, horaFin: form.horaFin,
@@ -85,11 +85,14 @@ export default function ModificarReserva({ arriendos, boxes, profesionales, soli
     const [h1,m1] = form.horaInicio.split(":").map(Number);
     const [h2,m2] = form.horaFin.split(":").map(Number);
     const horas = ((h2*60+m2)-(h1*60+m1))/60;
-    const minHoras = minHorasDeBox(box);
-    if (horas < minHoras) {
-      showToast(`${box.nombre}: mínimo ${minHoras} horas consecutivas`, "err"); return;
+    // Duración y monto según el catálogo comercial de cada modalidad:
+    // impone el mínimo de 2h del médico, los bloques 1/2/4/8 del Pabellón
+    // y unifica el reprecio con la tarifa real (antes usaba tarifa_hora plana)
+    const precioCat = calcularPrecio(box.tipo || box.nombre, horas);
+    if (!precioCat.valido) {
+      showToast(`${box.nombre}: ${precioCat.label}`, "err"); return;
     }
-    const monto = box ? box.tarifa_hora * horas : arr.monto;
+    const monto = precioCat.monto;
     setGuardando(true);
     // La escritura pasa por /api/reservar (modo modificación): re-valida en el
     // servidor contra datos frescos del recurso compartido y revierte si otra

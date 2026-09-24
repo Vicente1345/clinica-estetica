@@ -1,20 +1,25 @@
 // ─── RECURSO FÍSICO vs MODALIDAD COMERCIAL ────────────────────────
-// El Box Dental y el Box Estético son DOS modalidades comerciales que
-// comparten UN mismo espacio físico → comparten calendario.
-// El Box Médico es un espacio físico independiente con calendario propio
-// y mínimo de 2 horas consecutivas por reserva.
+// El Box Médico y el Box Estético son DOS modalidades comerciales que
+// comparten UN mismo espacio físico (Box Mixto) → comparten calendario.
+// El Box Dental y el Pabellón son espacios independientes con agenda propia.
+// El Médico mantiene su mínimo de 2 horas consecutivas por reserva.
 //
 // Este módulo es la única fuente de verdad de esas reglas en el frontend.
 // api/_lib/disponibilidad.js es su espejo CommonJS para las funciones
 // serverless — si cambias algo aquí, cambia también allá (hay un test de
 // paridad en src/logic/disponibilidad.test.js que compara ambos).
 
-export const RECURSO_DENTAL_ESTETICO = "dental_estetico";
-export const RECURSO_MEDICO          = "medico";
+// Estructura definitiva de espacios físicos (v3):
+//   - Box Dental: independiente.
+//   - Box Mixto: Médico y Estético comparten UN espacio físico (agenda única).
+//   - Pabellón: independiente, con sus propias tarifas por bloque.
+export const RECURSO_DENTAL          = "dental";
+export const RECURSO_MEDICO_ESTETICO = "medico_estetico";
+export const RECURSO_PABELLON        = "pabellon";
 
 // Horas mínimas por modalidad. La regla de 2h es EXCLUSIVA del Box Médico
 // (obligatoria en frontend + backend); Dental y Estético no tienen mínimo.
-export const MIN_HORAS = { estetico: 1, dental: 1, medico: 2 };
+export const MIN_HORAS = { estetico: 1, dental: 1, medico: 2, pabellon: 1 };
 
 // "09:00:00" (time de Postgres) → "09:00"
 export const normHora = h => (h || "").slice(0, 5);
@@ -25,19 +30,24 @@ export function normTipoBox(box) {
   const t = ((box?.tipo || box?.nombre) || "")
     .toLowerCase()
     .normalize("NFD").replace(/[̀-ͯ]/g, "");
+  if (t.includes("pabell")) return "pabellon";
   if (t.includes("dental")) return "dental";
   if (t.includes("medic"))  return "medico";
   return "estetico";
 }
 
 export const recursoDeTipo = tipo =>
-  tipo === "medico" ? RECURSO_MEDICO : RECURSO_DENTAL_ESTETICO;
+  tipo === "dental"   ? RECURSO_DENTAL
+  : tipo === "pabellon" ? RECURSO_PABELLON
+  : RECURSO_MEDICO_ESTETICO; // medico y estetico comparten el Box Mixto
 
 export const recursoDeBox = box => recursoDeTipo(normTipoBox(box));
 
 // Modalidades (box_tipo de solicitudes_paciente) que ocupan un recurso
 export const tiposDelRecurso = recurso =>
-  recurso === RECURSO_MEDICO ? ["medico"] : ["dental", "estetico"];
+  recurso === RECURSO_DENTAL   ? ["dental"]
+  : recurso === RECURSO_PABELLON ? ["pabellon"]
+  : ["medico", "estetico"];
 
 // Ids de todos los boxes que comparten el recurso físico del box dado
 export function boxIdsDelRecurso(boxes, box) {
@@ -92,14 +102,22 @@ export function validarDuracionMinima(box, horas) {
 // El valor por hora aplica hasta un máximo de 3 horas; sobre eso el arriendo
 // se cobra como jornada completa.
 //   Estético: 1h $10.000 · 2h $18.000 · 3h $27.000 · jornada $45.000
-//   Dental:   $9.000/hr hasta 3h · jornada $45.000
+//   Dental:   $15.000/hr hasta 3h (tarifa Flex del catálogo) · jornada $45.000
 //   Médico:   mín 2h · $12.000/hr hasta 3h · jornada $55.000
+//   Pabellón: SOLO bloques de 1h $55.000 · 2h $100.000 · media jornada (4h)
+//             $200.000 · jornada completa (8h) $360.000
 export function calcularPrecio(tipoBox, horas) {
   const tipo = normTipoBox({ tipo: tipoBox });
   if (tipo === "dental") {
-    if (horas < 1)   return { monto: 0,            label: "Mínimo 1 hora",                 valido: false };
-    if (horas <= 3)  return { monto: horas * 9000, label: `${horas} hora${horas > 1 ? "s" : ""} · $9.000/hr`, valido: true };
-    return             { monto: 45000,             label: "Jornada · $45.000",             valido: true };
+    if (horas < 1)   return { monto: 0,             label: "Mínimo 1 hora",                 valido: false };
+    if (horas <= 3)  return { monto: horas * 15000, label: `${horas} hora${horas > 1 ? "s" : ""} · $15.000/hr`, valido: true };
+    return             { monto: 45000,              label: "Jornada · $45.000",             valido: true };
+  }
+  if (tipo === "pabellon") {
+    const tarifas = { 1: [55000, "1 hora · $55.000"], 2: [100000, "2 horas · $100.000"], 4: [200000, "Media jornada (4h) · $200.000"], 8: [360000, "Jornada completa (8h) · $360.000"] };
+    const t = tarifas[horas];
+    if (t) return { monto: t[0], label: t[1], valido: true };
+    return { monto: 0, label: "El Pabellón se arrienda en bloques de 1, 2, 4 u 8 horas", valido: false };
   }
   if (tipo === "medico") {
     if (horas < 2)   return { monto: 0,             label: "Mínimo 2 horas consecutivas en box médico", valido: false };

@@ -7,7 +7,7 @@ import { SubirComprobante, BadgeVerificado, VerComprobante, PanelVerificacion } 
 import Calendario from './Calendario';
 import ModificarReserva from './ModificarReserva';
 import ChatBot from './ChatBot';
-import { minHorasDeBox } from './logic/disponibilidad';
+import { minHorasDeBox, recursoDeTipo } from './logic/disponibilidad';
 
 // ─── CONSTANTES ───────────────────────────────────────────────────
 const CATEGORIAS = ['Inyectables','Materiales descartables','Productos tópicos','Equipos/accesorios','Otros'];
@@ -1046,10 +1046,10 @@ export default function App() {
               <div style={{marginBottom:16}}>
                 <label style={S.label}>Tipo de box *</label>
                 <div style={{display:'flex',gap:10,flexWrap:'wrap'}}>
-                  {[['estetico','✨ Box Estético'],['dental','🦷 Box Dental'],['medico','🏥 Box Médico']].map(([tipo,label])=>{
+                  {[['estetico','✨ Box Estético'],['dental','🦷 Box Dental'],['medico','🏥 Box Médico'],['pabellon','⚕️ Pabellón']].map(([tipo,label])=>{
                     const activo = arrForm.tipoBox===tipo;
-                    const borde  = tipo==='dental'?'#1D9E75':tipo==='medico'?'#C9A96E':'#378ADD';
-                    const fondo  = tipo==='dental'?'#E1F5EE':tipo==='medico'?'#FEF3E2':'#E6F1FB';
+                    const borde  = tipo==='dental'?'#1D9E75':tipo==='medico'?'#C9A96E':tipo==='pabellon'?'#9C2960':'#378ADD';
+                    const fondo  = tipo==='dental'?'#E1F5EE':tipo==='medico'?'#FEF3E2':tipo==='pabellon'?'#FCE4EC':'#E6F1FB';
                     return (
                       <div
                         key={tipo}
@@ -1057,13 +1057,13 @@ export default function App() {
                         style={{flex:'1 1 140px',padding:'12px',borderRadius:10,border:`2px solid ${activo?borde:'#ddd'}`,background:activo?fondo:'#fff',cursor:'pointer',textAlign:'center'}}
                       >
                         <div style={{fontSize:14,fontWeight:600}}>{label}</div>
-                        <div style={{fontSize:11,color:'#888',marginTop:3}}>{tipo==='dental'?'Con/sin asistente':tipo==='medico'?'Mínimo 2 horas consecutivas':'Por hora o plan fijo'}</div>
+                        <div style={{fontSize:11,color:'#888',marginTop:3}}>{tipo==='dental'?'Con/sin asistente':tipo==='medico'?'Mínimo 2 horas consecutivas':tipo==='pabellon'?'Bloques de 1, 2, 4 u 8 horas':'Por hora o plan fijo'}</div>
                       </div>
                     );
                   })}
                 </div>
                 <div style={{fontSize:11,color:'#888',marginTop:6}}>
-                  ℹ Dental y Estético comparten el mismo espacio físico (calendario único). El Box Médico es un espacio independiente.
+                  ℹ Médico y Estético comparten el mismo espacio físico — Box Mixto, calendario único. El Box Dental y el Pabellón son espacios independientes con agenda propia.
                 </div>
               </div>
 
@@ -1477,9 +1477,9 @@ export default function App() {
                 <h3 style={{margin:0,fontSize:14,fontWeight:500}}>Boxes</h3>
                 <button style={S.btn('primary',true)} onClick={async()=>{
                   const nombre=prompt('Nombre del box:');const tarifa=nombre?prompt('Tarifa/hora (CLP):'):null;
-                  const tipo=nombre&&tarifa?(prompt('Tipo (estetico / dental / medico):','estetico')||'estetico').toLowerCase().trim():null;
-                  if(nombre&&tarifa&&['estetico','dental','medico'].includes(tipo)){await sb.from('boxes').insert({nombre,tipo,tarifa_hora:+tarifa,activo:true});await fetchAll();showToast('Box agregado');}
-                  else if(nombre&&tarifa){showToast('Tipo inválido: usa estetico, dental o medico','err');}
+                  const tipo=nombre&&tarifa?(prompt('Tipo (estetico / dental / medico / pabellon):','estetico')||'estetico').toLowerCase().trim():null;
+                  if(nombre&&tarifa&&['estetico','dental','medico','pabellon'].includes(tipo)){await sb.from('boxes').insert({nombre,tipo,tarifa_hora:+tarifa,activo:true,recurso:recursoDeTipo(tipo)});await fetchAll();showToast('Box agregado');}
+                  else if(nombre&&tarifa){showToast('Tipo inválido: usa estetico, dental, medico o pabellon','err');}
                 }}>+ Agregar</button>
               </div>
               {boxes.map(b=>(
