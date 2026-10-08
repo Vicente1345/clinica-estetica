@@ -26,7 +26,7 @@ module.exports = async (req, res) => {
   }
 
   const body = typeof req.body === 'string' ? JSON.parse(req.body) : (req.body || {});
-  const sb = getSbAdmin();
+  const sb = await getSbAdmin();
   if (!sb) return res.status(500).json({ ok: false, error: 'Sin conexión a la base de datos' });
 
   try {

@@ -22,15 +22,33 @@ const crypto = require('crypto');
 const { createClient } = require('@supabase/supabase-js');
 
 // ─── Supabase admin ────────────────────────────────────────────────
-function getSbAdmin() {
-  const url = process.env.REACT_APP_SUPABASE_URL || process.env.SUPABASE_URL;
-  const service = process.env.SUPABASE_SERVICE_ROLE_KEY;
-  const anon = process.env.REACT_APP_SUPABASE_ANON_KEY || process.env.SUPABASE_ANON_KEY;
+// Valores de entorno con trim(): un espacio o salto de línea al pegar la
+// clave en Vercel basta para que Supabase la rechace.
+let _sbAdminCache = null;
+async function getSbAdmin() {
+  if (_sbAdminCache) return _sbAdminCache;
+  const url = (process.env.REACT_APP_SUPABASE_URL || process.env.SUPABASE_URL || '').trim();
+  const service = (process.env.SUPABASE_SERVICE_ROLE_KEY || '').trim();
+  const anon = (process.env.REACT_APP_SUPABASE_ANON_KEY || process.env.SUPABASE_ANON_KEY || '').trim();
   if (!url) return null;
-  if (!service) {
+  const opts = { auth: { persistSession: false } };
+  if (service) {
+    // Se verifica la clave con una consulta mínima: si Supabase la rechaza,
+    // se cae a la anon key (mientras RLS siga abierta tiene el mismo acceso
+    // que el login antiguo) en vez de dejar a todo el equipo sin poder entrar.
+    try {
+      const c = createClient(url, service, opts);
+      const { error } = await c.from('boxes').select('id').limit(1);
+      if (!error) { _sbAdminCache = c; return c; }
+      console.error('seguridad: Supabase RECHAZA SUPABASE_SERVICE_ROLE_KEY (' + error.message + '); usando anon key como respaldo. Corregir la variable en Vercel.');
+    } catch (e) {
+      console.error('seguridad: SUPABASE_SERVICE_ROLE_KEY inválida (' + e.message + '); usando anon key como respaldo. Corregir la variable en Vercel.');
+    }
+  } else {
     console.warn('seguridad: SUPABASE_SERVICE_ROLE_KEY no configurada; usando anon key (fallback). Con RLS estricto esto dejará de funcionar.');
   }
-  return createClient(url, service || anon, { auth: { persistSession: false } });
+  _sbAdminCache = createClient(url, anon, opts);
+  return _sbAdminCache;
 }
 
 // ─── Contraseñas (scrypt) ──────────────────────────────────────────

@@ -29,7 +29,7 @@ module.exports = async (req, res) => {
   if (!id) return res.status(400).json({ ok: false, error: 'Falta id del arriendo' });
   if (!motivo) return res.status(400).json({ ok: false, error: 'El motivo de la cancelación es requerido' });
 
-  const sb = getSbAdmin();
+  const sb = await getSbAdmin();
   if (!sb) return res.status(500).json({ ok: false, error: 'Sin conexión a la base de datos' });
 
   const { data: arr, error } = await sb.from('arriendos')
