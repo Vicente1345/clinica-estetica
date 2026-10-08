@@ -1025,7 +1025,9 @@ export default function App() {
                     <span style={{fontWeight:500}}>{user.nombre}</span>
                     <span style={{fontSize:11, color:'#888'}}>(asignado automáticamente)</span>
                   </div>
-                  {!arrForm.profId && (
+                  {/* Solo tras cargar los datos: mientras la lista de profesionales
+                      viene en camino (senal lenta en movil) no es un problema de vinculo */}
+                  {!loading && !arrForm.profId && (
                     <div style={{background:'#FCEBEB',border:'1px solid #F5C2C7',borderRadius:8,padding:'9px 12px',fontSize:12,color:'#A32D2D',marginTop:8,lineHeight:1.6}}>
                       Tu cuenta no esta vinculada a una profesional, por lo que aun no puedes reservar.
                       Pide a la administracion que te agregue en <strong>Configuracion -> Profesionales</strong> con el mismo nombre de tu usuario (<strong>{user.nombre}</strong>).
