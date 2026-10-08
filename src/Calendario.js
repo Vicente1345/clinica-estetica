@@ -362,7 +362,10 @@ const citaPacienteEnSlot = (fecha, hora) => {
                   if (ocupado)  { bg="#F8D7DA"; color="#721C24"; label="Ocupado"; cursor="default"; }
                   if (cita)     {
                     bg="#FCE4EC"; color="#9C2960"; label="👤 Paciente"; cursor="not-allowed";
-                    title = `Cita: ${cita.nombre}${cita.tratamiento?` · ${cita.tratamiento}`:""} (${(cita.hora_inicio||"").slice(0,5)}–${(cita.hora_fin||"").slice(0,5)}) · ${cita.estado}`;
+                    // Las profesionales no ven datos personales de pacientes
+                    title = user?.rol === "prof"
+                      ? `Cita de paciente (${(cita.hora_inicio||"").slice(0,5)}–${(cita.hora_fin||"").slice(0,5)})`
+                      : `Cita: ${cita.nombre}${cita.tratamiento?` · ${cita.tratamiento}`:""} (${(cita.hora_inicio||"").slice(0,5)}–${(cita.hora_fin||"").slice(0,5)}) · ${cita.estado}`;
                   }
                   if (miReserva){ bg="#CCE5FF"; color="#004085"; label="Mi reserva"; cursor="default"; title=""; }
                   if (selec)    { bg="#FFF3CD"; color="#856404"; label="Selec."; }

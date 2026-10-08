@@ -158,7 +158,9 @@ export default function App() {
       sb.from('profesionales').select('*').order('nombre'),
       sb.from('boxes').select('*').order('nombre'),
       apiUsuarios({ accion: 'listar' }).then(d => ({ data: d.ok ? d.usuarios : null })),
-      sb.from('solicitudes_paciente').select('*').order('created_at',{ascending:false}).limit(200),
+      sb.from('solicitudes_paciente')
+        .select(user?.rol === 'prof' ? 'id,box_tipo,fecha_solicitada,hora_inicio,hora_fin,estado,created_at' : '*')
+        .order('created_at',{ascending:false}).limit(200),
     ]);
     if (ins.data)  setInsumos(ins.data);
     if (mov.data)  setMovimientos(mov.data);
@@ -168,7 +170,7 @@ export default function App() {
     if (usr.data)  setUsuarios(usr.data);
     if (sol.data)  setSolicitudes(sol.data);
     setLoading(false);
-  }, []);
+  }, [user?.rol]);
 
   useEffect(() => { if (user) fetchAll(); }, [user, fetchAll]);
 
@@ -206,9 +208,13 @@ export default function App() {
   }, [movimientos, user]);
 
   const arriendosVisibles = useMemo(() => {
-    if (user?.rol === 'prof') return arriendos.filter(a => a.profesional_nombre === user.nombre);
+    if (user?.rol === 'prof') {
+      const yo = normalizeNombre(user.nombre);
+      const miId = profesionales.find(p => normalizeNombre(p.nombre) === yo)?.id;
+      return arriendos.filter(a => (miId && a.profesional_id === miId) || normalizeNombre(a.profesional_nombre) === yo);
+    }
     return arriendos;
-  }, [arriendos, user]);
+  }, [arriendos, user, profesionales]);
 
   // ── RETIRO STATE ──
   const emptyRet = { insumoId:'', cantidad:1, profId:'', paciente:today(), obs:'', origen:'clinica', insumoPropio:'' };
@@ -1170,9 +1176,23 @@ export default function App() {
             <h3 style={{margin:0,fontSize:15,fontWeight:500}}>Agenda de boxes</h3>
             {CAN.arriendos(user.rol)&&<button style={S.btn('primary',true)} onClick={()=>{setArrStep(0);setTab('arriendos');}}>+ Nuevo arriendo</button>}
           </div>
-          {boxes.map(box=>{
-            const res=arriendos.filter(a=>a.box_id===box.id&&a.estado==='confirmado').map(a=>({tipo:'arriendo', ...a}));
-            const cit=solicitudes.filter(s => s.box_tipo===box.tipo && s.fecha_solicitada && ['agendada','agendado','contactado','confirmada'].includes(s.estado))
+          {user.rol==='prof' && (
+            <div style={{fontSize:12,color:'#666',background:'#f8f8f8',borderRadius:8,padding:'8px 12px',marginBottom:12}}>
+              Aquí ves solo tus reservas confirmadas. Para ver qué horarios están libres en cada box, usa la pestaña <strong>Disponibilidad</strong>.
+            </div>
+          )}
+          {boxes.filter(box=>{
+            // Un box inactivo solo se muestra si tiene reservas visibles
+            if (box.activo) return true;
+            return (user.rol==='prof'?arriendosVisibles:arriendos).some(a=>a.box_id===box.id&&a.estado==='confirmado');
+          }).map(box=>{
+            const fuente = user.rol==='prof' ? arriendosVisibles : arriendos;
+            const res=fuente.filter(a=>a.box_id===box.id&&a.estado==='confirmado').map(a=>({tipo:'arriendo', ...a}));
+            // Las citas de pacientes pertenecen a una modalidad, no a un box: se
+            // muestran solo bajo el primer box activo de ese tipo (sin duplicar),
+            // y nunca a las profesionales (datos personales de pacientes).
+            const esBoxDeCitas = box.activo && boxes.find(b=>b.activo&&b.tipo===box.tipo)?.id===box.id;
+            const cit=(user.rol==='prof' || !esBoxDeCitas) ? [] : solicitudes.filter(s => s.box_tipo===box.tipo && s.fecha_solicitada && ['agendada','agendado','contactado','confirmada'].includes(s.estado))
               .map(s=>({tipo:'cita', id:'c'+s.id, fecha:s.fecha_solicitada, hora_inicio:(s.hora_inicio||'').slice(0,5), hora_fin:(s.hora_fin||'').slice(0,5), nombre:s.nombre, tratamiento:s.tratamiento||s.motivo_consulta, estado:s.estado}));
             const todos=[...res,...cit].sort((a,b)=>(a.fecha||'').localeCompare(b.fecha||'')||(a.hora_inicio||'').localeCompare(b.hora_inicio||''));
             return (
