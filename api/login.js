@@ -41,12 +41,20 @@ module.exports = async (req, res) => {
     .eq('activo', true)
     .maybeSingle();
 
+  // Un error de la consulta NO es "credenciales incorrectas": es una falla del
+  // servidor (p. ej. SUPABASE_SERVICE_ROLE_KEY mal configurada) y debe verse
+  // como tal. Ocultarlo hacía imposible distinguirlo de una contraseña errónea.
+  if (error) {
+    console.error('[login] error consultando usuarios:', error.message);
+    return res.status(500).json({ ok: false, error: 'Error del servidor al verificar el acceso. Avisa a la administración.' });
+  }
+
   // Verificación aunque no exista el usuario: latencia comparable en ambos
   // casos y respuesta idéntica → no se puede enumerar emails.
   const almacenado = u ? u.password_hash : 'scrypt:16384:AAAAAAAAAAAAAAAAAAAAAA==:AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=';
   const v = verificarPassword(password, almacenado);
 
-  if (error || !u || !v.ok) {
+  if (!u || !v.ok) {
     console.log(`[login] fallo email=${email} ip=${ip}`);
     return res.status(401).json({ ok: false, error: 'Email o contraseña incorrectos' });
   }
