@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from "react";
-import { sb } from "./supabase";
+import { apiGet } from "./api";
 import { normTipoBox, recursoDeTipo, ESTADOS_OCUPAN } from "./logic/disponibilidad";
 
 // ─── Panel de resumen ejecutivo de arriendos (solo admin) ───────────────
@@ -64,11 +64,8 @@ export default function ResumenEjecutivo({ boxes }) {
     let vivo = true;
     (async () => {
       setCargando(true);
-      const { data, error } = await sb.from("arriendos")
-        .select("id,box_id,box_nombre,fecha,horas,estado,monto,verificado")
-        .gte("fecha", d1).lte("fecha", d2)
-        .order("fecha");
-      if (vivo) { setDatos(error ? [] : (data || [])); setCargando(false); }
+      const resp = await apiGet(`/api/datos?resumen=1&desde=${d1}&hasta=${d2}`);
+      if (vivo) { setDatos(resp.ok ? (resp.arriendos || []) : []); setCargando(false); }
     })();
     return () => { vivo = false; };
   }, [d1, d2, abierto]);

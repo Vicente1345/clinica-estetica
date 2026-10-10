@@ -1,6 +1,5 @@
 import { useState, useEffect } from "react";
-import { sb } from "./supabase";
-import { recursoDeBox, tiposDelRecurso, normHora, seSolapan, ESTADOS_OCUPAN, ESTADOS_CITA_OCUPAN } from "./logic/disponibilidad";
+import { recursoDeBox, tiposDelRecurso, normHora, seSolapan } from "./logic/disponibilidad";
 
 // ── PALETA inspirada en Barcelona Clinic Instagram ─────────────
 const C = {
@@ -98,15 +97,14 @@ export default function Landing({ onLogin }) {
   const [dispSemana, setDispSemana]       = useState(0);
 
   useEffect(() => {
-    sb.from("boxes").select("id,nombre,tipo").eq("activo",true).order("nombre")
-      .then(({data})=>{ if(data) setDispBoxes(data); });
-    sb.from("arriendos").select("box_id,fecha,hora_inicio,hora_fin,estado")
-      .in("estado", ESTADOS_OCUPAN).order("fecha")
-      .then(({data})=>{ if(data) setDispArriendos(data); });
-    // Las citas de pacientes también ocupan el recurso físico
-    sb.from("solicitudes_paciente").select("box_tipo,fecha_solicitada,hora_inicio,hora_fin,estado")
-      .in("estado", ESTADOS_CITA_OCUPAN)
-      .then(({data})=>{ if(data) setDispCitas(data); });
+    // /api/ocupacion: disponibilidad sanitizada (slots sin nombres ni montos);
+    // única lectura pública que sobrevive al blindaje RLS
+    fetch("/api/ocupacion").then(r=>r.json()).then(data=>{
+      if (!data.ok) return;
+      setDispBoxes((data.boxes||[]).filter(b=>b.activo).map(({id,nombre,tipo})=>({id,nombre,tipo})));
+      setDispArriendos(data.arriendos||[]);
+      setDispCitas(data.citas||[]);
+    }).catch(()=>{});
   }, []);
 
   const dispRecursos = (() => {

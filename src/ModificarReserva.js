@@ -132,9 +132,11 @@ export default function ModificarReserva({ arriendos, boxes, profesionales, soli
     // servidor contra datos frescos del recurso compartido y revierte si otra
     // reserva simultánea gana el horario.
     try {
+      let token = "";
+      try { token = JSON.parse(sessionStorage.getItem("cli_user") || "{}")._token || ""; } catch {}
       const r = await fetch("/api/reservar", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
         body: JSON.stringify({ modificar: {
           id: selId,
           fecha: form.fecha, hora_inicio: form.horaInicio, hora_fin: form.horaFin,

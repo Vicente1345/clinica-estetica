@@ -1,5 +1,5 @@
 import { useState, useRef } from 'react';
-import { sb } from './supabase';
+import { apiGestion, abrirComprobante, subirArchivoComprobante } from './api';
 
 const S = {
   btn: (v='primary',sm) => ({ padding:sm?'5px 14px':'9px 22px', borderRadius:8, border:'none', cursor:'pointer', fontSize:sm?12:14, fontWeight:500, background:v==='primary'?'#111':v==='danger'?'#E24B4A':v==='success'?'#1D9E75':'#e8e8e8', color:v==='secondary'?'#111':'#fff' }),
@@ -33,9 +33,12 @@ export function SubirComprobante({ tabla, registroId, onSubido }) {
     setLoading(true); setErr('');
     const ext  = file.name.split('.').pop();
     const path = `${tabla}/${registroId}/${Date.now()}.${ext}`;
-    const { error: upErr } = await sb.storage.from('comprobantes').upload(path, file, { upsert:true });
+    // La subida usa la anon key (INSERT-only en el bucket); el vínculo al
+    // registro lo hace el servidor validando identidad y tabla
+    const { error: upErr } = await subirArchivoComprobante(path, file);
     if (upErr) { setErr('Error al subir: ' + upErr.message); setLoading(false); return; }
-    await sb.from(tabla).update({ comprobante_url:path, comprobante_nombre:file.name, verificado:'pendiente' }).eq('id', registroId);
+    const resp = await apiGestion('comprobante_vincular', { tabla, id: registroId, path, nombre: file.name });
+    if (!resp.ok) { setErr(resp.error || 'No se pudo registrar el comprobante'); setLoading(false); return; }
     setLoading(false);
     onSubido && onSubido();
   };
@@ -87,11 +90,10 @@ export function BadgeVerificado({ estado }) {
 }
 
 // ── Ver comprobante ───────────────────────────────────────────
-export function VerComprobante({ path, nombre }) {
-  if (!path) return null;
+export function VerComprobante({ tabla, id, nombre }) {
+  if (!tabla || !id) return null;
   const abrir = async () => {
-    const { data } = await sb.storage.from('comprobantes').createSignedUrl(path, 3600);
-    if (data?.signedUrl) window.open(data.signedUrl, '_blank');
+    await abrirComprobante(tabla, id); // URL firmada emitida por el servidor
   };
   return (
     <button onClick={abrir} style={{...S.btn('secondary',true),fontSize:11}}>
@@ -106,17 +108,11 @@ export function PanelVerificacion({ tabla, items, onActualizar }) {
 
   const accion = async (item, nuevoEstado) => {
     setProcesando(item.id);
-    const updates = { verificado: nuevoEstado };
-    if (nuevoEstado === 'aprobado') {
-      updates.pagado  = true;
-      updates.estado  = 'confirmado';
-    }
-    if (nuevoEstado === 'rechazado') {
-      updates.pagado = false;
-      updates.estado = 'pendiente';
-    }
-    await sb.from(tabla).update(updates).eq('id', item.id);
+    // El servidor aplica las columnas correctas por tabla (en movimientos el
+    // update viejo tocaba pagado/estado, columnas inexistentes, y fallaba mudo)
+    const resp = await apiGestion('verificar_pago', { tabla, id: item.id, decision: nuevoEstado });
     setProcesando(null);
+    if (!resp.ok) { alert(resp.error || 'No se pudo aplicar la verificación'); return; }
     onActualizar && onActualizar();
   };
 
@@ -142,7 +138,7 @@ export function PanelVerificacion({ tabla, items, onActualizar }) {
           </div>
           <div style={{display:'flex',gap:8,alignItems:'center',flexWrap:'wrap'}}>
             {item.comprobante_url && (
-              <VerComprobante path={item.comprobante_url} nombre={item.comprobante_nombre}/>
+              <VerComprobante tabla={tabla} id={item.id} nombre={item.comprobante_nombre}/>
             )}
             <button
               onClick={()=>accion(item,'aprobado')}

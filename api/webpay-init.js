@@ -26,11 +26,9 @@ function getCreds() {
   return SANDBOX;
 }
 
-function getSb() {
-  const url = process.env.REACT_APP_SUPABASE_URL || process.env.SUPABASE_URL;
-  const key = process.env.REACT_APP_SUPABASE_ANON_KEY || process.env.SUPABASE_ANON_KEY;
-  return createClient(url, key);
-}
+const { getSbAdmin, requiereRol } = require('./_lib/seguridad');
+// service_role (con fallback a anon mientras RLS siga abierta)
+function getSb() { return getSbAdmin(); }
 
 module.exports = async (req, res) => {
   res.setHeader('Access-Control-Allow-Origin', '*');
@@ -40,11 +38,27 @@ module.exports = async (req, res) => {
   if (req.method !== 'POST')    return res.status(405).json({ error: 'Method not allowed' });
 
   try {
-    const body = typeof req.body === 'string' ? JSON.parse(req.body) : (req.body || {});
-    const { arriendoId, monto } = body;
+    // Solo usuarias logueadas inician pagos
+    const auth = requiereRol(req, ['admin', 'recep', 'prof']);
+    if (!auth.ok) return res.status(auth.status).json({ error: auth.error });
 
-    if (!arriendoId || !monto || monto < 50) {
-      return res.status(400).json({ error: 'Falta arriendoId o monto inválido (mínimo $50)' });
+    const body = typeof req.body === 'string' ? JSON.parse(req.body) : (req.body || {});
+    const { arriendoId } = body;
+
+    if (!arriendoId) {
+      return res.status(400).json({ error: 'Falta arriendoId' });
+    }
+    // El monto se lee del arriendo en BD: el cliente ya no puede manipularlo
+    const sbMonto = await getSb();
+    const { data: arrPago } = await sbMonto.from('arriendos')
+      .select('id,monto,estado,pagado').eq('id', arriendoId).single();
+    if (!arrPago) return res.status(404).json({ error: 'Arriendo no encontrado' });
+    if (arrPago.estado !== 'pendiente' || arrPago.pagado) {
+      return res.status(409).json({ error: 'El arriendo no está pendiente de pago (no se puede iniciar un cobro)' });
+    }
+    const monto = Number(arrPago.monto);
+    if (!monto || monto < 50) {
+      return res.status(400).json({ error: 'El arriendo no tiene un monto válido para pagar' });
     }
 
     const creds = getCreds();
@@ -87,7 +101,7 @@ module.exports = async (req, res) => {
     const data = await r.json();   // { token, url }
 
     // Registrar en Supabase para el commit posterior
-    const sb = getSb();
+    const sb = await getSb();
     await sb.from('webpay_transacciones').insert({
       buy_order:   buyOrder,
       token_ws:    data.token,

@@ -246,12 +246,10 @@ const TOOLS = [
 ];
 
 // ─── HELPERS ───────────────────────────────────────────────────────
-function getSupabase() {
-  const url = process.env.REACT_APP_SUPABASE_URL || process.env.SUPABASE_URL;
-  const key = process.env.REACT_APP_SUPABASE_ANON_KEY || process.env.SUPABASE_ANON_KEY;
-  if (!url || !key) return null;
-  return createClient(url, key);
-}
+// service_role vía getSbAdmin (con fallback a anon mientras RLS siga abierta):
+// el bot necesita leer ocupación e insertar solicitudes con RLS cerrada.
+const { getSbAdmin } = require("./_lib/seguridad");
+function getSupabase() { return getSbAdmin(); }
 
 // Convierte "HH:MM" a minutos desde medianoche
 function hhmmToMin(hhmm) {
@@ -358,7 +356,7 @@ async function enviarEmailPaciente(detalles) {
 
 // ─── EJECUCIÓN DE HERRAMIENTAS ─────────────────────────────────────
 async function ejecutarHerramienta(name, input) {
-  const sb = getSupabase();
+  const sb = await getSupabase();
   if (!sb) return { error: "Servicio temporalmente no disponible. Escribe a +56 9 3774 2182." };
 
   if (name === "consultar_disponibilidad") {

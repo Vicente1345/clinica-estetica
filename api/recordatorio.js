@@ -2,14 +2,11 @@
 // Invocado diariamente por Vercel Cron (vercel.json)
 // También puede llamarse manualmente: GET /api/recordatorio?token=RECORDATORIO_SECRET
 
-const { createClient } = require('@supabase/supabase-js');
+const { getSbAdmin } = require('./_lib/seguridad');
 
-function getSupabase() {
-  const url = process.env.REACT_APP_SUPABASE_URL || process.env.SUPABASE_URL;
-  const key = process.env.REACT_APP_SUPABASE_ANON_KEY || process.env.SUPABASE_ANON_KEY;
-  if (!url || !key) return null;
-  return createClient(url, key);
-}
+// service_role (con fallback a anon mientras RLS siga abierta): el cron debe
+// poder leer solicitudes_paciente con la tabla ya blindada.
+function getSupabase() { return getSbAdmin(); }
 
 async function enviarEmail(to, subject, html) {
   const apiKey = process.env.RESEND_API_KEY;
@@ -45,11 +42,14 @@ module.exports = async (req, res) => {
   const isVercelCron = req.headers['x-vercel-cron'] === '1';
   const tokenEnv     = process.env.RECORDATORIO_SECRET;
   const tokenReq     = req.query.token || req.headers['authorization'];
-  if (!isVercelCron && tokenEnv && tokenReq !== tokenEnv) {
+  // Sin ser cron: exige SIEMPRE el token manual. (El guard anterior dejaba el
+  // endpoint abierto a cualquiera cuando RECORDATORIO_SECRET no estaba
+  // configurada — habría permitido disparar correos a pacientes a voluntad.)
+  if (!isVercelCron && (!tokenEnv || tokenReq !== tokenEnv)) {
     return res.status(401).json({ error: 'No autorizado' });
   }
 
-  const sb = getSupabase();
+  const sb = await getSupabase();
   if (!sb) return res.status(500).json({ error: 'Sin conexión a BD' });
 
   const fecha = mañanaChile();

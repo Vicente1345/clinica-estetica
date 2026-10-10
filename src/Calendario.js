@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { sb } from "./supabase";
+import { apiOcupacion, apiGestion, tokenSesion } from "./api";
 import {
   calcularPrecio, boxIdsDelRecurso, tiposDelRecurso, recursoDeBox,
   minHorasDeBox, normTipoBox, seSolapan, normHora,
@@ -43,11 +43,10 @@ export default function Calendario({ user, boxes, profesionales, arriendos: arri
   useEffect(() => { if (arriendosProp) setArriendos(arriendosProp); }, [arriendosProp]);
 
 const recargarArriendos = async () => {
-  // Rol prof: solo columnas de ocupación (los datos de otras profesionales
-  // no deben llegar a su navegador); admin recibe el detalle completo
-  const cols = user?.rol === "prof" ? "id,box_id,box_nombre,fecha,hora_inicio,hora_fin,horas,estado" : "*";
-  const { data } = await sb.from("arriendos").select(cols).order("fecha");
-  if (data) setArriendos(data);
+  // /api/ocupacion: el SERVIDOR decide cuánto detalle según el token
+  // (staff recibe nombres para el tooltip; una prof solo slots de ocupación)
+  const data = await apiOcupacion();
+  if (data.ok) setArriendos(data.arriendos || []);
 };
 
 useEffect(() => { recargarArriendos(); }, []);
@@ -201,7 +200,7 @@ const citaPacienteEnSlot = (fecha, hora) => {
     try {
       const r = await fetch("/api/reservar", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${tokenSesion()}` },
         body: JSON.stringify({ arriendo: {
           fecha:              reserva.fecha,
           box_id:             reserva.box.id,
@@ -237,23 +236,10 @@ const citaPacienteEnSlot = (fecha, hora) => {
     if (!creado) { setGuardando(false); return; }
     const pid = creado.pid;
 
+    // El descuento de jornada lo hace el servidor (busca el plan activo y
+    // decrementa con guard optimista; la identidad prof sale del token)
     const tipoBoxNorm = normTipoBox(reserva.box);
-    const { data: planActivo } = await sb
-      .from("planes_profesional")
-      .select("id, jornadas_stock")
-      .eq("profesional_id", pid)
-      .eq("box_tipo", tipoBoxNorm)
-      .eq("verificado", "aprobado")
-      .gt("jornadas_stock", 0)
-      .order("created_at", { ascending:false })
-      .limit(1)
-      .single();
-
-    if (planActivo) {
-      await sb.from("planes_profesional")
-        .update({ jornadas_stock: planActivo.jornadas_stock - 1 })
-        .eq("id", planActivo.id);
-    }
+    await apiGestion("jornada_descuento", { profId: pid, boxTipo: tipoBoxNorm });
 
     setGuardando(false);
     setReserva(null);
@@ -275,8 +261,8 @@ const citaPacienteEnSlot = (fecha, hora) => {
     try {
       const r = await fetch("/api/webpay-init", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ arriendoId: nuevoArr.id, monto: precio.monto }),
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${tokenSesion()}` },
+        body: JSON.stringify({ arriendoId: nuevoArr.id }), // el monto lo lee el servidor de la BD
       });
       if (!r.ok) throw new Error(await r.text());
       initData = await r.json();

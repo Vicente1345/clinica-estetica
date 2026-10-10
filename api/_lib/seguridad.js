@@ -47,8 +47,12 @@ async function getSbAdmin() {
   } else {
     console.warn('seguridad: SUPABASE_SERVICE_ROLE_KEY no configurada; usando anon key (fallback). Con RLS estricto esto dejará de funcionar.');
   }
-  _sbAdminCache = createClient(url, anon, opts);
-  return _sbAdminCache;
+  // El fallback NO se cachea: si el rechazo de la service key fue transitorio
+  // (timeout, hipo de red), la siguiente llamada vuelve a intentarla en vez de
+  // dejar la instancia pegada en anon (que con RLS cerrada no sirve de nada).
+  const fallback = createClient(url, anon, opts);
+  fallback.__fallbackAnon = true;
+  return fallback;
 }
 
 // ─── Contraseñas (scrypt) ──────────────────────────────────────────

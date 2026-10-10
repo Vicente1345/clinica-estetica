@@ -20,17 +20,17 @@
 //       ó { modificar: { id, fecha, hora_inicio, hora_fin, box_id, ... } }.
 // Respuesta: { ok:true, arriendos:[...] } ó { ok:false, error, conflictos? }.
 
-const { createClient } = require('@supabase/supabase-js');
 const {
   boxIdsDelRecurso, tiposDelRecurso, recursoDeBox, minHorasDeBox, normTipoBox,
   seSolapan, normHora, ESTADOS_OCUPAN, ESTADOS_CITA_OCUPAN, ganaCarrera,
+  calcularPrecio,
 } = require('./_lib/disponibilidad');
 
-function getSb() {
-  const url = process.env.REACT_APP_SUPABASE_URL || process.env.SUPABASE_URL;
-  const key = process.env.REACT_APP_SUPABASE_ANON_KEY || process.env.SUPABASE_ANON_KEY;
-  return createClient(url, key);
-}
+const normalizarNombre = n => (n || '').toLowerCase().replace(/^(dr\.?|dra\.?)\s+/i, '').trim();
+const { getSbAdmin, requiereRol } = require('./_lib/seguridad');
+
+// service_role (con fallback a anon mientras RLS siga abierta)
+function getSb() { return getSbAdmin(); }
 
 const HORA_RE = /^\d{2}:\d{2}(:\d{2})?$/;
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -81,16 +81,61 @@ module.exports = async (req, res) => {
   try {
     if (req.method !== 'POST') return res.status(405).json({ ok: false, error: 'Método no permitido' });
 
+    // Toda reserva exige sesión; las modificaciones, rol admin
+    const auth = requiereRol(req, ['admin', 'recep', 'prof']);
+    if (!auth.ok) return res.status(auth.status).json({ ok: false, error: auth.error });
+
     const body = typeof req.body === 'string' ? JSON.parse(req.body) : (req.body || {});
     const esModificacion = !!body.modificar;
-    const rows = esModificacion
+    if (esModificacion && auth.usuario.rol !== 'admin') {
+      return res.status(403).json({ ok: false, error: 'Solo administración puede modificar reservas' });
+    }
+    let rows = esModificacion
       ? [body.modificar]
       : (body.arriendos || (body.arriendo ? [body.arriendo] : []));
     if (!rows.length) return res.status(400).json({ ok: false, error: 'Sin datos de arriendo' });
     if (esModificacion && !rows[0].id)
       return res.status(400).json({ ok: false, error: 'Modificación sin id de arriendo' });
 
-    const sb = getSb();
+    // ── Whitelist de columnas: el cliente no dicta estado/pago/verificación.
+    //    Una reserva nace SIEMPRE pendiente y sin pagar; la confirmación llega
+    //    por la verificación del comprobante (admin) o por webpay-commit.
+    if (esModificacion) {
+      const m = rows[0];
+      rows = [{
+        id: m.id,
+        fecha: m.fecha, hora_inicio: m.hora_inicio, hora_fin: m.hora_fin,
+        box_id: m.box_id, box_nombre: m.box_nombre,
+        horas: Number(m.horas) || 0,
+        monto: Math.max(0, Math.floor(Number(m.monto) || 0)),
+        obs_modificacion: typeof m.obs_modificacion === 'string' ? m.obs_modificacion.slice(0, 500) : null,
+      }];
+    } else {
+      const VERIF_INICIAL = ['sin_pago', 'pendiente'];
+      rows = rows.map(r => ({
+        fecha: r.fecha, hora_inicio: r.hora_inicio, hora_fin: r.hora_fin,
+        box_id: r.box_id, box_nombre: r.box_nombre,
+        profesional_id: r.profesional_id, profesional_nombre: r.profesional_nombre,
+        horas: Number(r.horas) || 0,
+        monto: Math.max(0, Math.floor(Number(r.monto) || 0)),
+        metodo: typeof r.metodo === 'string' ? r.metodo.slice(0, 40) : 'Efectivo',
+        obs: typeof r.obs === 'string' ? r.obs.slice(0, 500) : null,
+        pagado: false,
+        estado: 'pendiente',
+        verificado: VERIF_INICIAL.includes(r.verificado) ? r.verificado : 'sin_pago',
+      }));
+    }
+
+    const sb = await getSb();
+
+    // ── Identidad: una profesional solo reserva a su propio nombre ──
+    if (!esModificacion && auth.usuario.rol === 'prof') {
+      const { data: profs } = await sb.from('profesionales').select('id,nombre');
+      const yo = normalizarNombre(auth.usuario.nombre);
+      const mio = (profs || []).find(p => normalizarNombre(p.nombre) === yo);
+      if (!mio) return res.status(403).json({ ok: false, error: 'Tu cuenta no está vinculada a una profesional. Pide al admin que te agregue en Configuración > Profesionales con el mismo nombre.' });
+      rows = rows.map(r => ({ ...r, profesional_id: mio.id, profesional_nombre: mio.nombre }));
+    }
 
     // ── Box y recurso físico ──
     const { data: boxes, error: eBoxes } = await sb.from('boxes').select('id,nombre,tipo,activo');
@@ -102,6 +147,18 @@ module.exports = async (req, res) => {
     if (!box.activo) return res.status(400).json({ ok: false, error: 'Box inactivo' });
     if (rows.some(r => r.box_id !== boxId))
       return res.status(400).json({ ok: false, error: 'Todas las jornadas deben ser del mismo box' });
+    // El nombre del box lo fija el servidor (coherencia con el id)
+    rows.forEach(r => { r.box_nombre = box.nombre; });
+    // Webpay cobra el monto guardado en BD: para esa vía el precio sale del
+    // catálogo, nunca del cliente.
+    if (!esModificacion) {
+      for (const r of rows) {
+        if (r.metodo === 'Webpay') {
+          const p = calcularPrecio(box.tipo || box.nombre, horasDe(r.hora_inicio, r.hora_fin));
+          if (p && p.valido) r.monto = p.monto;
+        }
+      }
+    }
 
     // ── Formato, duración y mínimo por modalidad (médico: 2h consecutivas) ──
     const minHoras = minHorasDeBox(box);

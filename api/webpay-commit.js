@@ -24,11 +24,10 @@ function getCreds() {
   return SANDBOX;
 }
 
-function getSb() {
-  const url = process.env.REACT_APP_SUPABASE_URL || process.env.SUPABASE_URL;
-  const key = process.env.REACT_APP_SUPABASE_ANON_KEY || process.env.SUPABASE_ANON_KEY;
-  return createClient(url, key);
-}
+const { getSbAdmin } = require('./_lib/seguridad');
+// service_role (con fallback a anon mientras RLS siga abierta). El endpoint
+// sigue siendo público: lo invoca el redirect de Transbank con token_ws.
+function getSb() { return getSbAdmin(); }
 
 // Vercel parsea form-urlencoded automáticamente pero por las dudas lo manejamos
 function getToken(req) {
@@ -54,7 +53,7 @@ module.exports = async (req, res) => {
 
     if (tbkToken && !token) {
       // Usuario canceló desde la pasarela Webpay
-      const sb0 = getSb();
+      const sb0 = await getSb();
       await sb0.from('webpay_transacciones')
         .update({ estado: 'anulada', commit_at: new Date().toISOString() })
         .eq('token_ws', tbkToken);
@@ -81,7 +80,7 @@ module.exports = async (req, res) => {
     const aprobado = result.status === 'AUTHORIZED' && result.response_code === 0;
 
     // Actualizar registro de transacción
-    const sb = getSb();
+    const sb = await getSb();
     const { data: tx } = await sb
       .from('webpay_transacciones')
       .select('*')
@@ -134,20 +133,27 @@ module.exports = async (req, res) => {
 
       if (conflicto) {
         huboConflicto = true;
-        await sb.from('arriendos').update({
+        const { error: eUpd1 } = await sb.from('arriendos').update({
           pagado:           true,   // el cobro sí ocurrió: queda registrado para gestión/reembolso
           estado:           'cancelado',
           verificado:       'aprobado',
           metodo:           'Webpay',
           obs_modificacion: 'Pago Webpay aprobado pero el horario fue tomado por otra reserva o cita del recurso compartido. Requiere gestión de la administración (reagendar o reembolsar).',
         }).eq('id', tx.arriendo_id);
+        if (eUpd1) { console.error('webpay-commit: no se pudo marcar el conflicto:', eUpd1.message); return res.redirect(302, `${base}/cowork?webpay=error`); }
       } else {
-        await sb.from('arriendos').update({
+        // El cobro YA ocurrió en Transbank: si la confirmación no se persiste,
+        // avisar error (no "ok") para que administración lo gestione.
+        const { data: upd, error: eUpd2 } = await sb.from('arriendos').update({
           pagado:     true,
           estado:     'confirmado',
           verificado: 'aprobado',
           metodo:     'Webpay',
-        }).eq('id', tx.arriendo_id);
+        }).eq('id', tx.arriendo_id).select('id');
+        if (eUpd2 || !upd || !upd.length) {
+          console.error('webpay-commit: PAGO APROBADO SIN PERSISTIR arriendo', tx.arriendo_id, eUpd2 && eUpd2.message);
+          return res.redirect(302, `${base}/cowork?webpay=error`);
+        }
       }
     }
 

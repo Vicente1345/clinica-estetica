@@ -1,14 +1,14 @@
 import TabPlanes from './TabPlanes';
 import { SelectorPlan, PLANES } from './PlanesArriendo';
 import { useState, useMemo, useEffect, useCallback } from 'react';
-import { sb } from './supabase';
+import { apiGet, apiGestion, tokenSesion as tokenApi } from './api';
 import Login from './Login';
 import { SubirComprobante, BadgeVerificado, VerComprobante, PanelVerificacion } from './Comprobante';
 import Calendario from './Calendario';
 import ModificarReserva from './ModificarReserva';
 import ResumenEjecutivo from './ResumenEjecutivo';
 import ChatBot from './ChatBot';
-import { minHorasDeBox, recursoDeTipo } from './logic/disponibilidad';
+import { minHorasDeBox } from './logic/disponibilidad';
 
 // ─── CONSTANTES ───────────────────────────────────────────────────
 const CATEGORIAS = ['Inyectables','Materiales descartables','Productos tópicos','Equipos/accesorios','Otros'];
@@ -119,6 +119,57 @@ const apiUsuarios = async (payload) => {
   } catch { return { ok: false, error: 'Error de conexión' }; }
 };
 
+// ─── Diagnóstico de seguridad (Config, solo admin) ─────────────────
+// Confirma que la service_role key de Vercel funciona ANTES de ejecutar el
+// SQL que blinda las tablas con RLS (si la key está mala, cerrar RLS caería
+// la plataforma). No muestra secretos, solo estados.
+function DiagSeguridad() {
+  const [res, setRes] = useState(null);
+  const [cargando, setCargando] = useState(false);
+  const correr = async () => {
+    setCargando(true);
+    const data = await apiGet('/api/diag-seguridad');
+    setRes(data);
+    setCargando(false);
+  };
+  const Fila = ({ etiqueta, valor, ok }) => (
+    <div style={{display:'flex',justifyContent:'space-between',gap:10,fontSize:12,padding:'4px 0',borderBottom:'1px solid #f3f3f3'}}>
+      <span style={{color:'#555'}}>{etiqueta}</span>
+      <span style={{fontWeight:600,color: ok ? '#1D9E75' : '#A32D2D'}}>{String(valor)}</span>
+    </div>
+  );
+  return (
+    <div style={{background:'#fff',border:'1px solid #eee',borderRadius:12,padding:16,marginBottom:28}}>
+      <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',flexWrap:'wrap',gap:8}}>
+        <div>
+          <h3 style={{margin:0,fontSize:14,fontWeight:500}}>🛡 Diagnóstico de seguridad</h3>
+          <div style={{fontSize:12,color:'#888',marginTop:2}}>Verifica la configuración del servidor (necesario antes de activar el blindaje RLS).</div>
+        </div>
+        <button style={S.btn('secondary',true)} onClick={correr} disabled={cargando}>
+          {cargando ? 'Verificando…' : 'Ejecutar diagnóstico'}
+        </button>
+      </div>
+      {res && !res.ok && <div style={{fontSize:12,color:'#A32D2D',marginTop:10}}>{res.error || 'Error al consultar'}</div>}
+      {res?.ok && (
+        <div style={{marginTop:12}}>
+          <Fila etiqueta="Service role key presente" valor={res.checks.service_key_presente ? 'sí' : 'NO'} ok={res.checks.service_key_presente}/>
+          <Fila etiqueta="Rol de la key" valor={res.checks.service_key_rol || '—'} ok={res.checks.service_key_rol === 'service_role'}/>
+          <Fila etiqueta="Consulta de prueba" valor={res.checks.service_key_consulta || '—'} ok={res.checks.service_key_consulta === 'ok'}/>
+          <Fila etiqueta="SESSION_SECRET" valor={res.checks.session_secret ? 'configurada' : 'FALTA'} ok={res.checks.session_secret}/>
+          <Fila etiqueta="ALLOWED_ORIGINS" valor={res.checks.allowed_origins ? 'configurada' : 'falta (opcional)'} ok={res.checks.allowed_origins}/>
+          <Fila etiqueta="RESEND_API_KEY" valor={res.checks.resend_api_key ? 'configurada' : 'falta (recordatorios)'} ok={res.checks.resend_api_key}/>
+          <Fila etiqueta="RECORDATORIO_SECRET" valor={res.checks.recordatorio_secret ? 'configurada' : 'falta (opcional)'} ok={res.checks.recordatorio_secret}/>
+          <div style={{marginTop:10,padding:'8px 12px',borderRadius:8,fontSize:13,fontWeight:600,
+            background: res.lista_para_rls ? '#EAF3DE' : '#FCEBEB',
+            color: res.lista_para_rls ? '#3B6D11' : '#A32D2D'}}>
+            {res.lista_para_rls ? '✓ Lista para activar el blindaje RLS' : '✗ NO ejecutar el SQL de RLS todavía: corrige lo rojo primero'}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ─── APP ──────────────────────────────────────────────────────────
 export default function App() {
   const [user, setUser]   = useState(() => { try { return JSON.parse(sessionStorage.getItem('cli_user')); } catch { return null; } });
@@ -156,40 +207,27 @@ export default function App() {
   const handleLogout = () => { sessionStorage.removeItem('cli_user'); setUser(null); resetFormulariosDeUsuario(); };
 
   // ── FETCH DATA ──
+  // Todo llega de /api/datos: el servidor filtra por rol según el token,
+  // así el navegador de una profesional nunca recibe datos de terceros.
   const fetchAll = useCallback(async () => {
     setLoading(true);
-    const [ins, mov, arr, prof, bx, usr, sol] = await Promise.all([
-      sb.from('insumos').select('*').eq('activo',true).order('nombre'),
-      sb.from('movimientos').select('*').order('created_at',{ascending:false}).limit(200),
-      sb.from('arriendos')
-        .select(user?.rol === 'prof' ? 'id,box_id,box_nombre,fecha,hora_inicio,hora_fin,horas,estado' : '*')
-        .order('fecha',{ascending:false}).limit(200),
-      sb.from('profesionales').select('*').order('nombre'),
-      sb.from('boxes').select('*').order('nombre'),
-      apiUsuarios({ accion: 'listar' }).then(d => ({ data: d.ok ? d.usuarios : null })),
-      sb.from('solicitudes_paciente')
-        .select(user?.rol === 'prof' ? 'id,box_tipo,fecha_solicitada,hora_inicio,hora_fin,estado,created_at' : '*')
-        .order('created_at',{ascending:false}).limit(200),
+    const [datos, usr] = await Promise.all([
+      apiGet('/api/datos'),
+      apiUsuarios({ accion: 'listar' }),
     ]);
-    if (ins.data)  setInsumos(ins.data);
-    if (mov.data)  setMovimientos(mov.data);
-    if (arr.data)  setArriendos(arr.data);
-    if (prof.data) { setProfesionalesAll(prof.data); setProfesionales(prof.data.filter(x => x.activo !== false)); }
-    if (bx.data)   setBoxes(bx.data);
-    if (usr.data)  setUsuarios(usr.data);
-    if (sol.data)  setSolicitudes(sol.data);
-    // Rol prof: sus propias reservas, completas, para Dashboard/Arriendos/comprobantes
-    if (user?.rol === 'prof' && prof.data) {
-      const yo = normalizeNombre(user.nombre);
-      const miId = prof.data.find(p => normalizeNombre(p.nombre) === yo)?.id;
-      if (miId) {
-        const { data: mios } = await sb.from('arriendos').select('*')
-          .eq('profesional_id', miId).order('fecha',{ascending:false}).limit(200);
-        setMisArriendos(mios || []);
-      } else setMisArriendos([]);
+    if (datos.ok) {
+      setInsumos(datos.insumos || []);
+      setMovimientos(datos.movimientos || []);
+      setArriendos(datos.arriendos || []);
+      setProfesionalesAll(datos.profesionales || []);
+      setProfesionales((datos.profesionales || []).filter(x => x.activo !== false));
+      setBoxes(datos.boxes || []);
+      setSolicitudes(datos.solicitudes || []);
+      setMisArriendos(datos.misArriendos || []);
     }
+    if (usr.ok) setUsuarios(usr.usuarios || []);
     setLoading(false);
-  }, [user?.rol]);
+  }, []);
 
   useEffect(() => { if (user) fetchAll(); }, [user, fetchAll]);
 
@@ -252,24 +290,21 @@ export default function App() {
   const [retNuevoId, setRetNuevoId] = useState(null);
 
   const confirmarRetiro = async (pagado) => {
-    const profNombre = user?.rol==='prof' ? user.nombre : (profesionales.find(p=>p.id===ret.profId)?.nombre||'');
-    const row = {
-      tipo:'retiro', insumo_id: ret.origen==='clinica' ? ret.insumoId : null,
-      insumo_nombre: insRet?.nombre || ret.insumoPropio,
-      cantidad:+ret.cantidad, profesional_nombre:profNombre,
-      paciente:ret.paciente, obs:ret.obs, origen_insumo:ret.origen,
-      pago_requerido: insRet?.pago_previo && ret.origen==='clinica',
-      pago_pagado: false,
-      pago_monto:  insRet?.pago_previo && ret.origen==='clinica' ? insRet.precio * +ret.cantidad : 0,
-      pago_metodo: retMetodo,
-      verificado: insRet?.pago_previo && ret.origen==='clinica' ? 'sin_pago' : 'aprobado',
-    };
-    const { data } = await sb.from('movimientos').insert(row).select().single();
-    if (ret.origen==='clinica' && insRet) {
-      await sb.from('insumos').update({ stock: insRet.stock - +ret.cantidad }).eq('id', insRet.id);
-    }
+    // El servidor valida stock, calcula el monto desde el catálogo y registra
+    // el movimiento + descuento de stock (la identidad prof sale del token)
+    const resp = await apiGestion('retiro', {
+      origen: ret.origen,
+      insumoId: ret.origen==='clinica' ? ret.insumoId : null,
+      insumoPropio: ret.insumoPropio,
+      cantidad: +ret.cantidad,
+      profId: ret.profId,
+      paciente: ret.paciente,
+      obs: ret.obs,
+      metodo: retMetodo,
+    });
+    if (!resp.ok) { showToast(resp.error || 'No se pudo registrar el retiro', 'err'); return; }
     await fetchAll();
-    setRetNuevoId(data?.id || null);
+    setRetNuevoId(resp.id || null);
     setRet(emptyRet);
     if (insRet?.pago_previo && ret.origen==='clinica') {
       setRetStep(3); // paso comprobante
@@ -326,7 +361,7 @@ export default function App() {
     try {
       const r = await fetch('/api/reservar', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${tokenApi()}` },
         body: JSON.stringify(payload),
       });
       return await r.json();
@@ -394,7 +429,7 @@ export default function App() {
       // Registrar plan con días y horario fijo
       const fechaVenc = new Date(arrForm.fecha + 'T12:00:00');
       fechaVenc.setMonth(fechaVenc.getMonth() + arrForm.planMeses);
-      await sb.from('planes_profesional').insert({
+      await apiGestion('plan_registrar', {
         profesional_id:     arrForm.profId,
         profesional_nombre: prof?.nombre || '',
         box_tipo:           arrForm.tipoBox || '',
@@ -403,11 +438,8 @@ export default function App() {
         plan_precio:        arrForm.monto,
         con_asistente:      arrForm.planAsistente || false,
         jornadas_totales:   fechas.length,
-        jornadas_stock:     fechas.length,
         fecha_inicio:       arrForm.fecha,
         fecha_vencimiento:  fechaVenc.toISOString().split('T')[0],
-        estado:             'pendiente',
-        verificado:         'sin_pago',
         dias_semana:        arrForm.diasJornada,
         hora_inicio:        arrForm.horaInicio,
         hora_fin:           arrForm.horaFin,
@@ -526,8 +558,8 @@ export default function App() {
     try {
       const r = await fetch('/api/webpay-init', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ arriendoId: nuevoArr.id, monto: montoCobro }),
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${tokenApi()}` },
+        body: JSON.stringify({ arriendoId: nuevoArr.id }), // el monto lo lee el servidor de la BD
       });
       if (!r.ok) throw new Error(await r.text());
       initData = await r.json();
@@ -569,18 +601,10 @@ export default function App() {
   // Elimina definitivamente solo si la profesional no tiene historial;
   // si lo tiene, se conserva para no romper reservas y planes ya registrados.
   const eliminarProfesional = async (prof) => {
-    const [arrRes, planRes] = await Promise.all([
-      sb.from('arriendos').select('id', { count:'exact', head:true }).eq('profesional_id', prof.id),
-      sb.from('planes_profesional').select('id', { count:'exact', head:true }).eq('profesional_id', prof.id),
-    ]);
-    const nArr = arrRes.count || 0, nPlan = planRes.count || 0;
-    if (nArr + nPlan > 0) {
-      showToast(`${prof.nombre} tiene ${nArr} arriendo(s) y ${nPlan} plan(es) registrados: no se puede eliminar. Usa "Desactivar" para ocultarla de las reservas.`, 'err');
-      return;
-    }
     if (!window.confirm(`¿Eliminar definitivamente a ${prof.nombre}? Esta acción no se puede deshacer.`)) return;
-    const { error } = await sb.from('profesionales').delete().eq('id', prof.id);
-    if (error) return showToast('No se pudo eliminar: ' + error.message, 'err');
+    // El servidor re-verifica que no tenga arriendos ni planes antes de borrar
+    const resp = await apiGestion('profesional_eliminar', { id: prof.id });
+    if (!resp.ok) return showToast(resp.error || 'No se pudo eliminar', 'err');
     await fetchAll();
     showToast('Profesional eliminada');
   };
@@ -634,8 +658,8 @@ export default function App() {
           <div style={{display:'flex',gap:10,marginTop:20}}>
             <button style={S.btn('primary')} onClick={async()=>{
               if(!insForm.nombre.trim()) return showToast('Nombre requerido','err');
-              if(modal.id) await sb.from('insumos').update({...insForm}).eq('id',modal.id);
-              else await sb.from('insumos').insert({...insForm});
+              const resp = await apiGestion('insumo_guardar', { ...insForm, id: modal.id || null });
+              if(!resp.ok) return showToast(resp.error||'No se pudo guardar','err');
               await fetchAll(); showToast(modal.id?'Insumo actualizado':'Insumo agregado'); setModal(null);
             }}>Guardar</button>
             <button style={S.btn('secondary')} onClick={()=>setModal(null)}>Cancelar</button>
@@ -660,9 +684,8 @@ export default function App() {
           <div style={{display:'flex',gap:10,marginTop:20}}>
             <button style={S.btn('primary')} onClick={async()=>{
               if(!ingSel) return showToast('Selecciona un insumo','err');
-              const ins2=insumos.find(i=>i.id===ingSel);
-              await sb.from('insumos').update({stock:ins2.stock+ingQty}).eq('id',ingSel);
-              await sb.from('movimientos').insert({tipo:'ingreso',insumo_id:ingSel,insumo_nombre:ins2.nombre,cantidad:ingQty,profesional_nombre:ingResp||'Administración',paciente:'-',origen_insumo:'clinica',obs:ingObs});
+              const resp = await apiGestion('ingreso_stock', { insumoId: ingSel, cantidad: ingQty, responsable: ingResp, obs: ingObs });
+              if(!resp.ok) return showToast(resp.error||'No se pudo registrar el ingreso','err');
               await fetchAll();
               setIngSel('');setIngQty(1);setIngResp('');setIngObs('');
               showToast('Stock actualizado'); setModal(null);
@@ -686,10 +709,8 @@ export default function App() {
             <button style={S.btn('primary')} onClick={async()=>{
               const nombre = profForm.nombre.trim(), especialidad = profForm.especialidad.trim();
               if(!nombre||!especialidad) return showToast('Nombre y especialidad requeridos','err');
-              const { error } = modal.id
-                ? await sb.from('profesionales').update({nombre,especialidad}).eq('id',modal.id)
-                : await sb.from('profesionales').insert({nombre,especialidad,activo:true});
-              if(error) return showToast('No se pudo guardar: '+error.message,'err');
+              const resp = await apiGestion('profesional_guardar', { id: modal.id || null, nombre, especialidad });
+              if(!resp.ok) return showToast(resp.error||'No se pudo guardar','err');
               await fetchAll(); showToast(modal.id?'Profesional actualizada':'Profesional agregada'); setModal(null);
             }}>Guardar</button>
             <button style={S.btn('secondary')} onClick={()=>setModal(null)}>Cancelar</button>
@@ -1151,7 +1172,7 @@ export default function App() {
                 )
               )}
               {a.comprobante_url && (
-                <div style={{marginTop:8}}><VerComprobante path={a.comprobante_url} nombre={a.comprobante_nombre}/></div>
+                <div style={{marginTop:8}}><VerComprobante tabla="arriendos" id={a.id} nombre={a.comprobante_nombre}/></div>
               )}
             </div>
           ))}
@@ -1385,33 +1406,37 @@ export default function App() {
                   )}
                   {(s.estado === 'pendiente' || s.estado === 'agendada') && (
                     <button style={S.btn('primary',true)} onClick={async()=>{
-                      await sb.from('solicitudes_paciente').update({estado:'contactado', contactado_por:user.nombre, contactado_at:new Date().toISOString()}).eq('id',s.id);
+                      const resp = await apiGestion('solicitud_estado', { id: s.id, accion: 'contactado' });
+                      if(!resp.ok) return showToast(resp.error||'Error','err');
                       await fetchAll(); showToast('Marcado como contactado');
                     }}>Marcar contactado</button>
                   )}
                   {s.estado === 'agendada' && (
                     <button style={S.btn('success',true)} onClick={async()=>{
-                      await sb.from('solicitudes_paciente').update({estado:'confirmada', contactado_por:user.nombre, contactado_at:new Date().toISOString()}).eq('id',s.id);
+                      const resp = await apiGestion('solicitud_estado', { id: s.id, accion: 'confirmada' });
+                      if(!resp.ok) return showToast(resp.error||'Error','err');
                       await fetchAll(); showToast('Cita confirmada ✓');
                     }}>✓ Confirmar cita</button>
                   )}
                   {(s.estado === 'pendiente' || s.estado === 'contactado') && (
                     <button style={S.btn('success',true)} onClick={async()=>{
-                      await sb.from('solicitudes_paciente').update({estado:'agendado'}).eq('id',s.id);
+                      const resp = await apiGestion('solicitud_estado', { id: s.id, accion: 'agendado' });
+                      if(!resp.ok) return showToast(resp.error||'Error','err');
                       await fetchAll(); showToast('Marcado como agendado');
                     }}>Marcar agendado</button>
                   )}
                   {s.estado !== 'descartado' && (
                     <button style={S.btn('danger',true)} onClick={async()=>{
                       const obs = prompt('Razón del descarte (opcional):') || '';
-                      await sb.from('solicitudes_paciente').update({estado:'descartado', admin_obs: obs || s.admin_obs}).eq('id',s.id);
+                      const resp = await apiGestion('solicitud_estado', { id: s.id, accion: 'descartado', admin_obs: obs || s.admin_obs });
+                      if(!resp.ok) return showToast(resp.error||'Error','err');
                       await fetchAll(); showToast('Descartada');
                     }}>Descartar</button>
                   )}
                   <button style={S.btn('secondary',true)} onClick={()=>{
                     const nuevaObs = prompt('Notas internas:', s.admin_obs || '');
                     if (nuevaObs !== null) {
-                      sb.from('solicitudes_paciente').update({admin_obs: nuevaObs}).eq('id',s.id).then(fetchAll).then(()=>showToast('Notas guardadas'));
+                      apiGestion('solicitud_estado', { id: s.id, accion: 'obs', admin_obs: nuevaObs }).then(fetchAll).then(()=>showToast('Notas guardadas'));
                     }
                   }}>📝 Notas</button>
                 </div>
@@ -1453,7 +1478,7 @@ export default function App() {
                   <div style={{fontSize:12,color:'#666'}}>{item.profesional_nombre} · {item.fecha}</div>
                 </div>
                 <div style={{display:'flex',gap:8,alignItems:'center',flexWrap:'wrap'}}>
-                  {item.comprobante_url&&<VerComprobante path={item.comprobante_url} nombre={item.comprobante_nombre}/>}
+                  {item.comprobante_url&&<VerComprobante tabla={item.box_nombre?'arriendos':'movimientos'} id={item.id} nombre={item.comprobante_nombre}/>}
                   <BadgeVerificado estado={item.verificado}/>
                 </div>
               </div>
@@ -1474,6 +1499,7 @@ export default function App() {
       {/* ── CONFIGURACIÓN (solo admin) ── */}
       {tab==='config' && user.rol==='admin' && (
         <div>
+          <DiagSeguridad/>
           {/* USUARIOS */}
           <div style={{marginBottom:28}}>
             <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:12}}>
@@ -1521,8 +1547,8 @@ export default function App() {
                     <button style={S.btn('secondary',true)} onClick={()=>{setProfForm({nombre:p.nombre,especialidad:p.especialidad||''});setModal({tipo:'profesional',id:p.id});}}>Editar</button>
                     <button style={{...S.btn('secondary',true),background:p.activo===false?'#EAF3DE':'#FAEEDA',color:p.activo===false?'#3B6D11':'#854F0B'}}
                       onClick={async()=>{
-                        const { error } = await sb.from('profesionales').update({activo:p.activo===false}).eq('id',p.id);
-                        if(error) return showToast('No se pudo cambiar el estado: '+error.message,'err');
+                        const resp = await apiGestion('profesional_activo', { id: p.id, activo: p.activo===false });
+                        if(!resp.ok) return showToast(resp.error||'No se pudo cambiar el estado','err');
                         await fetchAll(); showToast(p.activo===false?'Profesional activada':'Profesional desactivada');
                       }}>
                       {p.activo===false?'Activar':'Desactivar'}
@@ -1542,7 +1568,7 @@ export default function App() {
                 <button style={S.btn('primary',true)} onClick={async()=>{
                   const nombre=prompt('Nombre del box:');const tarifa=nombre?prompt('Tarifa/hora (CLP):'):null;
                   const tipo=nombre&&tarifa?(prompt('Tipo (estetico / dental / medico / pabellon):','estetico')||'estetico').toLowerCase().trim():null;
-                  if(nombre&&tarifa&&['estetico','dental','medico','pabellon'].includes(tipo)){await sb.from('boxes').insert({nombre,tipo,tarifa_hora:+tarifa,activo:true,recurso:recursoDeTipo(tipo)});await fetchAll();showToast('Box agregado');}
+                  if(nombre&&tarifa&&['estetico','dental','medico','pabellon'].includes(tipo)){const resp=await apiGestion('box_crear',{nombre,tipo,tarifa_hora:+tarifa});if(!resp.ok)return showToast(resp.error||'No se pudo crear','err');await fetchAll();showToast('Box agregado');}
                   else if(nombre&&tarifa){showToast('Tipo inválido: usa estetico, dental, medico o pabellon','err');}
                 }}>+ Agregar</button>
               </div>
@@ -1550,7 +1576,7 @@ export default function App() {
                 <div key={b.id} style={{...S.card(),padding:12}}>
                   <div style={{display:'flex',justifyContent:'space-between',alignItems:'center'}}>
                     <div><div style={{fontWeight:500,fontSize:14}}>{b.nombre} · {b.tipo}</div><div style={{fontSize:12,color:'#666'}}>{fmt(b.tarifa_hora)}/hora</div></div>
-                    <button style={{...S.btn('secondary',true),background:b.activo?'#FCEBEB':'#EAF3DE',color:b.activo?'#A32D2D':'#3B6D11'}} onClick={async()=>{await sb.from('boxes').update({activo:!b.activo}).eq('id',b.id);fetchAll();}}>
+                    <button style={{...S.btn('secondary',true),background:b.activo?'#FCEBEB':'#EAF3DE',color:b.activo?'#A32D2D':'#3B6D11'}} onClick={async()=>{const resp=await apiGestion('box_activo',{id:b.id,activo:!b.activo});if(!resp.ok)return showToast(resp.error||'Error','err');fetchAll();}}>
                       {b.activo?'Desactivar':'Activar'}
                     </button>
                   </div>

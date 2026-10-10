@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from "react";
-import { sb } from "./supabase";
+import { apiGet, apiGestion, abrirComprobante, subirArchivoComprobante } from "./api";
 
 const fmt = n => (n||0).toLocaleString("es-CL",{style:"currency",currency:"CLP",maximumFractionDigits:0});
 
@@ -50,13 +50,10 @@ function SubirComprobantePlan({ planId, onSubido }) {
     setSubiendo(true); setError("");
     const ext  = archivo.name.split(".").pop();
     const path = `planes/${planId}/${Date.now()}.${ext}`;
-    const { error: upErr } = await sb.storage.from("comprobantes").upload(path, archivo, { upsert:true });
+    const { error: upErr } = await subirArchivoComprobante(path, archivo);
     if (upErr) { setError("Error al subir: " + upErr.message); setSubiendo(false); return; }
-    await sb.from("planes_profesional").update({
-      comprobante_url: path,
-      comprobante_nombre: archivo.name,
-      verificado: "pendiente",
-    }).eq("id", planId);
+    const resp = await apiGestion("comprobante_vincular", { tabla: "planes_profesional", id: planId, path, nombre: archivo.name });
+    if (!resp.ok) { setError(resp.error || "No se pudo registrar el comprobante"); setSubiendo(false); return; }
     setSubiendo(false);
     onSubido && onSubido();
   };
@@ -163,10 +160,9 @@ export default function TabPlanes({ user, profesionales, boxes, onReservar }) {
 
   const cargar = async () => {
     setLoading(true);
-    const q = sb.from("planes_profesional").select("*").order("created_at", {ascending:false});
-    if (profId) q.eq("profesional_id", profId);
-    const { data } = await q;
-    setPlanes(data || []);
+    // /api/datos ya devuelve los planes filtrados por rol (prof: solo los suyos)
+    const datos = await apiGet("/api/datos");
+    setPlanes(datos.ok ? (datos.planes || []) : []);
     setLoading(false);
   };
 
@@ -179,7 +175,7 @@ export default function TabPlanes({ user, profesionales, boxes, onReservar }) {
     setCreando(true);
     const fecha = new Date(fechaInicio);
     const venc  = new Date(fecha); venc.setMonth(venc.getMonth() + 1);
-    const { data } = await sb.from("planes_profesional").insert({
+    const resp = await apiGestion("plan_registrar", {
       profesional_id:    pid,
       profesional_nombre: prof?.nombre || user.nombre,
       box_tipo:          boxActivo,
@@ -188,14 +184,11 @@ export default function TabPlanes({ user, profesionales, boxes, onReservar }) {
       plan_precio:       planSel.precio,
       con_asistente:     planSel.asistente,
       jornadas_totales:  planSel.jornadas,
-      jornadas_stock:    planSel.jornadas,
       fecha_inicio:      fechaInicio,
       fecha_vencimiento: venc.toISOString().split("T")[0],
-      estado:            "pendiente",
-      verificado:        "sin_pago",
-    }).select().single();
+    });
     setCreando(false);
-    setNuevoPlanId(data?.id || null);
+    setNuevoPlanId(resp.ok ? resp.id : null);
     setPlanSel(null);
     cargar();
   };
@@ -245,13 +238,13 @@ export default function TabPlanes({ user, profesionales, boxes, onReservar }) {
                   </span>
                   {p.verificado==="pendiente" && (
                     <button onClick={async()=>{
-                      await sb.from("planes_profesional").update({verificado:"aprobado",estado:"activo"}).eq("id",p.id);
+                      await apiGestion("plan_verificar", { id: p.id, decision: "aprobado" });
                       cargar();
                     }} style={S.btn("success",true)}>Aprobar</button>
                   )}
                   {p.verificado==="pendiente" && (
                     <button onClick={async()=>{
-                      await sb.from("planes_profesional").update({verificado:"rechazado",estado:"cancelado"}).eq("id",p.id);
+                      await apiGestion("plan_verificar", { id: p.id, decision: "rechazado" });
                       cargar();
                     }} style={S.btn("danger",true)}>Rechazar</button>
                   )}
@@ -261,7 +254,7 @@ export default function TabPlanes({ user, profesionales, boxes, onReservar }) {
                 Jornadas: <strong>{p.jornadas_stock}/{p.jornadas_totales}</strong> disponibles · Vigencia: {p.fecha_inicio} → {p.fecha_vencimiento}
               </div>
               {p.comprobante_url && (
-                <button onClick={()=>sb.storage.from("comprobantes").createSignedUrl(p.comprobante_url,3600).then(({data})=>window.open(data?.signedUrl))}
+                <button onClick={()=>abrirComprobante("planes_profesional", p.id)}
                   style={{...S.btn("secondary",true),marginTop:8,fontSize:11}}>
                   📎 Ver comprobante
                 </button>
