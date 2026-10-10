@@ -1,21 +1,21 @@
 // ─── RECURSO FÍSICO vs MODALIDAD COMERCIAL ────────────────────────
-// El Box Médico y el Box Estético son DOS modalidades comerciales que
-// comparten UN mismo espacio físico (Box Mixto) → comparten calendario.
-// El Box Dental y el Pabellón son espacios independientes con agenda propia.
-// El Médico mantiene su mínimo de 2 horas consecutivas por reserva.
+// Dos espacios físicos, cuatro modalidades comerciales:
+//  - Box Mixto: Médico y Estético comparten UN espacio → calendario único.
+//  - Box Dental/Pabellón: Dental y Pabellón comparten UN espacio → calendario
+//    único (son dos modalidades de arriendo del mismo recinto).
+// El Médico mantiene su mínimo de 2 horas consecutivas; el Pabellón sus
+// bloques de 1/2/4/8 horas.
 //
 // Este módulo es la única fuente de verdad de esas reglas en el frontend.
 // api/_lib/disponibilidad.js es su espejo CommonJS para las funciones
 // serverless — si cambias algo aquí, cambia también allá (hay un test de
 // paridad en src/logic/disponibilidad.test.js que compara ambos).
 
-// Estructura definitiva de espacios físicos (v3):
-//   - Box Dental: independiente.
+// Estructura de espacios físicos (v4):
+//   - Box Dental/Pabellón: UN espacio físico con dos modalidades de arriendo.
 //   - Box Mixto: Médico y Estético comparten UN espacio físico (agenda única).
-//   - Pabellón: independiente, con sus propias tarifas por bloque.
-export const RECURSO_DENTAL          = "dental";
+export const RECURSO_DENTAL_PABELLON = "dental_pabellon";
 export const RECURSO_MEDICO_ESTETICO = "medico_estetico";
-export const RECURSO_PABELLON        = "pabellon";
 
 // Horas mínimas por modalidad. La regla de 2h es EXCLUSIVA del Box Médico
 // (obligatoria en frontend + backend); Dental y Estético no tienen mínimo.
@@ -37,17 +37,17 @@ export function normTipoBox(box) {
 }
 
 export const recursoDeTipo = tipo =>
-  tipo === "dental"   ? RECURSO_DENTAL
-  : tipo === "pabellon" ? RECURSO_PABELLON
-  : RECURSO_MEDICO_ESTETICO; // medico y estetico comparten el Box Mixto
+  (tipo === "dental" || tipo === "pabellon")
+    ? RECURSO_DENTAL_PABELLON  // dental y pabellon comparten el mismo recinto
+    : RECURSO_MEDICO_ESTETICO; // medico y estetico comparten el Box Mixto
 
 export const recursoDeBox = box => recursoDeTipo(normTipoBox(box));
 
 // Modalidades (box_tipo de solicitudes_paciente) que ocupan un recurso
 export const tiposDelRecurso = recurso =>
-  recurso === RECURSO_DENTAL   ? ["dental"]
-  : recurso === RECURSO_PABELLON ? ["pabellon"]
-  : ["medico", "estetico"];
+  recurso === RECURSO_DENTAL_PABELLON
+    ? ["dental", "pabellon"]
+    : ["medico", "estetico"];
 
 // Ids de todos los boxes que comparten el recurso físico del box dado
 export function boxIdsDelRecurso(boxes, box) {

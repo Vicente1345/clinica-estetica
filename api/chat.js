@@ -148,29 +148,31 @@ Usa \`registrar_solicitud_paciente\` (la solicitud queda como pendiente y la adm
 - Si el paciente da un email, regístralo (es importante para enviarle confirmación).
 - Si hay un error técnico al guardar, da el WhatsApp +56 9 3774 2182.
 
-## Espacios de la clínica (REGLA IMPORTANTE — 3 espacios físicos)
+## Espacios de la clínica (REGLA IMPORTANTE — 2 espacios físicos)
 
-La clínica tiene **3 espacios físicos**:
+La clínica tiene **2 espacios físicos**:
 
-- **Box Dental** (\`box_tipo: "dental"\`): espacio INDEPENDIENTE con agenda propia. Limpiezas dentales, aplicación de flúor, blanqueamiento, brackets, ortodoncia, endodoncia, odontopediatría, exodoncias, tapaduras y todos los procedimientos odontológicos. Plan Flex (sin asistente) y Plan PRO (con asistente) son **modalidades de arriendo del MISMO box dental**, no boxes distintos. Su ocupación NO afecta a los demás espacios.
+- **Box Dental / Pabellón (UN solo espacio físico con doble función y calendario COMPARTIDO)**:
+  - Modalidad Dental (\`box_tipo: "dental"\`): limpiezas dentales, aplicación de flúor, blanqueamiento, brackets, ortodoncia, endodoncia, odontopediatría, exodoncias, tapaduras y todos los procedimientos odontológicos. Plan Flex (sin asistente) y Plan PRO (con asistente) son **modalidades de arriendo del MISMO box dental**, no boxes distintos.
+  - Modalidad Pabellón: SOLO arriendo profesional por bloques (no se agendan citas de pacientes en el pabellón vía chat).
+  - **Como comparten el espacio, un horario ocupado en Dental también está ocupado en Pabellón y viceversa.**
 - **Box Mixto Médico / Estético (UN solo espacio físico con doble función y calendario COMPARTIDO)**:
   - Modalidad Médica (\`box_tipo: "medico"\`): consultas y procedimientos médicos generales.
   - Modalidad Estética (\`box_tipo: "estetico"\`): botox, Hydrafacial, Endymed, Sculptra, Exosomas, Profhilo, Mesoterapia, Armonización Facial, depilación láser, RF corporal, enzimas lipolíticas y todos los procedimientos estéticos faciales y corporales.
   - **Como comparten el espacio, un horario ocupado en Médico también está ocupado en Estético y viceversa.**
-- **Pabellón**: recinto independiente con agenda propia, SOLO para arriendo profesional por bloques (no se agendan citas de pacientes en el pabellón vía chat).
 
 **Nunca trates Plan Flex o Plan PRO como boxes separados.** Si te lo preguntan, aclara que son tipos de arriendo del mismo Box Dental.
 
 ## Si te preguntan por arriendo de espacios (profesionales)
 
 La clínica también funciona como cowork médico:
-- **Box Dental (independiente)**:
+- **Box Dental / Pabellón (espacio compartido, calendario único)**:
   - Plan Flex (sin asistente): $15.000/h (de 1 a 3 horas, sin mínimo), $45.000 jornada, planes desde $150.000/mes anual.
   - Plan PRO (con asistente): $18.000/h (de 1 a 3 horas, sin mínimo), $65.000 jornada, planes desde $230.000/mes anual, Plan Exclusivo $1.350.000/mes.
 - **Box Mixto Médico/Estético (espacio compartido, calendario único)**:
   - Modalidad Estética: $10.000/h (mínimo 1 hora), $45.000 jornada, planes mensuales desde $170.000/mes.
   - Modalidad Médica: $12.000/h con **mínimo obligatorio de 2 horas consecutivas** (no se arrienda 1 hora), $55.000 jornada, planes desde $215.000/mes.
-- **Pabellón (independiente)**: bloques de 1 hora $55.000, 2 horas $100.000, media jornada (4 h) $200.000, jornada completa (8 h) $360.000.
+  - Modalidad Pabellón: bloques de 1 hora $55.000, 2 horas $100.000, media jornada (4 h) $200.000, jornada completa (8 h) $360.000.
 
 Para info detallada redirige al sitio de profesionales o WhatsApp.`;
 
@@ -371,9 +373,9 @@ async function ejecutarHerramienta(name, input) {
   return { error: `Herramienta desconocida: ${name}` };
 }
 
-// Ocupación por RECURSO FÍSICO: el Box Médico y el Box Estético comparten un
-// mismo espacio (Box Mixto), así que una cita/arriendo en cualquiera de las dos
-// modalidades bloquea a la otra. El Box Dental y el Pabellón son independientes.
+// Ocupación por RECURSO FÍSICO: Médico+Estético comparten el Box Mixto y
+// Dental+Pabellón comparten el otro recinto; una cita/arriendo en una
+// modalidad bloquea a su compañera de espacio.
 // Considera TANTO citas de pacientes (solicitudes_paciente) COMO arriendos de
 // profesionales (arriendos) del recurso. Devuelve [{ini, fin}] en minutos.
 async function getOcupados(sb, fecha, box_tipo) {

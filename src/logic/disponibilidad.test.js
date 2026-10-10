@@ -1,10 +1,10 @@
-// Pruebas obligatorias de disponibilidad — estructura definitiva v3:
-//   - Box Dental: independiente.
+// Pruebas obligatorias de disponibilidad — estructura definitiva v4:
+//   - Box Dental y Pabellón: DOS MODALIDADES del MISMO espacio físico
+//     (recurso 'dental_pabellon', agenda única; Pabellón en bloques 1/2/4/8 h).
 //   - Box Mixto: Médico y Estético comparten UN espacio físico (agenda única).
-//   - Pabellón: independiente, bloques de 1/2/4/8 horas.
-// Cubre: bloqueo cruzado Médico↔Estético, independencia de Dental y Pabellón,
-// mínimo 2h del médico, cancelaciones, consecutivos, solapamientos parciales,
-// desempate de reservas simultáneas y precios por modalidad.
+// Cubre: bloqueo cruzado Médico↔Estético y Dental↔Pabellón, independencia
+// entre ambos espacios, mínimo 2h del médico, cancelaciones, consecutivos,
+// solapamientos parciales, desempate de simultáneas y precios por modalidad.
 
 import * as esm from "./disponibilidad";
 const cjs = require("../../api/_lib/disponibilidad");
@@ -45,7 +45,7 @@ describe.each([["frontend (src/logic)", esm], ["serverless (api/_lib)", cjs]])("
     });
   });
 
-  describe("independencia del Box Dental", () => {
+  describe("espacio compartido Dental + Pabellón (frente al Box Mixto)", () => {
     test("una reserva DENTAL no bloquea Médico/Estético", () => {
       const ocupado = [arr("den", "2026-10-01", "10:00", "12:00")];
       expect(conflictos(d, { arriendos: ocupado, box: EST, fecha: "2026-10-01", horaInicio: "10:00", horaFin: "12:00" })).toHaveLength(0);
@@ -58,30 +58,50 @@ describe.each([["frontend (src/logic)", esm], ["serverless (api/_lib)", cjs]])("
       expect(conflictos(d, { arriendos: ocupado, box: DEN, fecha: "2026-10-01", horaInicio: "14:00", horaFin: "16:00" })).toHaveLength(0);
     });
 
-    test("el dental tiene su propio recurso", () => {
-      expect(d.recursoDeBox(DEN)).toBe("dental");
-      expect(d.boxIdsDelRecurso(BOXES, DEN)).toEqual(["den"]);
+    test("Dental y Pabellón comparten exactamente el mismo recurso", () => {
+      expect(d.recursoDeBox(DEN)).toBe("dental_pabellon");
+      expect(d.recursoDeBox(PAB)).toBe("dental_pabellon");
+      expect(d.boxIdsDelRecurso(BOXES, DEN).sort()).toEqual(["den", "pab"]);
+    });
+
+    test("una reserva DENTAL bloquea el mismo horario en PABELLÓN", () => {
+      const ocupado = [arr("den", "2026-10-01", "10:00", "12:00")];
+      expect(conflictos(d, { arriendos: ocupado, box: PAB, fecha: "2026-10-01", horaInicio: "10:00", horaFin: "11:00" })).toHaveLength(1);
+      expect(conflictos(d, { arriendos: ocupado, box: PAB, fecha: "2026-10-01", horaInicio: "11:00", horaFin: "13:00" })).toHaveLength(1);
+    });
+
+    test("una reserva de PABELLÓN bloquea el mismo horario en DENTAL", () => {
+      const ocupado = [arr("pab", "2026-10-01", "10:00", "14:00")];
+      expect(conflictos(d, { arriendos: ocupado, box: DEN, fecha: "2026-10-01", horaInicio: "12:00", horaFin: "13:00" })).toHaveLength(1);
+    });
+
+    test("Dental↔Pabellón consecutivos NO chocan; al cancelar se libera para ambos", () => {
+      const ocupado = [arr("den", "2026-10-01", "10:00", "12:00")];
+      expect(conflictos(d, { arriendos: ocupado, box: PAB, fecha: "2026-10-01", horaInicio: "12:00", horaFin: "14:00" })).toHaveLength(0);
+      const cancelada = [arr("den", "2026-10-01", "10:00", "12:00", "cancelado")];
+      expect(conflictos(d, { arriendos: cancelada, box: PAB, fecha: "2026-10-01", horaInicio: "10:00", horaFin: "12:00" })).toHaveLength(0);
+      expect(conflictos(d, { arriendos: cancelada, box: DEN, fecha: "2026-10-01", horaInicio: "10:00", horaFin: "12:00" })).toHaveLength(0);
     });
   });
 
-  describe("independencia del Pabellón", () => {
-    test("una reserva de PABELLÓN no bloquea a ningún otro espacio", () => {
+  describe("el espacio Dental/Pabellón es independiente del Box Mixto", () => {
+    test("una reserva de PABELLÓN no bloquea Médico/Estético (y sí al Dental)", () => {
       const ocupado = [arr("pab", "2026-10-01", "10:00", "14:00")];
-      for (const box of [EST, DEN, MED]) {
+      for (const box of [EST, MED]) {
         expect(conflictos(d, { arriendos: ocupado, box, fecha: "2026-10-01", horaInicio: "10:00", horaFin: "12:00" })).toHaveLength(0);
       }
+      expect(conflictos(d, { arriendos: ocupado, box: DEN, fecha: "2026-10-01", horaInicio: "10:00", horaFin: "12:00" })).toHaveLength(1);
     });
 
-    test("las reservas de los demás espacios no bloquean el Pabellón", () => {
+    test("las reservas del Box Mixto no bloquean el Pabellón", () => {
       const ocupado = [
-        arr("den", "2026-10-01", "10:00", "12:00"),
         arr("med", "2026-10-01", "10:00", "12:00"),
+        arr("est", "2026-10-01", "14:00", "16:00"),
       ];
-      expect(conflictos(d, { arriendos: ocupado, box: PAB, fecha: "2026-10-01", horaInicio: "10:00", horaFin: "12:00" })).toHaveLength(0);
+      expect(conflictos(d, { arriendos: ocupado, box: PAB, fecha: "2026-10-01", horaInicio: "10:00", horaFin: "16:00" })).toHaveLength(0);
     });
 
-    test("el pabellón tiene su propio recurso y sí choca consigo mismo", () => {
-      expect(d.recursoDeBox(PAB)).toBe("pabellon");
+    test("el pabellón sí choca consigo mismo", () => {
       const ocupado = [arr("pab", "2026-10-01", "10:00", "14:00")];
       expect(conflictos(d, { arriendos: ocupado, box: PAB, fecha: "2026-10-01", horaInicio: "12:00", horaFin: "13:00" })).toHaveLength(1);
     });
@@ -182,8 +202,9 @@ describe.each([["frontend (src/logic)", esm], ["serverless (api/_lib)", cjs]])("
       expect(d.conflictosCita({ solicitudes: [cita("dental")], box: DEN, fecha: "2026-10-01", horaInicio: "10:00", horaFin: "12:00" })).toHaveLength(1);
     });
 
-    test("ninguna cita bloquea el Pabellón", () => {
-      for (const t of ["dental", "medico", "estetico"]) {
+    test("una cita dental SÍ bloquea el Pabellón (comparten recinto); las del Box Mixto no", () => {
+      expect(d.conflictosCita({ solicitudes: [cita("dental")], box: PAB, fecha: "2026-10-01", horaInicio: "10:00", horaFin: "12:00" })).toHaveLength(1);
+      for (const t of ["medico", "estetico"]) {
         expect(d.conflictosCita({ solicitudes: [cita(t)], box: PAB, fecha: "2026-10-01", horaInicio: "10:00", horaFin: "12:00" })).toHaveLength(0);
       }
     });

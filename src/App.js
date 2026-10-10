@@ -6,6 +6,7 @@ import Login from './Login';
 import { SubirComprobante, BadgeVerificado, VerComprobante, PanelVerificacion } from './Comprobante';
 import Calendario from './Calendario';
 import ModificarReserva from './ModificarReserva';
+import ResumenEjecutivo from './ResumenEjecutivo';
 import ChatBot from './ChatBot';
 import { minHorasDeBox, recursoDeTipo } from './logic/disponibilidad';
 
@@ -17,6 +18,10 @@ const today = () => {
   const d = new Date();
   return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
 };
+// Agrupación de la Agenda por mes/año, en hora de Chile
+const MESES_ES = ['ENERO','FEBRERO','MARZO','ABRIL','MAYO','JUNIO','JULIO','AGOSTO','SEPTIEMBRE','OCTUBRE','NOVIEMBRE','DICIEMBRE'];
+const tituloMesEs = f => `${MESES_ES[Number((f||'').slice(5,7))-1]||''} ${(f||'').slice(0,4)}`;
+const mesActualChile = () => new Date().toLocaleDateString('en-CA',{timeZone:'America/Santiago'}).slice(0,7);
 
 // Normaliza nombre para comparar usuarios.nombre vs profesionales.nombre
 // "Dra. Katherine Büchner" → "katherine büchner"
@@ -132,6 +137,8 @@ export default function App() {
   const [boxes, setBoxes]               = useState([]);
   const [usuarios, setUsuarios]         = useState([]);
   const [solicitudes, setSolicitudes]   = useState([]);
+  const [misArriendos, setMisArriendos] = useState([]); // rol prof: solo sus reservas, completas
+  const [mesesColapsados, setMesesColapsados] = useState({}); // Agenda: toggles por box+mes
 
   const showToast = (msg, tipo='ok') => { setToast({msg,tipo}); setTimeout(()=>setToast(null),3200); };
 
@@ -154,7 +161,9 @@ export default function App() {
     const [ins, mov, arr, prof, bx, usr, sol] = await Promise.all([
       sb.from('insumos').select('*').eq('activo',true).order('nombre'),
       sb.from('movimientos').select('*').order('created_at',{ascending:false}).limit(200),
-      sb.from('arriendos').select('*').order('fecha',{ascending:false}).limit(200),
+      sb.from('arriendos')
+        .select(user?.rol === 'prof' ? 'id,box_id,box_nombre,fecha,hora_inicio,hora_fin,horas,estado' : '*')
+        .order('fecha',{ascending:false}).limit(200),
       sb.from('profesionales').select('*').order('nombre'),
       sb.from('boxes').select('*').order('nombre'),
       apiUsuarios({ accion: 'listar' }).then(d => ({ data: d.ok ? d.usuarios : null })),
@@ -169,6 +178,16 @@ export default function App() {
     if (bx.data)   setBoxes(bx.data);
     if (usr.data)  setUsuarios(usr.data);
     if (sol.data)  setSolicitudes(sol.data);
+    // Rol prof: sus propias reservas, completas, para Dashboard/Arriendos/comprobantes
+    if (user?.rol === 'prof' && prof.data) {
+      const yo = normalizeNombre(user.nombre);
+      const miId = prof.data.find(p => normalizeNombre(p.nombre) === yo)?.id;
+      if (miId) {
+        const { data: mios } = await sb.from('arriendos').select('*')
+          .eq('profesional_id', miId).order('fecha',{ascending:false}).limit(200);
+        setMisArriendos(mios || []);
+      } else setMisArriendos([]);
+    }
     setLoading(false);
   }, [user?.rol]);
 
@@ -208,13 +227,9 @@ export default function App() {
   }, [movimientos, user]);
 
   const arriendosVisibles = useMemo(() => {
-    if (user?.rol === 'prof') {
-      const yo = normalizeNombre(user.nombre);
-      const miId = profesionales.find(p => normalizeNombre(p.nombre) === yo)?.id;
-      return arriendos.filter(a => (miId && a.profesional_id === miId) || normalizeNombre(a.profesional_nombre) === yo);
-    }
+    if (user?.rol === 'prof') return misArriendos;
     return arriendos;
-  }, [arriendos, user, profesionales]);
+  }, [arriendos, misArriendos, user]);
 
   // ── RETIRO STATE ──
   const emptyRet = { insumoId:'', cantidad:1, profId:'', paciente:today(), obs:'', origen:'clinica', insumoPropio:'' };
@@ -1071,7 +1086,7 @@ export default function App() {
                   })}
                 </div>
                 <div style={{fontSize:11,color:'#888',marginTop:6}}>
-                  ℹ Médico y Estético comparten el mismo espacio físico — Box Mixto, calendario único. El Box Dental y el Pabellón son espacios independientes con agenda propia.
+                  ℹ Hay dos espacios físicos: Médico y Estético comparten el Box Mixto, y Dental y Pabellón comparten el otro recinto. Reservar una modalidad bloquea el horario de su compañera de espacio.
                 </div>
               </div>
 
@@ -1105,6 +1120,7 @@ export default function App() {
               )}
             </div>
           )}
+          {user.rol==='admin' && <div style={{marginTop:24}}><ResumenEjecutivo boxes={boxes}/></div>}
           <h3 style={{fontSize:14,fontWeight:500,margin:'24px 0 10px'}}>Arriendos registrados</h3>
           {arriendosVisibles.length===0&&<div style={{fontSize:13,color:'#888'}}>Sin arriendos aún</div>}
           {arriendosVisibles.map(a=>(
@@ -1151,6 +1167,7 @@ export default function App() {
             user={user}
             boxes={boxes}
             arriendos={arriendos}
+            misArriendoIds={misArriendos.map(a=>a.id)}
             profesionales={profesionales}
             solicitudes={solicitudes}
             onNuevoArriendo={async()=>{ await fetchAll(); setTab('arriendos'); }}
@@ -1195,6 +1212,16 @@ export default function App() {
             const cit=(user.rol==='prof' || !esBoxDeCitas) ? [] : solicitudes.filter(s => s.box_tipo===box.tipo && s.fecha_solicitada && ['agendada','agendado','contactado','confirmada'].includes(s.estado))
               .map(s=>({tipo:'cita', id:'c'+s.id, fecha:s.fecha_solicitada, hora_inicio:(s.hora_inicio||'').slice(0,5), hora_fin:(s.hora_fin||'').slice(0,5), nombre:s.nombre, tratamiento:s.tratamiento||s.motivo_consulta, estado:s.estado}));
             const todos=[...res,...cit].sort((a,b)=>(a.fecha||'').localeCompare(b.fecha||'')||(a.hora_inicio||'').localeCompare(b.hora_inicio||''));
+            // Agrupación por mes/año (misma fila por reserva, bajo encabezados
+            // tipo "SEPTIEMBRE 2026"); los meses pasados parten colapsados
+            const meses = [];
+            for (const r of todos) {
+              const k = (r.fecha||'').slice(0,7);
+              let g = meses[meses.length-1];
+              if (!g || g.key !== k) { g = { key:k, items:[] }; meses.push(g); }
+              g.items.push(r);
+            }
+            const mesActual = mesActualChile();
             return (
               <div key={box.id} style={S.card()}>
                 <div style={{display:'flex',justifyContent:'space-between',alignItems:'center'}}>
@@ -1203,7 +1230,19 @@ export default function App() {
                 </div>
                 {todos.length===0?<div style={{fontSize:13,color:'#888',marginTop:10}}>Sin reservas</div>:(
                   <div style={{marginTop:10}}>
-                    {todos.map(r=>r.tipo==='cita' ? (
+                    {meses.map(g => {
+                      const kk = box.id + '|' + g.key;
+                      const abierto = (kk in mesesColapsados) ? !mesesColapsados[kk] : g.key >= mesActual;
+                      return (
+                        <div key={kk}>
+                          <div onClick={()=>setMesesColapsados(prev=>({...prev,[kk]:abierto}))}
+                            style={{display:'flex',alignItems:'center',gap:8,cursor:'pointer',margin:'10px 0 6px',fontSize:12,fontWeight:700,letterSpacing:1,color:'#888',userSelect:'none'}}>
+                            <span>{abierto?'▾':'▸'}</span>
+                            <span>{tituloMesEs(g.key)}</span>
+                            <span style={{background:'#ececec',borderRadius:10,padding:'1px 8px',fontWeight:600}}>{g.items.length}</span>
+                            <span style={{flex:1,height:1,background:'#ececec'}}/>
+                          </div>
+                          {abierto && g.items.map(r=>r.tipo==='cita' ? (
                       <div key={r.id} style={{display:'flex',justifyContent:'space-between',padding:'7px 10px',background:'#FCE4EC',borderRadius:8,marginBottom:6,fontSize:13,flexWrap:'wrap',gap:6,borderLeft:'3px solid #9C2960'}}>
                         <span><strong>{r.fecha}</strong> {r.hora_inicio}–{r.hora_fin}</span>
                         <span style={{color:'#9C2960'}}>👤 Paciente: {r.nombre}{r.tratamiento?` · ${r.tratamiento}`:''}</span>
@@ -1215,7 +1254,10 @@ export default function App() {
                         <span style={{color:'#666'}}>{r.profesional_nombre}</span>
                         <span style={S.badge('teal')}>✓ {fmt(r.monto)}</span>
                       </div>
-                    ))}
+                          ))}
+                        </div>
+                      );
+                    })}
                   </div>
                 )}
               </div>

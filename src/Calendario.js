@@ -31,7 +31,7 @@ function normalizeNombre(nombre) {
   return (nombre || "").toLowerCase().replace(/^(dr\.?|dra\.?)\s+/i, '').trim();
 }
 
-export default function Calendario({ user, boxes, profesionales, arriendos: arriendosProp, solicitudes = [], onNuevoArriendo }) {
+export default function Calendario({ user, boxes, profesionales, arriendos: arriendosProp, solicitudes = [], misArriendoIds = [], onNuevoArriendo }) {
   const [semana, setSemana]       = useState(0);
   const [boxSel, setBoxSel]       = useState(null);
   const [reserva, setReserva]     = useState(null);
@@ -43,7 +43,10 @@ export default function Calendario({ user, boxes, profesionales, arriendos: arri
   useEffect(() => { if (arriendosProp) setArriendos(arriendosProp); }, [arriendosProp]);
 
 const recargarArriendos = async () => {
-  const { data } = await sb.from("arriendos").select("*").order("fecha");
+  // Rol prof: solo columnas de ocupación (los datos de otras profesionales
+  // no deben llegar a su navegador); admin recibe el detalle completo
+  const cols = user?.rol === "prof" ? "id,box_id,box_nombre,fecha,hora_inicio,hora_fin,horas,estado" : "*";
+  const { data } = await sb.from("arriendos").select(cols).order("fecha");
   if (data) setArriendos(data);
 };
 
@@ -65,8 +68,8 @@ useEffect(() => { recargarArriendos(); }, []);
   });
 
   // Ocupación sobre el RECURSO FÍSICO: Médico y Estético comparten un mismo
-  // espacio (Box Mixto), así que una reserva en cualquiera de las dos
-  // modalidades bloquea a la otra. Dental y Pabellón son independientes.
+  // espacio (Box Mixto) y Dental/Pabellón comparten otro: una reserva en una
+  // modalidad bloquea a la otra del mismo recinto.
   const idsRecursoSel = boxSel ? boxIdsDelRecurso(boxes || [], boxSel) : [];
 
   const estaOcupado = (fecha, hora) => {
@@ -81,7 +84,7 @@ useEffect(() => { recargarArriendos(); }, []);
 
 // Detecta si un slot de la grilla (1 hora completa) está bloqueado por una cita
 // de paciente en el mismo RECURSO físico (una cita médica bloquea también la
-// vista estética y viceversa; las citas dentales solo bloquean el Box Dental)
+// vista estética y viceversa; una cita dental bloquea también el Pabellón)
 const cellEnd = (hora) => {
   const [h] = hora.split(":").map(Number);
   return (h+1).toString().padStart(2,"0") + ":00";
@@ -107,12 +110,25 @@ const citaPacienteEnSlot = (fecha, hora) => {
   return arriendos.some(a =>
     idsRecursoSel.includes(a.box_id) &&
     a.fecha === fecha &&
-    (a.profesional_nombre === user.nombre || a.profesional_id === profId) &&
+    (misArriendoIds.includes(a.id) || a.profesional_nombre === user.nombre || a.profesional_id === profId) &&
     ESTADOS_OCUPAN.includes(a.estado) &&
     seSolapan(hora, cellEnd(hora), a.hora_inicio, a.hora_fin)
   );
 };
   const esPasado = (fecha, hora) => new Date(`${fecha}T${hora}:00`) < new Date();
+
+  // Solo admin: detalle de la reserva que ocupa una celda (quién, modalidad,
+  // horario y estado). Para el resto de los roles no se construye ni muestra.
+  const detalleAdminEnSlot = (fecha, hora) => {
+    if (user?.rol !== "admin") return "";
+    const a = arriendos.find(x =>
+      idsRecursoSel.includes(x.box_id) && x.fecha === fecha &&
+      ESTADOS_OCUPAN.includes(x.estado) &&
+      seSolapan(hora, cellEnd(hora), x.hora_inicio, x.hora_fin)
+    );
+    if (!a) return "";
+    return `Reservado · ${a.profesional_nombre || "(sin profesional)"} · ${a.box_nombre} · ${normHora(a.hora_inicio)}–${normHora(a.hora_fin)} · ${a.estado}`;
+  };
 
   const handleClickSlot = (fecha, hora) => {
     if (!boxSel || estaOcupado(fecha,hora) || esPasado(fecha,hora) || citaPacienteEnSlot(fecha,hora)) return;
@@ -301,9 +317,7 @@ const citaPacienteEnSlot = (fecha, hora) => {
         {!boxSel ? "" :
           recursoDeBox(boxSel) === "medico_estetico"
             ? "ℹ Médico y Estético comparten el mismo espacio físico (Box Mixto): una reserva en cualquiera de las dos modalidades bloquea el horario en ambas." + (normTipoBox(boxSel) === "medico" ? " Médico exige mínimo 2 horas consecutivas." : "")
-          : recursoDeBox(boxSel) === "pabellon"
-            ? "ℹ El Pabellón tiene agenda propia · se arrienda en bloques de 1, 2, 4 u 8 horas."
-            : "ℹ El Box Dental tiene calendario propio e independiente."}
+            : "ℹ Dental y Pabellón comparten el mismo espacio físico: una reserva en cualquiera de las dos modalidades bloquea el horario en ambas." + (normTipoBox(boxSel) === "pabellon" ? " El Pabellón se arrienda en bloques de 1, 2, 4 u 8 horas." : "")}
       </div>
 
       {/* Navegación semana */}
@@ -359,7 +373,7 @@ const citaPacienteEnSlot = (fecha, hora) => {
                   const selec      = reserva?.fecha===d.fecha && reserva?.horaInicio===hora;
                   let bg="#D4EDDA", color="#155724", label="Disponible", cursor="pointer", title="";
                   if (pasado)   { bg="#f0f0f0"; color="#aaa"; label="–"; cursor="default"; }
-                  if (ocupado)  { bg="#F8D7DA"; color="#721C24"; label="Ocupado"; cursor="default"; }
+                  if (ocupado)  { bg="#F8D7DA"; color="#721C24"; label="Ocupado"; cursor="default"; title = detalleAdminEnSlot(d.fecha, hora); }
                   if (cita)     {
                     bg="#FCE4EC"; color="#9C2960"; label="👤 Paciente"; cursor="not-allowed";
                     // Las profesionales no ven datos personales de pacientes

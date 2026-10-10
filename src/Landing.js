@@ -92,8 +92,8 @@ export default function Landing({ onLogin }) {
   const [dispBoxes, setDispBoxes]         = useState([]);
   const [dispArriendos, setDispArriendos] = useState([]);
   const [dispCitas, setDispCitas]         = useState([]);
-  // El calendario público se muestra por RECURSO FÍSICO: Médico y Estético
-  // comparten un mismo espacio (Box Mixto); Dental y Pabellón son independientes.
+  // El calendario público se muestra por RECURSO FÍSICO: Médico+Estético
+  // comparten el Box Mixto y Dental+Pabellón comparten el otro recinto.
   const [dispRecursoSel, setDispRecursoSel] = useState("medico_estetico");
   const [dispSemana, setDispSemana]       = useState(0);
 
@@ -113,7 +113,7 @@ export default function Landing({ onLogin }) {
     const grupos = {};
     dispBoxes.forEach(b => {
       const k = recursoDeBox(b);
-      if (!grupos[k]) grupos[k] = { key:k, nombre: k==="dental" ? "🦷 Box Dental" : k==="pabellon" ? "⚕️ Pabellón" : "🏥✨ Box Mixto Médico / Estético", ids:[] };
+      if (!grupos[k]) grupos[k] = { key:k, nombre: k==="dental_pabellon" ? "🦷⚕️ Box Dental / Pabellón" : "🏥✨ Box Mixto Médico / Estético", ids:[] };
       grupos[k].ids.push(b.id);
     });
     return Object.values(grupos);
@@ -190,7 +190,7 @@ export default function Landing({ onLogin }) {
       {/* ── STATS ── */}
       <section style={{ background:C.lila, padding:"28px 40px" }}>
         <div style={{ maxWidth:800, margin:"0 auto", display:"grid", gridTemplateColumns:"repeat(3,1fr)", gap:20, textAlign:"center" }}>
-          {[["3","Espacios equipados"],["100%","Documentación al día"],["Flex","Horarios a tu medida"]].map(([n,t])=>(
+          {[["2","Espacios equipados"],["100%","Documentación al día"],["Flex","Horarios a tu medida"]].map(([n,t])=>(
             <div key={t}>
               <div style={{ fontSize:30, fontWeight:700, color:C.blanco }}>{n}</div>
               <div style={{ fontSize:11, letterSpacing:".15em", textTransform:"uppercase", color:C.lilaPale, marginTop:4 }}>{t}</div>
@@ -232,9 +232,9 @@ export default function Landing({ onLogin }) {
           </div>
           <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fit,minmax(260px,1fr))", gap:24 }}>
             {[
-              { icon:"🦷", color:C.rosa, bg:C.rosaPale, nombre:"Box Dental", desc:"Espacio dental independiente con unidad completa. Su agenda no se cruza con la de los demás espacios. Modalidades Flex (sin asistente) y Pro (con asistente).", items:["Sillón dental completo","Lámpara de fotocurado","Instrumental y bandeja de examen","Rayos X · equipo portátil","Carpule","Esterilización básica","Eliminación de residuos","Opción con asistente (Pro)"] },
+              { icon:"🦷", color:C.rosa, bg:C.rosaPale, nombre:"Box Dental", desc:"Unidad dental completa, en modalidades Flex (sin asistente) y Pro (con asistente). Comparte recinto y calendario con el Pabellón: un horario tomado en uno bloquea al otro.", items:["Sillón dental completo","Lámpara de fotocurado","Instrumental y bandeja de examen","Rayos X · equipo portátil","Carpule","Esterilización básica","Eliminación de residuos","Opción con asistente (Pro)"] },
               { icon:"🏥✨", color:C.lila, bg:C.lilaPale, nombre:"Box Mixto Médico / Estético", desc:"Un único espacio físico de doble función: consultas y procedimientos médicos, o tratamientos estéticos. Se arrienda en modalidad Médico o Estético — el calendario es compartido entre ambas. Médico exige mínimo 2 horas consecutivas.", items:["Camilla y aro de luz profesional","Escritorio y lavamanos","Refrigerador","Alcohol, desinfección y EPP","Sabanilla desechable","Esterilización de instrumental simple","Eliminación de residuos básicos y cortopunzantes"] },
-              { icon:"⚕️", color:C.dorado, bg:C.beige, nombre:"Pabellón", desc:"Pabellón independiente con agenda propia, para procedimientos que requieren un recinto dedicado. Se arrienda en bloques de 1, 2, 4 u 8 horas.", items:["Recinto exclusivo por bloque","Agenda y valores propios","Bloques de 1, 2, 4 u 8 horas","Coordinación de aseo entre bloques"] },
+              { icon:"⚕️", color:C.dorado, bg:C.beige, nombre:"Pabellón", desc:"Modalidad pabellón del mismo recinto del Box Dental, para procedimientos que requieren el espacio completo. Se arrienda en bloques de 1, 2, 4 u 8 horas y comparte calendario con Dental.", items:["Recinto exclusivo por bloque","Agenda y valores propios","Bloques de 1, 2, 4 u 8 horas","Coordinación de aseo entre bloques"] },
             ].map(b=>(
               <div key={b.nombre} style={{ background:C.blanco, borderRadius:16, overflow:"hidden", boxShadow:"0 4px 24px rgba(155,142,196,0.12)" }}>
                 <div style={{ background:`linear-gradient(135deg, ${b.color}, ${b.color}bb)`, padding:"36px 28px", textAlign:"center" }}>
@@ -595,7 +595,7 @@ export default function Landing({ onLogin }) {
               <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fit,minmax(240px,1fr))", gap:12 }}>
                 <div style={{ padding:"14px 18px", background:C.blanco, borderRadius:10, border:`1px solid ${C.beigeOscuro}`, fontSize:12, color:C.cafeClaro, fontFamily:"system-ui", lineHeight:1.9 }}>
                   <strong style={{ display:"block", marginBottom:6, color:C.cafe }}>📋 Condiciones</strong>
-                  Se arrienda exclusivamente en bloques de 1, 2, 4 u 8 horas · Agenda independiente del Box Dental y del Box Mixto
+                  Se arrienda exclusivamente en bloques de 1, 2, 4 u 8 horas · Comparte recinto y calendario con el Box Dental
                 </div>
               </div>
             </div>
@@ -693,9 +693,7 @@ export default function Landing({ onLogin }) {
           <p style={{ textAlign:"center", fontSize:11, color:C.gris, fontFamily:"system-ui", margin:"0 0 16px" }}>
             {dispRecursoSel==="medico_estetico"
               ? "Médico y Estético comparten el mismo espacio físico (Box Mixto): el calendario es único para ambas modalidades · Médico mínimo 2 horas consecutivas"
-              : dispRecursoSel==="pabellon"
-              ? "Agenda independiente · bloques de 1, 2, 4 u 8 horas"
-              : "Calendario propio e independiente del resto de los espacios"}
+              : "Dental y Pabellón comparten el mismo espacio físico: el calendario es único para ambas modalidades · Pabellón en bloques de 1, 2, 4 u 8 horas"}
           </p>
           {(() => {
             const getLunesP = (off=0) => {

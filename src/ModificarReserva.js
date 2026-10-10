@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { conflictosArriendo, conflictosCita, minHorasDeBox, normHora, calcularPrecio } from "./logic/disponibilidad";
+import { conflictosArriendo, conflictosCita, minHorasDeBox, normHora, calcularPrecio, normTipoBox } from "./logic/disponibilidad";
 
 const HORAS = ["08:00","09:00","10:00","11:00","12:00","13:00","14:00","15:00","16:00","17:00","18:00","19:00","20:00"];
 const fmt = n => (n||0).toLocaleString("es-CL",{style:"currency",currency:"CLP",maximumFractionDigits:0});
@@ -33,6 +33,17 @@ export default function ModificarReserva({ arriendos, boxes, profesionales, soli
   const [toast, setToast]             = useState(null);
   const [confirmarCancelar, setConfirmarCancelar] = useState(false);
 
+  // ── Filtros combinables (solo afectan la lista; la edición no cambia) ──
+  const hoy = new Date().toLocaleDateString("en-CA", { timeZone: "America/Santiago" });
+  const [fFecha, setFFecha]   = useState("");      // fecha exacta
+  const [fDesde, setFDesde]   = useState(hoy);     // rango: desde (por defecto, próximas)
+  const [fHasta, setFHasta]   = useState("");      // rango: hasta
+  const [fMes, setFMes]       = useState("");      // mes/año (YYYY-MM)
+  const [fProf, setFProf]     = useState("");      // búsqueda por nombre
+  const [fTipo, setFTipo]     = useState("");      // tipo de box
+  const [fEstado, setFEstado] = useState("activas");
+  const [visLimit, setVisLimit] = useState(15);    // carga progresiva
+
   if (userRol !== "admin") return null;
   if (!arriendos || !boxes || !profesionales) {
     return <div style={{fontSize:13,color:"#888",padding:20}}>Cargando reservas…</div>;
@@ -43,9 +54,32 @@ export default function ModificarReserva({ arriendos, boxes, profesionales, soli
     setTimeout(()=>setToast(null), 3500);
   };
 
-  const proximos = arriendos
-    .filter(a => a && a.fecha && a.estado !== "cancelado")
+  const setF = (setter) => (v) => { setter(v); setVisLimit(15); };
+  const limpiarFiltros = () => {
+    setFFecha(""); setFDesde(""); setFHasta(""); setFMes("");
+    setFProf(""); setFTipo(""); setFEstado("activas"); setVisLimit(15);
+  };
+  const norm = s => (s||"").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g,"");
+  const tipoDeArr = (a) => {
+    const box = boxes.find(b => b.id === a.box_id);
+    return normTipoBox(box?.tipo || box?.nombre || a.box_nombre);
+  };
+  // Filtros combinables sobre las reservas ya cargadas (máx. 200 recientes,
+  // para no traer todo el histórico de una vez); orden cronológico
+  const filtrados = arriendos
+    .filter(a => a && a.fecha)
+    .filter(a => fEstado === "todas" ? true : fEstado === "activas" ? a.estado !== "cancelado" : a.estado === fEstado)
+    .filter(a => !fFecha || a.fecha === fFecha)
+    .filter(a => !fDesde || a.fecha >= fDesde)
+    .filter(a => !fHasta || a.fecha <= fHasta)
+    .filter(a => !fMes   || a.fecha.startsWith(fMes))
+    .filter(a => !fProf  || norm(a.profesional_nombre).includes(norm(fProf)))
+    .filter(a => !fTipo  || tipoDeArr(a) === fTipo)
     .sort((a,b) => (a.fecha||"").localeCompare(b.fecha||"") || (a.hora_inicio||"").localeCompare(b.hora_inicio||""));
+  const proximos = filtrados.slice(0, visLimit);
+  const MESES = ["ENERO","FEBRERO","MARZO","ABRIL","MAYO","JUNIO","JULIO","AGOSTO","SEPTIEMBRE","OCTUBRE","NOVIEMBRE","DICIEMBRE"];
+  const tituloMes = (f) => `${MESES[Number(f.slice(5,7))-1]} ${f.slice(0,4)}`;
+  const conteoMes = filtrados.reduce((m,a)=>{ const k=a.fecha.slice(0,7); m[k]=(m[k]||0)+1; return m; },{});
 
   const seleccionar = (arr) => {
     setSelId(arr.id);
@@ -180,17 +214,80 @@ export default function ModificarReserva({ arriendos, boxes, profesionales, soli
         Solo puedes modificar o cancelar reservas con <strong>más de 48 horas de anticipación</strong>.
       </p>
 
-      {proximos.length === 0 && (
-        <div style={{fontSize:13,color:"#888"}}>Sin reservas registradas.</div>
+      {/* ── Barra de filtros combinables ── */}
+      <div style={{background:"#fff",border:"1px solid #eee",borderRadius:12,padding:14,marginBottom:14}}>
+        <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(150px,1fr))",gap:10}}>
+          <div>
+            <label style={S.label}>Fecha exacta</label>
+            <input type="date" style={S.input} value={fFecha} onChange={e=>setF(setFFecha)(e.target.value)}/>
+          </div>
+          <div>
+            <label style={S.label}>Desde</label>
+            <input type="date" style={S.input} value={fDesde} onChange={e=>setF(setFDesde)(e.target.value)}/>
+          </div>
+          <div>
+            <label style={S.label}>Hasta</label>
+            <input type="date" style={S.input} value={fHasta} onChange={e=>setF(setFHasta)(e.target.value)}/>
+          </div>
+          <div>
+            <label style={S.label}>Mes / año</label>
+            <input type="month" style={S.input} value={fMes} onChange={e=>setF(setFMes)(e.target.value)}/>
+          </div>
+          <div>
+            <label style={S.label}>Profesional</label>
+            <input style={S.input} placeholder="Buscar por nombre…" value={fProf} onChange={e=>setF(setFProf)(e.target.value)}/>
+          </div>
+          <div>
+            <label style={S.label}>Tipo de box</label>
+            <select style={S.input} value={fTipo} onChange={e=>setF(setFTipo)(e.target.value)}>
+              <option value="">Todos</option>
+              <option value="dental">Dental</option>
+              <option value="pabellon">Pabellón</option>
+              <option value="medico">Médico</option>
+              <option value="estetico">Estético</option>
+            </select>
+          </div>
+          <div>
+            <label style={S.label}>Estado</label>
+            <select style={S.input} value={fEstado} onChange={e=>setF(setFEstado)(e.target.value)}>
+              <option value="activas">Activas (pend. + conf.)</option>
+              <option value="pendiente">Pendiente</option>
+              <option value="confirmado">Confirmado</option>
+              <option value="cancelado">Cancelado</option>
+              <option value="todas">Todas</option>
+            </select>
+          </div>
+        </div>
+        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginTop:12,flexWrap:"wrap",gap:8}}>
+          <span style={{fontSize:13,color:"#555"}}>
+            <strong>{filtrados.length}</strong> reserva{filtrados.length===1?"":"s"} encontrada{filtrados.length===1?"":"s"}
+            {filtrados.length>visLimit ? ` · mostrando las primeras ${visLimit}` : ""}
+          </span>
+          <button style={S.btn("secondary",true)} onClick={limpiarFiltros}>✕ Limpiar filtros</button>
+        </div>
+      </div>
+
+      {filtrados.length === 0 && (
+        <div style={{fontSize:13,color:"#888"}}>Sin reservas que coincidan con los filtros.</div>
       )}
 
-      {proximos.map(arr => {
+      {proximos.map((arr, i) => {
         const puede   = puedeModificar(arr.fecha, arr.hora_inicio);
         const hrsRest = horasRestantes(arr.fecha, arr.hora_inicio);
         const esSelec = selId === arr.id;
+        const mesKey   = (arr.fecha||"").slice(0,7);
+        const nuevoMes = i === 0 || (proximos[i-1].fecha||"").slice(0,7) !== mesKey;
 
         return (
-          <div key={arr.id} style={{...S.card,
+          <div key={arr.id}>
+          {nuevoMes && (
+            <div style={{fontSize:12,fontWeight:700,letterSpacing:1,color:"#888",margin:"18px 0 8px",display:"flex",alignItems:"center",gap:8}}>
+              <span>{tituloMes(arr.fecha)}</span>
+              <span style={{background:"#eee",borderRadius:10,padding:"1px 8px",fontWeight:600}}>{conteoMes[mesKey]}</span>
+              <span style={{flex:1,height:1,background:"#eee"}}/>
+            </div>
+          )}
+          <div style={{...S.card,
             border:`1px solid ${esSelec?"#111":puede?"#ddd":"#F5C2C7"}`,
             background: esSelec?"#f0f0f0": puede?"#f8f8f8":"#FFF5F5"}}>
 
@@ -277,8 +374,17 @@ export default function ModificarReserva({ arriendos, boxes, profesionales, soli
               </div>
             )}
           </div>
+          </div>
         );
       })}
+
+      {filtrados.length > visLimit && (
+        <div style={{textAlign:"center",marginTop:12}}>
+          <button style={S.btn("secondary")} onClick={()=>setVisLimit(v=>v+15)}>
+            Mostrar más ({filtrados.length - visLimit} restantes)
+          </button>
+        </div>
+      )}
     </div>
   );
 }

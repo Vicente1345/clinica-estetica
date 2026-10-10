@@ -3,9 +3,8 @@
 // de paridad en src/logic/disponibilidad.test.js compara los dos.
 // (Los archivos api/_* no se exponen como endpoints en Vercel.)
 
-const RECURSO_DENTAL          = "dental";
+const RECURSO_DENTAL_PABELLON = "dental_pabellon";
 const RECURSO_MEDICO_ESTETICO = "medico_estetico";
-const RECURSO_PABELLON        = "pabellon";
 
 const MIN_HORAS = { estetico: 1, dental: 1, medico: 2, pabellon: 1 };
 
@@ -22,16 +21,16 @@ function normTipoBox(box) {
 }
 
 const recursoDeTipo = tipo =>
-  tipo === "dental"   ? RECURSO_DENTAL
-  : tipo === "pabellon" ? RECURSO_PABELLON
-  : RECURSO_MEDICO_ESTETICO;
+  (tipo === "dental" || tipo === "pabellon")
+    ? RECURSO_DENTAL_PABELLON
+    : RECURSO_MEDICO_ESTETICO;
 
 const recursoDeBox = box => recursoDeTipo(normTipoBox(box));
 
 const tiposDelRecurso = recurso =>
-  recurso === RECURSO_DENTAL   ? ["dental"]
-  : recurso === RECURSO_PABELLON ? ["pabellon"]
-  : ["medico", "estetico"];
+  recurso === RECURSO_DENTAL_PABELLON
+    ? ["dental", "pabellon"]
+    : ["medico", "estetico"];
 
 function boxIdsDelRecurso(boxes, box) {
   const recurso = recursoDeBox(box);
@@ -106,7 +105,7 @@ function ganaCarrera(mio, otro) {
 }
 
 module.exports = {
-  RECURSO_DENTAL, RECURSO_MEDICO_ESTETICO, RECURSO_PABELLON, MIN_HORAS,
+  RECURSO_DENTAL_PABELLON, RECURSO_MEDICO_ESTETICO, MIN_HORAS,
   normHora, normTipoBox, recursoDeTipo, recursoDeBox, tiposDelRecurso,
   boxIdsDelRecurso, minHorasDeBox, seSolapan,
   ESTADOS_OCUPAN, ESTADOS_CITA_OCUPAN,
