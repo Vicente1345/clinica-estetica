@@ -28,6 +28,7 @@ const ROLES_OP = {
   plan_verificar:       ['admin', 'recep'],
   jornada_descuento:    ['admin', 'recep', 'prof'],
   comprobante_vincular: ['admin', 'recep', 'prof'],
+  comprobante_url:      ['admin', 'recep', 'prof'],
   verificar_pago:       ['admin', 'recep'],
 };
 
@@ -310,6 +311,27 @@ module.exports = async (req, res) => {
       if (error) throw error;
       return res.status(200).json({ ok: true });
     }
+    // ── URL firmada para VER un comprobante (admin/recep: cualquiera;
+    //    prof: solo los de sus propios registros) ──
+    if (op === 'comprobante_url') {
+      const TABLAS = ['arriendos', 'movimientos', 'planes_profesional'];
+      if (!TABLAS.includes(d.tabla) || !d.id) return res.status(400).json({ ok: false, error: 'Datos inválidos' });
+      const cols = d.tabla === 'movimientos'
+        ? 'id,comprobante_url,profesional_nombre'
+        : 'id,comprobante_url,profesional_id,profesional_nombre';
+      const { data: fila } = await sb.from(d.tabla).select(cols).eq('id', d.id).single();
+      if (!fila || !fila.comprobante_url) return res.status(404).json({ ok: false, error: 'Comprobante no encontrado' });
+      if (usuario.rol === 'prof') {
+        const mio = await miProfesional();
+        const esMia = (mio && fila.profesional_id === mio.id) ||
+          normalizeNombre(fila.profesional_nombre) === normalizeNombre(usuario.nombre);
+        if (!esMia) return res.status(403).json({ ok: false, error: 'Solo puedes ver tus propios comprobantes' });
+      }
+      const { data: firma, error: eFirma } = await sb.storage.from('comprobantes').createSignedUrl(fila.comprobante_url, 3600);
+      if (eFirma || !firma?.signedUrl) throw eFirma || new Error('sin signedUrl');
+      return res.status(200).json({ ok: true, url: firma.signedUrl });
+    }
+
     if (op === 'verificar_pago') {
       const TABLAS = ['arriendos', 'movimientos'];
       if (!TABLAS.includes(d.tabla)) return res.status(400).json({ ok: false, error: 'Tabla inválida' });

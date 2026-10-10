@@ -128,7 +128,7 @@ function DiagSeguridad() {
   const [cargando, setCargando] = useState(false);
   const correr = async () => {
     setCargando(true);
-    const data = await apiGet('/api/diag-seguridad');
+    const data = await apiGet('/api/datos?diag=1');
     setRes(data);
     setCargando(false);
   };

@@ -10,7 +10,47 @@
 // GET ?resumen=1&desde=YYYY-MM-DD&hasta=YYYY-MM-DD (solo admin)
 //   → { ok, arriendos } columnas agregables para el Resumen Ejecutivo
 
+const { createClient } = require('@supabase/supabase-js');
 const { getSbAdmin, requiereRol } = require('./_lib/seguridad');
+
+// ── Diagnóstico de configuración (GET /api/datos?diag=1, solo admin) ──
+// Vive aquí y no en su propio archivo por el límite de 12 funciones
+// serverless del plan Hobby de Vercel. No devuelve secretos, solo estados.
+function rolDeKey(key) {
+  try {
+    const payload = JSON.parse(Buffer.from(key.split('.')[1], 'base64url').toString('utf8'));
+    return payload.role || '(sin claim role)';
+  } catch { return '(no parsea como JWT)'; }
+}
+
+async function diagnostico(res) {
+  const url = (process.env.REACT_APP_SUPABASE_URL || process.env.SUPABASE_URL || '').trim();
+  const service = (process.env.SUPABASE_SERVICE_ROLE_KEY || '').trim();
+  const checks = {
+    supabase_url: !!url,
+    session_secret: !!process.env.SESSION_SECRET,
+    allowed_origins: !!process.env.ALLOWED_ORIGINS,
+    resend_api_key: !!process.env.RESEND_API_KEY,
+    recordatorio_secret: !!process.env.RECORDATORIO_SECRET,
+    service_key_presente: !!service,
+    service_key_rol: service ? (service.startsWith('sb_secret_') ? 'service_role (formato sb_secret)' : rolDeKey(service)) : null,
+    service_key_consulta: null, // debe decir 'ok'
+  };
+  // Prueba REAL con un cliente fresco (sin el caché de getSbAdmin)
+  if (url && service) {
+    try {
+      const sbTest = createClient(url, service, { auth: { persistSession: false } });
+      const { error } = await sbTest.from('usuarios').select('id', { count: 'exact', head: true });
+      checks.service_key_consulta = error ? `error: ${error.message}` : 'ok';
+    } catch (e) {
+      checks.service_key_consulta = `excepción: ${e.message}`;
+    }
+  }
+  const rolOk = checks.service_key_rol === 'service_role' || checks.service_key_rol === 'service_role (formato sb_secret)';
+  const listaParaRLS = checks.supabase_url && checks.session_secret &&
+    checks.service_key_presente && rolOk && checks.service_key_consulta === 'ok';
+  return res.status(200).json({ ok: true, checks, lista_para_rls: listaParaRLS });
+}
 
 // Mismo vínculo usuarios.nombre ↔ profesionales.nombre que usa el frontend
 const normalizeNombre = n => (n || '').toLowerCase().replace(/^(dr\.?|dra\.?)\s+/i, '').trim();
@@ -26,6 +66,12 @@ module.exports = async (req, res) => {
   if (!sb) return res.status(500).json({ ok: false, error: 'Sin conexión a la base de datos' });
 
   try {
+    // ── Modo diagnóstico de seguridad (solo admin) ──
+    if (req.query && req.query.diag) {
+      if (usuario.rol !== 'admin') return res.status(403).json({ ok: false, error: 'Solo administración' });
+      return await diagnostico(res);
+    }
+
     // ── Modo resumen ejecutivo (solo admin) ──
     if (req.query && req.query.resumen) {
       if (usuario.rol !== 'admin') return res.status(403).json({ ok: false, error: 'Solo administración' });

@@ -47,16 +47,9 @@ export async function apiOcupacion(params = '') {
 
 // Abre un comprobante vía URL firmada generada en el servidor
 export async function abrirComprobante(tabla, id) {
-  try {
-    const r = await fetch('/api/comprobante-url', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${tokenSesion()}` },
-      body: JSON.stringify({ tabla, id }),
-    });
-    const data = await r.json();
-    if (data.ok && data.url) { window.open(data.url, '_blank'); return true; }
-    return false;
-  } catch { return false; }
+  const data = await apiGestion('comprobante_url', { tabla, id });
+  if (data.ok && data.url) { window.open(data.url, '_blank'); return true; }
+  return false;
 }
 
 // Subida del comprobante: única operación que permanece con la anon key

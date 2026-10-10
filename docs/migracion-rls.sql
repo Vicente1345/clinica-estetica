@@ -20,8 +20,8 @@
 --     acceso. Los endpoints usan service_role, que bypassa RLS.
 --   · Storage (bucket comprobantes): solo INSERT para anon (subir un
 --     comprobante nuevo); listar/leer/sobrescribir queda cerrado — la
---     visualización pasa por /api/comprobante-url (URL firmada, con
---     verificación de identidad).
+--     visualización pasa por el servidor (/api/gestion op comprobante_url:
+--     URL firmada con verificación de identidad).
 --
 -- Rollback de emergencia: docs/rollback-rls.sql (restaura acceso abierto).
 -- ════════════════════════════════════════════════════════════════════
