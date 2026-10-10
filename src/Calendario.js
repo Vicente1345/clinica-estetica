@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { apiOcupacion, apiGestion, tokenSesion } from "./api";
 import {
   calcularPrecio, boxIdsDelRecurso, tiposDelRecurso, recursoDeBox,
@@ -39,18 +39,28 @@ export default function Calendario({ user, boxes, profesionales, arriendos: arri
   const [profId, setProfId]       = useState("");
   const [guardando, setGuardando] = useState(false);
   const [arriendos, setArriendos] = useState(arriendosProp || []);
-
-  useEffect(() => { if (arriendosProp) setArriendos(arriendosProp); }, [arriendosProp]);
+  const [conDetalle, setConDetalle] = useState(false); // el servidor envió nombres
+  const pedidoRef = useRef(0);
 
 const recargarArriendos = async () => {
-  // /api/ocupacion: el SERVIDOR decide cuánto detalle según el token
-  // (staff recibe nombres para el tooltip; una prof solo slots de ocupación)
-  const data = await apiOcupacion();
-  if (data.ok) setArriendos(data.arriendos || []);
+  // /api/ocupacion para la SEMANA VISIBLE: el SERVIDOR decide cuánto detalle
+  // según el token (admin/recep reciben el nombre; una prof solo slots).
+  const n = ++pedidoRef.current;
+  const desde = getLunes(semana);
+  const hasta = new Date(desde); hasta.setDate(desde.getDate() + 6);
+  const data = await apiOcupacion(`?desde=${formatFecha(desde)}&hasta=${formatFecha(hasta)}`);
+  if (n !== pedidoRef.current) return; // llegó una respuesta más nueva
+  if (data.ok) { setArriendos(data.arriendos || []); setConDetalle(!!data.detalle); }
 };
 
-useEffect(() => { recargarArriendos(); }, []);
-  useEffect(() => { if (boxes?.length && !boxSel) setBoxSel(boxes[0]); }, [boxes]);
+// Se recarga al montar, al cambiar de semana y cada vez que App refresca sus
+// datos (nueva reserva, modificación, cancelación): arriendosProp es la señal
+useEffect(() => { recargarArriendos(); }, [arriendosProp, semana]);
+  // Solo boxes activos en el selector (el Box Dental duplicado quedó inactivo)
+  const boxesActivos = (boxes || []).filter(b => b.activo !== false);
+  useEffect(() => {
+    if (boxesActivos.length && (!boxSel || boxSel.activo === false)) setBoxSel(boxesActivos[0]);
+  }, [boxes]);
   useEffect(() => {
     if (user?.rol === "prof") {
       const userNorm = normalizeNombre(user.nombre);
@@ -116,17 +126,30 @@ const citaPacienteEnSlot = (fecha, hora) => {
 };
   const esPasado = (fecha, hora) => new Date(`${fecha}T${hora}:00`) < new Date();
 
-  // Solo admin: detalle de la reserva que ocupa una celda (quién, modalidad,
-  // horario y estado). Para el resto de los roles no se construye ni muestra.
-  const detalleAdminEnSlot = (fecha, hora) => {
-    if (user?.rol !== "admin") return "";
-    const a = arriendos.find(x =>
+  // Solo admin: quién ocupa cada celda (nombre visible en la grilla) y el
+  // detalle completo en el tooltip (modalidad, horario y estado). Para los
+  // demás roles no se construye: además el servidor no les envía nombres.
+  const esAdmin = user?.rol === "admin";
+  // Todas las reservas que tocan la celda (puede haber 2 si una termina y
+  // otra empieza a la media hora), en orden. Vacío si el servidor no envió
+  // el detalle: así nunca se rotula "(sin profesional)" por error.
+  const ocupantesEnSlot = (fecha, hora) => {
+    if (!esAdmin || !conDetalle) return [];
+    return arriendos.filter(x =>
       idsRecursoSel.includes(x.box_id) && x.fecha === fecha &&
       ESTADOS_OCUPAN.includes(x.estado) &&
       seSolapan(hora, cellEnd(hora), x.hora_inicio, x.hora_fin)
-    );
+    ).sort((a, b) => normHora(a.hora_inicio).localeCompare(normHora(b.hora_inicio)));
+  };
+  // "Dra. Francisca Portoles Díaz" → "Francisca Portoles" (nombre + 1er apellido)
+  const nombreCorto = (n) => {
+    const partes = (n || "").replace(/^(dr\.?|dra\.?)\s+/i, "").trim().split(/\s+/).filter(Boolean);
+    return partes.slice(0, 2).join(" ") || "(sin profesional)";
+  };
+  const detalleAdmin = (a) => {
     if (!a) return "";
-    return `Reservado · ${a.profesional_nombre || "(sin profesional)"} · ${a.box_nombre} · ${normHora(a.hora_inicio)}–${normHora(a.hora_fin)} · ${a.estado}`;
+    const modalidad = boxes?.find(b => b.id === a.box_id)?.nombre || a.box_nombre || "";
+    return `${a.profesional_nombre || "(sin profesional)"} · ${modalidad} · ${normHora(a.hora_inicio)}–${normHora(a.hora_fin)} · ${a.estado}`;
   };
 
   const handleClickSlot = (fecha, hora) => {
@@ -159,7 +182,7 @@ const citaPacienteEnSlot = (fecha, hora) => {
       ESTADOS_OCUPAN.includes(a.estado) &&
       seSolapan(reserva.horaInicio, horaFin, a.hora_inicio, a.hora_fin)
     );
-    if (arr) return `Choca con una reserva ${normHora(arr.hora_inicio)}–${normHora(arr.hora_fin)} (${arr.box_nombre})`;
+    if (arr) return `Choca con una reserva ${normHora(arr.hora_inicio)}–${normHora(arr.hora_fin)} (${boxes?.find(b => b.id === arr.box_id)?.nombre || "espacio compartido"})`;
     const tipos = tiposDelRecurso(recursoDeBox(reserva.box));
     const cita = (solicitudes || []).find(s =>
       tipos.includes(s.box_tipo) &&
@@ -292,7 +315,7 @@ const citaPacienteEnSlot = (fecha, hora) => {
 
       {/* Selector boxes */}
       <div style={{ display:"flex", gap:8, marginBottom:6, flexWrap:"wrap" }}>
-        {boxes?.map(b=>(
+        {boxesActivos.map(b=>(
           <button key={b.id} onClick={()=>setBoxSel(b)}
             style={{ padding:"6px 16px", borderRadius:20, border:`1px solid ${boxSel?.id===b.id?"#111":"#ccc"}`, background:boxSel?.id===b.id?"#111":"#fff", color:boxSel?.id===b.id?"#fff":"#444", cursor:"pointer", fontSize:13, fontWeight:boxSel?.id===b.id?600:400 }}>
             {b.nombre}
@@ -326,7 +349,7 @@ const citaPacienteEnSlot = (fecha, hora) => {
 
       {/* Leyenda */}
       <div style={{ display:"flex", gap:16, fontSize:12, marginBottom:10, flexWrap:"wrap" }}>
-        {[["#D4EDDA","#155724","✓ Disponible"],["#F8D7DA","#721C24","X Ocupado prof."],["#FCE4EC","#9C2960","👤 Cita paciente"],["#e8e8e8","#888","Pasado"],["#CCE5FF","#004085","Tu reserva"]].map(([bg,col,l])=>(
+        {[["#D4EDDA","#155724","✓ Disponible"],["#F8D7DA","#721C24", esAdmin ? "Ocupado (nombre de la profesional)" : "X Ocupado prof."],["#FCE4EC","#9C2960","👤 Cita paciente"],["#e8e8e8","#888","Pasado"],["#CCE5FF","#004085","Tu reserva"]].map(([bg,col,l])=>(
           <span key={l} style={{ display:"flex", alignItems:"center", gap:5 }}>
             <span style={{ display:"inline-block", width:14, height:14, background:bg, border:`1px solid ${col}`, borderRadius:3 }}/>
             <span style={{ color:"#555" }}>{l}</span>
@@ -334,9 +357,15 @@ const citaPacienteEnSlot = (fecha, hora) => {
         ))}
       </div>
 
+      {!boxesActivos.length && (
+        <div style={{ fontSize:13, color:"#A32D2D", background:"#FCEBEB", borderRadius:8, padding:"10px 14px", marginBottom:12 }}>
+          No hay boxes activos. Actívalos en Configuración para ver la disponibilidad.
+        </div>
+      )}
+
       {/* Grilla */}
-      <div style={{ overflowX:"auto" }}>
-        <table style={{ borderCollapse:"collapse", width:"100%", fontSize:12 }}>
+      {boxSel && <div style={{ overflowX:"auto" }}>
+        <table style={{ borderCollapse:"collapse", width:"100%", minWidth:620, fontSize:12, tableLayout:"fixed" }}>
           <thead>
             <tr>
               <th style={{ padding:"6px 8px", textAlign:"left", color:"#888", fontWeight:400, width:50 }}>Hora</th>
@@ -359,20 +388,29 @@ const citaPacienteEnSlot = (fecha, hora) => {
                   const selec      = reserva?.fecha===d.fecha && reserva?.horaInicio===hora;
                   let bg="#D4EDDA", color="#155724", label="Disponible", cursor="pointer", title="";
                   if (pasado)   { bg="#f0f0f0"; color="#aaa"; label="–"; cursor="default"; }
-                  if (ocupado)  { bg="#F8D7DA"; color="#721C24"; label="Ocupado"; cursor="default"; title = detalleAdminEnSlot(d.fecha, hora); }
+                  if (ocupado)  {
+                    bg="#F8D7DA"; color="#721C24"; label="Ocupado"; cursor="default";
+                    const ocupantes = ocupantesEnSlot(d.fecha, hora);
+                    if (ocupantes.length) {
+                      label = nombreCorto(ocupantes[0].profesional_nombre) + (ocupantes.length > 1 ? ` +${ocupantes.length - 1}` : "");
+                      title = ocupantes.map(detalleAdmin).join("\n");
+                    }
+                  }
                   if (cita)     {
                     bg="#FCE4EC"; color="#9C2960"; label="👤 Paciente"; cursor="not-allowed";
                     // Las profesionales no ven datos personales de pacientes
                     title = user?.rol === "prof"
                       ? `Cita de paciente (${(cita.hora_inicio||"").slice(0,5)}–${(cita.hora_fin||"").slice(0,5)})`
                       : `Cita: ${cita.nombre}${cita.tratamiento?` · ${cita.tratamiento}`:""} (${(cita.hora_inicio||"").slice(0,5)}–${(cita.hora_fin||"").slice(0,5)}) · ${cita.estado}`;
+                    const conArriendo = ocupantesEnSlot(d.fecha, hora);
+                    if (conArriendo.length) title += "\n+ Arriendo: " + conArriendo.map(detalleAdmin).join("\n+ Arriendo: ");
                   }
                   if (miReserva){ bg="#CCE5FF"; color="#004085"; label="Mi reserva"; cursor="default"; title=""; }
                   if (selec)    { bg="#FFF3CD"; color="#856404"; label="Selec."; }
                   return (
                     <td key={d.fecha} onClick={()=>handleClickSlot(d.fecha,hora)} title={title}
                       style={{ padding:"3px 4px", textAlign:"center", cursor, userSelect:"none" }}>
-                      <div style={{ background:bg, color, borderRadius:4, padding:"4px 2px", fontSize:11, fontWeight:500 }}>{label}</div>
+                      <div style={{ background:bg, color, borderRadius:4, padding:"4px 4px", fontSize:11, fontWeight:500, whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis" }}>{label}</div>
                     </td>
                   );
                 })}
@@ -380,7 +418,7 @@ const citaPacienteEnSlot = (fecha, hora) => {
             ))}
           </tbody>
         </table>
-      </div>
+      </div>}
 
       {/* Modal reserva */}
       {reserva && (

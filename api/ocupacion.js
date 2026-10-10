@@ -44,6 +44,14 @@ module.exports = async (req, res) => {
 
   // Detalle extra SOLO para admin/recep con token válido (verificado aquí)
   const usuario = usuarioDesdeReq(req);
+  // Si llega un token NO vacío que no verifica (vencido o adulterado), 401:
+  // así la app logueada vuelve al login en vez de recibir en silencio la
+  // versión pública y mostrar celdas sin nombre. Sin token (portada, widget)
+  // la respuesta pública sigue igual.
+  const bearer = String(req.headers['authorization'] || '');
+  if (bearer.startsWith('Bearer ') && bearer.slice(7).trim() && !usuario) {
+    return res.status(401).json({ ok: false, error: 'Sesión inválida o expirada. Vuelve a iniciar sesión.' });
+  }
   const esStaff = !!usuario && (usuario.rol === 'admin' || usuario.rol === 'recep');
   const colsArr = esStaff
     ? 'id,box_id,box_nombre,fecha,hora_inicio,hora_fin,horas,estado,profesional_nombre'
@@ -55,7 +63,7 @@ module.exports = async (req, res) => {
       sb.from('arriendos').select(colsArr)
         .in('estado', ESTADOS_OCUPAN)
         .gte('fecha', desde).lte('fecha', hasta)
-        .order('fecha'),
+        .order('fecha').order('hora_inicio'),
       sb.from('solicitudes_paciente')
         .select('box_tipo,fecha_solicitada,hora_inicio,hora_fin,estado')
         .in('estado', ESTADOS_CITA_OCUPAN)
@@ -66,6 +74,7 @@ module.exports = async (req, res) => {
 
     return res.status(200).json({
       ok: true,
+      detalle: esStaff, // true = los arriendos traen profesional_nombre
       boxes: bx.data || [],
       arriendos: arr.data || [],
       citas: cit.data || [],

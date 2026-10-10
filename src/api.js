@@ -41,6 +41,7 @@ export async function apiGestion(op, datos) {
 export async function apiOcupacion(params = '') {
   try {
     const r = await fetch('/api/ocupacion' + params, { headers: { Authorization: `Bearer ${tokenSesion()}` } });
+    if (siSesionExpirada(r)) return { ok: false, error: 'Sesión expirada' };
     return await r.json();
   } catch { return { ok: false, error: 'Error de conexión' }; }
 }
