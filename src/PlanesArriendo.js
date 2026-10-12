@@ -484,7 +484,7 @@ export const PLANES = {
 };
 
 // ─── COMPONENTE SELECTOR DE PLAN ──────────────────────────────────
-export function SelectorPlan({ tipoBox, onSeleccionar, boxes = [], arriendos = [], solicitudes = [] }) {
+export function SelectorPlan({ tipoBox, onSeleccionar, boxes = [], arriendos = [], solicitudes = [], ocultarPrecios = false }) {
   const [planSel,     setPlanSel]     = useState(null);
   const [diasSel,     setDiasSel]     = useState([]);
   const [horario,     setHorario]     = useState({ inicio: "09:00", fin: "14:00" });
@@ -503,6 +503,11 @@ export function SelectorPlan({ tipoBox, onSeleccionar, boxes = [], arriendos = [
     ? estructura.secciones.find(s => s.opciones.some(o => o.id === planSel))
     : null;
   const esPlan = opcionActual?.meses != null;
+  // Texto "N jornada(s) semanal(es)" de una opción de plan
+  const jornadasTxt = op => `${op.jornadas} jornada${op.jornadas === 1 ? "" : "s"} semanal${op.jornadas === 1 ? "" : "es"}`;
+  // ¿Esta sección/opción es un plan (con jornadas semanales)?
+  const esOpcionPlan = op => op && op.meses != null;
+  const ocultar = op => ocultarPrecios && esOpcionPlan(op);
 
   const toggleDia = d => setDiasSel(ds => ds.includes(d) ? ds.filter(x => x !== d) : [...ds, d]);
 
@@ -660,7 +665,7 @@ export function SelectorPlan({ tipoBox, onSeleccionar, boxes = [], arriendos = [
               <span style={{ fontSize: 14, marginRight: 8 }}>{sec.icono}</span>
               <span style={{ fontSize: 13, fontWeight: 600, color: "#111" }}>{sec.titulo}</span>
               {sec.descripcion && <div style={{ fontSize: 11, color: "#888", marginTop: 2, marginLeft: 22 }}>{sec.descripcion}</div>}
-              {sec.ref && <div style={{ fontSize: 10, color: "#888", marginTop: 2, marginLeft: 22, background: "#f0f0ec", display: "inline-block", padding: "1px 8px", borderRadius: 5 }}>ref: {sec.ref}</div>}
+              {sec.ref && !(ocultarPrecios && sec.tipo === "plan") && <div style={{ fontSize: 10, color: "#888", marginTop: 2, marginLeft: 22, background: "#f0f0ec", display: "inline-block", padding: "1px 8px", borderRadius: 5 }}>ref: {sec.ref}</div>}
             </div>
             <span style={{ fontSize: 12, color: "#888" }}>{seccionOpen === sec.id ? "▲" : "▼"}</span>
           </div>
@@ -676,17 +681,17 @@ export function SelectorPlan({ tipoBox, onSeleccionar, boxes = [], arriendos = [
                     onClick={() => { setPlanSel(op.id); setDiasSel([]); setCantHoras(op.horasOpciones ? op.horasOpciones[0] : null); }}
                     style={{ flex: "1 1 130px", maxWidth: 180, border: `2px solid ${sel ? estructura.borde : "#ddd"}`, borderRadius: 10, padding: "12px 10px", cursor: "pointer", background: sel ? estructura.color : "#fff", position: "relative", transition: "all .15s" }}
                   >
-                    {op.tag && (
+                    {op.tag && !ocultar(op) && (
                       <div style={{ position: "absolute", top: -9, right: 6, background: op.tagColor || "#1D9E75", color: "#fff", fontSize: 9, fontWeight: 700, padding: "2px 8px", borderRadius: 6 }}>
                         {op.tag}
                       </div>
                     )}
                     <div style={{ fontSize: 12, fontWeight: 600, color: sel ? estructura.texto : "#333", marginBottom: 4 }}>{op.label}</div>
-                    <div style={{ fontSize: 16, fontWeight: 700, color: sel ? estructura.borde : "#111", marginBottom: 4 }}>{fmt(op.precio)}</div>
+                    <div style={{ fontSize: ocultar(op) ? 13 : 16, fontWeight: 700, color: sel ? estructura.borde : "#111", marginBottom: 4 }}>{ocultar(op) ? jornadasTxt(op) : fmt(op.precio)}</div>
                     <div style={{ fontSize: 10, color: "#888", lineHeight: 1.5 }}>{op.detalle}</div>
-                    {op.meses && op.meses > 1 && <div style={{ fontSize: 10, color: "#888", marginTop: 3 }}>por mes · {op.meses} meses</div>}
+                    {op.meses && op.meses > 1 && <div style={{ fontSize: 10, color: "#888", marginTop: 3 }}>{ocultar(op) ? `vigencia ${op.meses} meses` : `por mes · ${op.meses} meses`}</div>}
                     {op.asistente && <div style={{ fontSize: 10, color: "#1D9E75", fontWeight: 600, marginTop: 4 }}>✓ incluye asistente</div>}
-                    {op.ref && <div style={{ fontSize: 9, color: "#aaa", marginTop: 4, borderTop: "1px solid #f0f0ec", paddingTop: 4 }}>{op.ref}</div>}
+                    {op.ref && !ocultar(op) && <div style={{ fontSize: 9, color: "#aaa", marginTop: 4, borderTop: "1px solid #f0f0ec", paddingTop: 4 }}>{op.ref}</div>}
                   </div>
                 );
               })}
@@ -700,7 +705,7 @@ export function SelectorPlan({ tipoBox, onSeleccionar, boxes = [], arriendos = [
         <div style={{ marginTop: 8, padding: 16, background: "#f8f8f6", borderRadius: 10, border: "1px solid #e8e8e4" }}>
           <div style={{ fontWeight: 700, fontSize: 13, marginBottom: 12 }}>
             {esPlan
-              ? `Configurar plan — ${fmt(opcionActual.precio)}/mes`
+              ? `Configurar plan — ${ocultar(opcionActual) ? jornadasTxt(opcionActual) : `${fmt(opcionActual.precio)}/mes`}`
               : `Confirmar sesión — ${opcionActual.horasOpciones && !opcionActual.precios ? `${fmt(opcionActual.precio)}/hora` : opcionActual.horasOpciones ? `desde ${fmt(opcionActual.precios[opcionActual.horasOpciones[0]])}` : fmt(opcionActual.precio)}`}
           </div>
 
@@ -862,7 +867,7 @@ export function SelectorPlan({ tipoBox, onSeleccionar, boxes = [], arriendos = [
                 <div style={{ background: estructura.color, border: `1px solid ${estructura.borde}`, borderRadius: 8, padding: "9px 12px", fontSize: 12, color: estructura.texto, marginBottom: 12 }}>
                   📅 Vigencia: {fechaInicio} →{" "}
                   {(() => { const d = new Date(fechaInicio); d.setMonth(d.getMonth() + opcionActual.meses); return d.toISOString().split("T")[0]; })()}
-                  {opcionActual.meses > 1 && <span style={{ marginLeft: 8, fontWeight: 600 }}>· Cobro mensual: {fmt(opcionActual.precio)}</span>}
+                  {opcionActual.meses > 1 && !ocultar(opcionActual) && <span style={{ marginLeft: 8, fontWeight: 600 }}>· Cobro mensual: {fmt(opcionActual.precio)}</span>}
                 </div>
               )}
             </>
@@ -882,7 +887,7 @@ export function SelectorPlan({ tipoBox, onSeleccionar, boxes = [], arriendos = [
                 : `${horario.inicio} – ${finEfectivo}`}</strong>{!esPlan && horasHorario > 0 && !modoSueltas ? ` (${horasHorario} hr)` : modoSueltas && horasSel.length ? ` (${horasSel.length} tramo${horasSel.length > 1 ? "s" : ""} de 1 hr)` : ""}</div>
               <div style={{ marginTop: 6, fontSize: 15, fontWeight: 700, color: estructura.borde }}>
                 {esPlan
-                  ? `Cobro mensual: ${fmt(opcionActual.precio)}`
+                  ? (ocultar(opcionActual) ? `Plan de ${jornadasTxt(opcionActual)}` : `Cobro mensual: ${fmt(opcionActual.precio)}`)
                   : `Total a pagar: ${errorHorario ? "—" : fmt(montoSuelto)}${opcionActual.horasOpciones && !opcionActual.precios && !errorHorario ? ` (${horasSuelta} hr × ${fmt(opcionActual.precio)})` : ""}`}
               </div>
             </div>

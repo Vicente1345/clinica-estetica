@@ -39,6 +39,16 @@ alter table pagos_plan           enable row level security;
 alter table insumos              enable row level security;
 alter table movimientos          enable row level security;
 alter table webpay_transacciones enable row level security;
+-- Tablas de Planes Especiales (si ya se ejecutó migracion-planes-especiales.sql)
+do $$
+begin
+  if to_regclass('public.planes_especiales') is not null then
+    execute 'alter table planes_especiales enable row level security';
+  end if;
+  if to_regclass('public.planes_especiales_historial') is not null then
+    execute 'alter table planes_especiales_historial enable row level security';
+  end if;
+end $$;
 
 -- 2. Fuera TODAS las policies de esas tablas (las actuales son ALL/true)
 do $$
@@ -49,7 +59,8 @@ begin
     where schemaname = 'public'
       and tablename in ('usuarios','profesionales','boxes','arriendos',
                         'solicitudes_paciente','planes_profesional','pagos_plan',
-                        'insumos','movimientos','webpay_transacciones')
+                        'insumos','movimientos','webpay_transacciones',
+                        'planes_especiales','planes_especiales_historial')
   loop
     execute format('drop policy %I on public.%I', r.policyname, r.tablename);
     raise notice 'eliminada policy % de %', r.policyname, r.tablename;

@@ -52,6 +52,13 @@ module.exports = async (req, res) => {
     .eq('id', id).select().single();
   if (eUpd) return res.status(500).json({ ok: false, error: 'No se pudo cancelar: ' + eUpd.message });
 
+  // Si la jornada pertenece a un plan especial, su total se mantiene al día
+  if (data && data.plan_profesional_id) {
+    const { count } = await sb.from('arriendos').select('id', { count: 'exact', head: true })
+      .eq('plan_profesional_id', data.plan_profesional_id).in('estado', ['pendiente', 'confirmado']);
+    await sb.from('planes_profesional').update({ jornadas_totales: count || 0 }).eq('id', data.plan_profesional_id);
+  }
+
   console.log(`[cancelar-arriendo] ${id} por ${auth.usuario.nombre}: ${motivo}`);
   return res.status(200).json({ ok: true, arriendo: data });
 };

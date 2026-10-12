@@ -34,14 +34,14 @@ const CAN = {
   insumos:     r => r==='admin' || r==='recep',
   retiro:      r => true,
   arriendos:   r => r==='admin' || r==='recep' || r==='prof',
-  solicitudes: r => r==='admin' || r==='recep',
+  solicitudes: r => r==='admin',   // recepción ya no gestiona solicitudes de pacientes
   reportes:    r => r==='admin',
 };
 
 const TABS_DEF = [
   { key:'modificar', label:'Modificar reservas', perm: r => r==='admin' },
   { key:'dashboard',   label:'Dashboard' },
-  { key:'solicitudes', label:'Solicitudes pacientes', perm: r => r==='admin'||r==='recep' },
+  { key:'solicitudes', label:'Solicitudes pacientes', perm: r => r==='admin' },
   { key:'insumos',     label:'Inventario',     perm: r => r==='admin'||r==='recep' },
   { key:'retiro',      label:'Retirar insumo' },
   { key:'arriendos',   label:'Arriendos',      perm: r => r==='admin'||r==='recep'||r==='prof' },
@@ -49,7 +49,7 @@ const TABS_DEF = [
   { key:'planes', label:'Planes' },
   { key:'agenda',      label:'Agenda' },
   { key:'movimientos', label:'Movimientos' },
-  { key:'verificacion', label:'Verificar pagos', perm: r => r==='admin'||r==='recep' },
+  { key:'verificacion', label:'Verificar pagos', perm: r => r==='admin' },   // solo admin verifica pagos
   { key:'config',      label:'Configuración',  perm: r => r==='admin' },
 ];
 
@@ -810,14 +810,17 @@ export default function App() {
                   <div style={{fontSize:22,fontWeight:700,color:'#533AB7'}}>{movsVisibles.filter(m=>m.tipo==='retiro').length}</div>
                 </div>
               </div>
-              <h3 style={{fontSize:13,fontWeight:600,marginBottom:10}}>Mis últimos arriendos</h3>
-              {arriendosVisibles.slice(0,5).map(a=>(
+              <h3 style={{fontSize:13,fontWeight:600,marginBottom:10}}>Mis próximos arriendos</h3>
+              {arriendosVisibles
+                .filter(a => a.estado !== 'cancelado' && (a.fecha||'') >= new Date().toLocaleDateString('en-CA',{timeZone:'America/Santiago'}))
+                .sort((a,b) => (a.fecha||'').localeCompare(b.fecha||'') || (a.hora_inicio||'').localeCompare(b.hora_inicio||''))
+                .slice(0,5).map(a=>(
                 <div key={a.id} style={{background:'#fff',borderRadius:10,padding:'10px 14px',marginBottom:8,border:'1px solid #eee',borderLeft:'3px solid #1D9E75'}}>
                   <div style={{fontWeight:600,fontSize:13}}>{a.box_nombre}</div>
                   <div style={{fontSize:12,color:'#666'}}>{a.fecha} · {a.hora_inicio}–{a.hora_fin}</div>
                   <div style={{fontSize:11,marginTop:3}}>
-                    <span style={{background:a.verificado==='aprobado'?'#EAF3DE':'#FAEEDA',color:a.verificado==='aprobado'?'#3B6D11':'#854F0B',padding:'1px 8px',borderRadius:6,fontWeight:600}}>
-                      {a.verificado==='aprobado'?'✓ Confirmado':'⏳ Pendiente'}
+                    <span style={{background:a.estado==='confirmado'?'#EAF3DE':'#FAEEDA',color:a.estado==='confirmado'?'#3B6D11':'#854F0B',padding:'1px 8px',borderRadius:6,fontWeight:600}}>
+                      {a.estado==='confirmado'?'✓ Confirmado':'⏳ Pendiente'}
                     </span>
                   </div>
                 </div>
@@ -828,7 +831,7 @@ export default function App() {
             // ── DASHBOARD ADMIN / RECEP ──
             <div>
               <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(150px,1fr))',gap:10,marginBottom:18}}>
-                {[['💰','Ingresos mes',fmt(totalInv),'#185FA5'],['🏠','Arriendos',fmt(recArr),'#1D9E75'],['💊','Insumos cobrados',fmt(recIns),'#533AB7'],['📅','Planes activos',planes?.length||0,'#854F0B'],['🔔','Por verificar',pendVerif,pendVerif>0?'#A32D2D':'#0F6E56'],['📦','Alertas stock',alertas.length,alertas.length>0?'#A32D2D':'#0F6E56']].map(([icon,t,v,c])=>(
+                {[['💰','Ingresos mes',fmt(totalInv),'#185FA5'],['🏠','Arriendos',fmt(recArr),'#1D9E75'],['💊','Insumos cobrados',fmt(recIns),'#533AB7'],['📅','Planes activos',planes?.length||0,'#854F0B'],...(user.rol==='admin'?[['🔔','Por verificar',pendVerif,pendVerif>0?'#A32D2D':'#0F6E56']]:[]),['📦','Alertas stock',alertas.length,alertas.length>0?'#A32D2D':'#0F6E56']].map(([icon,t,v,c])=>(
                   <div key={t} style={{background:'#fff',borderRadius:12,padding:'14px 16px',border:'1px solid #eee',textAlign:'center'}}>
                     <div style={{fontSize:18}}>{icon}</div>
                     <div style={{fontSize:10,color:'#888',margin:'4px 0'}}>{t}</div>
@@ -1031,7 +1034,9 @@ export default function App() {
                   ? `Horas: ${arrForm.tramos.map(t=>`${t.inicio}–${t.fin}`).join(' · ')} (${arrForm.tramos.length} hr no consecutivas)`
                   : `${arrForm.horaInicio} → ${arrForm.horaFin} (${horasArr} hr)`}</div>
                 <div>Profesional: <strong>{profesionales.find(p=>p.id===arrForm.profId)?.nombre}</strong></div>
-                <div style={{marginTop:6,fontSize:16}}>Total: <strong>{arrForm.esPlan ? `${fmt(arrForm.monto)}/mes` : fmt(montoCobro)}</strong></div>
+                <div style={{marginTop:6,fontSize:16}}>{arrForm.esPlan && user.rol==='recep'
+                  ? <>Plan: <strong>{(arrForm.diasJornada||[]).length} jornada{(arrForm.diasJornada||[]).length===1?'':'s'} semanal{(arrForm.diasJornada||[]).length===1?'':'es'}</strong></>
+                  : <>Total: <strong>{arrForm.esPlan ? `${fmt(arrForm.monto)}/mes` : fmt(montoCobro)}</strong></>}</div>
                 <div style={{fontSize:12,color:'#185FA5',marginTop:4}}>⚠ El horario se agenda solo al confirmar el pago</div>
               </div>
               {/* Selector método de pago */}
@@ -1114,6 +1119,7 @@ export default function App() {
               {/* Selector de plan — aparece al elegir el tipo de box */}
               {arrForm.tipoBox && (
                 <SelectorPlan
+                  ocultarPrecios={user.rol==='recep'}
                   tipoBox={arrForm.tipoBox}
                   boxes={boxes}
                   arriendos={arriendos}
@@ -1143,8 +1149,16 @@ export default function App() {
           )}
           {user.rol==='admin' && <div style={{marginTop:24}}><ResumenEjecutivo boxes={boxes}/></div>}
           <h3 style={{fontSize:14,fontWeight:500,margin:'24px 0 10px'}}>Arriendos registrados</h3>
-          {arriendosVisibles.length===0&&<div style={{fontSize:13,color:'#888'}}>Sin arriendos aún</div>}
-          {arriendosVisibles.map(a=>(
+          {(() => {
+            const nPlan = arriendosVisibles.filter(a => a.plan_profesional_id && a.estado !== 'cancelado').length;
+            return nPlan > 0 && (
+              <div style={{fontSize:12,color:'#555',background:'#F3F0FF',border:'1px solid #DDD6FE',borderRadius:8,padding:'8px 12px',marginBottom:10}}>
+                📅 <strong>{nPlan}</strong> jornada{nPlan===1?'':'s'} de planes especiales no se listan aquí: aparecen en la <strong>Agenda</strong> y en <strong>Disponibilidad</strong>.
+              </div>
+            );
+          })()}
+          {arriendosVisibles.filter(a=>!a.plan_profesional_id).length===0&&<div style={{fontSize:13,color:'#888'}}>Sin arriendos aún</div>}
+          {arriendosVisibles.filter(a=>!a.plan_profesional_id).map(a=>(
             <div key={a.id} style={S.card('#1D9E75')}>
               <div style={{display:'flex',justifyContent:'space-between',flexWrap:'wrap',gap:6}}>
                 <strong style={{fontSize:15}}>{a.box_nombre}</strong>
@@ -1155,7 +1169,7 @@ export default function App() {
               </div>
               <div style={{fontSize:13,marginTop:6}}>{a.profesional_nombre} · {a.fecha} · {a.hora_inicio}–{a.hora_fin} ({a.horas}h) · {fmt(a.monto)} · {a.metodo}</div>
               {/* Comprobante: se puede adjuntar mientras no este aprobado */}
-              {a.estado!=='cancelado' && a.metodo!=='Webpay' && (a.verificado==='sin_pago' || a.verificado==='rechazado') && (
+              {a.estado!=='cancelado' && a.metodo!=='Webpay' && (a.verificado==='sin_pago' || (a.verificado==='rechazado' && user.rol!=='recep')) && (
                 comprobanteAbierto===a.id ? (
                   <div style={{marginTop:10}}>
                     <SubirComprobante
@@ -1171,7 +1185,7 @@ export default function App() {
                   </button>
                 )
               )}
-              {a.comprobante_url && (
+              {a.comprobante_url && user.rol!=='recep' && (
                 <div style={{marginTop:8}}><VerComprobante tabla="arriendos" id={a.id} nombre={a.comprobante_nombre}/></div>
               )}
             </div>
@@ -1314,7 +1328,7 @@ export default function App() {
       )}
 
       {/* ── SOLICITUDES DE PACIENTES ── */}
-      {tab==='solicitudes' && (
+      {tab==='solicitudes' && user.rol==='admin' && (
         <div>
           <h3 style={{fontSize:15,fontWeight:500,margin:'0 0 6px'}}>Solicitudes de pacientes</h3>
           <p style={{margin:'0 0 16px',color:'#666',fontSize:13}}>Pacientes que pidieron hora desde el chatbot. Contáctalos por WhatsApp para confirmar.</p>
@@ -1447,7 +1461,7 @@ export default function App() {
       )}
 
       {/* ── VERIFICACIÓN DE PAGOS ── */}
-      {tab==='verificacion' && (
+      {tab==='verificacion' && user.rol==='admin' && (
         <div>
           <h3 style={{fontSize:15,fontWeight:500,margin:'0 0 6px'}}>Verificación de comprobantes</h3>
           <p style={{margin:'0 0 20px',fontSize:13,color:'#666'}}>Revisa y aprueba los pagos enviados por las profesionales.</p>

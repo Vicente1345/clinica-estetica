@@ -1,5 +1,24 @@
 import { useState, useEffect, useRef } from "react";
 import { apiGet, apiGestion, abrirComprobante, subirArchivoComprobante } from "./api";
+import PlanesEspeciales from "./PlanesEspeciales";
+
+const NOMBRE_DIA = { 1:"Lun", 2:"Mar", 3:"Mié", 4:"Jue", 5:"Vie", 6:"Sáb", 7:"Dom" };
+const describirHorario = h => (h || []).map(x => `${NOMBRE_DIA[x.dia]} ${x.hora_inicio}–${x.hora_fin}`).join(" · ");
+const BOX_TXT = t => t === "estetico" ? "✨ Box Estético" : t === "medico" ? "🏥 Box Médico" : t === "pabellon" ? "⚕️ Pabellón" : "🦷 Box Dental";
+const plural = (n, s1, sN) => `${n} ${n === 1 ? s1 : sN}`;
+
+// ¿A cuántas jornadas SEMANALES equivale un plan contratado?
+// (especial: días del horario; planes con días fijos: esos días; resto: el
+// número del id del catálogo, ej. "den_2j_sin_12m" → 2; "exclusivo" → 5)
+function jornadasSemanales(plan) {
+  if (plan.es_especial && Array.isArray(plan.horario)) return plan.horario.length;
+  if (Array.isArray(plan.dias_semana) && plan.dias_semana.length) return plan.dias_semana.length;
+  const m = String(plan.plan_id || "").match(/_(\d)j/);
+  if (m) return Number(m[1]);
+  if (/exc/i.test(String(plan.plan_id || ""))) return 5;
+  return plan.jornadas_totales ? Math.max(1, Math.round(plan.jornadas_totales / 4)) : null;
+}
+const jornadasTxt = n => n ? plural(n, "jornada semanal", "jornadas semanales") : "jornadas por definir";
 
 const fmt = n => (n||0).toLocaleString("es-CL",{style:"currency",currency:"CLP",maximumFractionDigits:0});
 
@@ -79,6 +98,7 @@ function SubirComprobantePlan({ planId, onSubido }) {
 
 // ── Panel de un plan activo ────────────────────────────────────
 function PlanActivo({ plan, onReservar, onActualizar }) {
+  if (plan.es_especial) return <PlanEspecialActivo plan={plan} onActualizar={onActualizar}/>;
   const pct = Math.round((plan.jornadas_stock / plan.jornadas_totales) * 100);
   const colorBarra = pct > 50 ? "#1D9E75" : pct > 20 ? "#EF9F27" : "#E24B4A";
 
@@ -144,6 +164,46 @@ function PlanActivo({ plan, onReservar, onActualizar }) {
   );
 }
 
+// ── Plan especial asignado (vista de la profesional beneficiaria) ──
+// Sus jornadas ya están reservadas: no hay "reservar jornada" ni stock.
+function PlanEspecialActivo({ plan, onActualizar }) {
+  const finalizado = !!plan.finalizado_at;
+  return (
+    <div style={{...S.card, borderLeft:"4px solid #6D28D9"}}>
+      <div style={{padding:"14px 16px"}}>
+        <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",flexWrap:"wrap",gap:8}}>
+          <div>
+            <div style={{fontWeight:600,fontSize:15}}>⭐ {plan.plan_label}</div>
+            <div style={{fontSize:12,color:"#888",marginTop:2}}>{BOX_TXT(plan.box_tipo)} · {jornadasTxt(jornadasSemanales(plan))}</div>
+          </div>
+          <span style={{fontSize:11,padding:"3px 10px",borderRadius:10,fontWeight:600,
+            background:finalizado?"#f0f0f0":plan.verificado==="aprobado"?"#EAF3DE":plan.verificado==="pendiente"?"#FAEEDA":"#f0f0f0",
+            color:finalizado?"#666":plan.verificado==="aprobado"?"#3B6D11":plan.verificado==="pendiente"?"#854F0B":"#666"}}>
+            {finalizado?"Finalizado":plan.verificado==="aprobado"?"✓ Pago aprobado":plan.verificado==="pendiente"?"⏳ Pendiente verificación":"Sin pago"}
+          </span>
+        </div>
+        <div style={{fontSize:13,color:"#444",marginTop:10,lineHeight:1.8}}>
+          🗓 <strong>{describirHorario(plan.horario)}</strong><br/>
+          Vigencia: {plan.fecha_inicio} → {plan.fecha_vencimiento} · {plan.jornadas_totales} jornadas reservadas
+        </div>
+        {!finalizado && (
+          <div style={{marginTop:8,fontSize:12,color:"#6D28D9",background:"#F3F0FF",borderRadius:8,padding:"8px 12px"}}>
+            Tus jornadas ya están reservadas: las ves en la <strong>Agenda</strong> y en <strong>Disponibilidad</strong>.
+          </div>
+        )}
+        {!finalizado && (plan.verificado === "sin_pago" || plan.verificado === "rechazado") && (
+          <SubirComprobantePlan planId={plan.id} onSubido={onActualizar}/>
+        )}
+        {!finalizado && plan.verificado === "pendiente" && (
+          <div style={{marginTop:10,background:"#FAEEDA",borderRadius:8,padding:"10px 12px",fontSize:12,color:"#854F0B"}}>
+            ⏳ Comprobante enviado — esperando aprobación de la administración.
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 // ── COMPONENTE PRINCIPAL ──────────────────────────────────────
 export default function TabPlanes({ user, profesionales, boxes, onReservar }) {
   const [planes, setPlanes]         = useState([]);
@@ -153,6 +213,7 @@ export default function TabPlanes({ user, profesionales, boxes, onReservar }) {
   const [fechaInicio, setFechaInicio] = useState(new Date().toISOString().split("T")[0]);
   const [creando, setCreando]       = useState(false);
   const [nuevoPlanId, setNuevoPlanId] = useState(null); // para subir comprobante
+  const [planesEspeciales, setPlanesEspeciales] = useState(null); // solo admin
 
   const profId = user?.rol === "prof"
     ? profesionales?.find(p => p.nombre === user.nombre)?.id
@@ -163,6 +224,7 @@ export default function TabPlanes({ user, profesionales, boxes, onReservar }) {
     // /api/datos ya devuelve los planes filtrados por rol (prof: solo los suyos)
     const datos = await apiGet("/api/datos");
     setPlanes(datos.ok ? (datos.planes || []) : []);
+    setPlanesEspeciales(datos.ok && Array.isArray(datos.planesEspeciales) ? datos.planesEspeciales : null);
     setLoading(false);
   };
 
@@ -193,8 +255,11 @@ export default function TabPlanes({ user, profesionales, boxes, onReservar }) {
     cargar();
   };
 
-  const misPlanes  = planes.filter(p => p.profesional_id === profId);
-  const todosPlanes = planes; // para admin
+  // El servidor ya entrega a la profesional SOLO sus planes (por su token)
+  const misPlanes  = user?.rol === "prof" ? planes : planes.filter(p => p.profesional_id === profId);
+  const todosPlanes = planes; // admin y recepción
+  const esAdmin = user?.rol === "admin";
+  const esRecep = user?.rol === "recep";
 
   return (
     <div>
@@ -216,7 +281,39 @@ export default function TabPlanes({ user, profesionales, boxes, onReservar }) {
         </div>
       )}
 
-      {/* ── ADMIN: todos los planes ── */}
+      {/* ── ADMIN: Planes Especiales (privados) ── */}
+      {esAdmin && !loading && (
+        <PlanesEspeciales
+          defs={planesEspeciales}
+          asignaciones={planes.filter(p => p.es_especial)}
+          profesionales={profesionales || []}
+          onCambio={cargar}
+        />
+      )}
+
+      {/* ── RECEPCIÓN: catálogo de referencia, sin precios ── */}
+      {esRecep && (
+        <div style={{marginBottom:28}}>
+          <h3 style={{fontSize:15,fontWeight:600,margin:"0 0 4px"}}>Planes disponibles</h3>
+          <p style={{fontSize:13,color:"#666",margin:"0 0 12px"}}>Referencia de jornadas semanales de cada plan.</p>
+          <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(220px,1fr))",gap:10}}>
+            {[["estetico","Estético"],["dental","Dental"],["medico","Médico"]].map(([k,nombre]) => (
+              <div key={k} style={{...S.card,padding:"12px 14px",marginBottom:0}}>
+                <div style={{fontWeight:600,fontSize:13,marginBottom:6}}>{BOX_TXT(k)}</div>
+                {PLANES_DEF[k].map(pl => (
+                  <div key={pl.id} style={{fontSize:13,padding:"4px 0",borderTop:"1px solid #f3f3f3"}}>
+                    Plan {nombre} — <strong>{jornadasTxt(Math.max(1, Math.round(pl.jornadas / 4)))}</strong>
+                    {pl.asistente && <span style={{fontSize:11,color:"#1D9E75"}}> · con asistente</span>}
+                    <div style={{fontSize:11,color:"#888"}}>{pl.jornadas} jornadas incluidas al mes · horario fijo</div>
+                  </div>
+                ))}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* ── ADMIN Y RECEPCIÓN: planes contratados ── */}
       {user?.rol !== "prof" && (
         <div style={{marginBottom:28}}>
           <h3 style={{fontSize:15,fontWeight:600,margin:"0 0 14px"}}>Planes contratados</h3>
@@ -227,22 +324,29 @@ export default function TabPlanes({ user, profesionales, boxes, onReservar }) {
               <div style={{display:"flex",justifyContent:"space-between",flexWrap:"wrap",gap:8}}>
                 <div>
                   <div style={{fontWeight:600,fontSize:14}}>{p.profesional_nombre}</div>
-                  <div style={{fontSize:12,color:"#666"}}>{p.plan_label} · {p.box_tipo==="estetico"?"✨ Estético":p.box_tipo==="medico"?"🏥 Médico":"🦷 Dental"}</div>
+                  <div style={{fontSize:12,color:"#666"}}>
+                    {p.plan_label} · {p.box_tipo==="estetico"?"✨ Estético":p.box_tipo==="medico"?"🏥 Médico":"🦷 Dental"}
+                    {p.es_especial && <span style={{marginLeft:6,fontSize:10,fontWeight:700,color:"#6D28D9",background:"#F3F0FF",padding:"1px 7px",borderRadius:6}}>⭐ ESPECIAL</span>}
+                  </div>
+                  <div style={{fontSize:12,color:"#185FA5",marginTop:2}}>
+                    {jornadasTxt(jornadasSemanales(p))}{p.es_especial && p.horario ? ` · ${describirHorario(p.horario)}` : ""}
+                  </div>
                 </div>
                 <div style={{display:"flex",gap:8,alignItems:"center",flexWrap:"wrap"}}>
-                  <span style={{fontSize:13,fontWeight:600,color:"#185FA5"}}>{fmt(p.plan_precio)}/mes</span>
+                  {esAdmin && <span style={{fontSize:13,fontWeight:600,color:"#185FA5"}}>{fmt(p.plan_precio)}/mes</span>}
+                  {p.finalizado_at && <span style={{fontSize:11,padding:"2px 8px",borderRadius:10,fontWeight:600,background:"#f0f0f0",color:"#666"}}>Finalizado</span>}
                   <span style={{fontSize:11,padding:"2px 8px",borderRadius:10,fontWeight:600,
                     background:p.verificado==="aprobado"?"#EAF3DE":p.verificado==="pendiente"?"#FAEEDA":"#f0f0f0",
                     color:p.verificado==="aprobado"?"#3B6D11":p.verificado==="pendiente"?"#854F0B":"#666"}}>
                     {p.verificado==="aprobado"?"✓ Aprobado":p.verificado==="pendiente"?"⏳ Pendiente":"Sin pago"}
                   </span>
-                  {p.verificado==="pendiente" && (
+                  {esAdmin && p.verificado==="pendiente" && (
                     <button onClick={async()=>{
                       await apiGestion("plan_verificar", { id: p.id, decision: "aprobado" });
                       cargar();
                     }} style={S.btn("success",true)}>Aprobar</button>
                   )}
-                  {p.verificado==="pendiente" && (
+                  {esAdmin && p.verificado==="pendiente" && (
                     <button onClick={async()=>{
                       await apiGestion("plan_verificar", { id: p.id, decision: "rechazado" });
                       cargar();
@@ -251,9 +355,11 @@ export default function TabPlanes({ user, profesionales, boxes, onReservar }) {
                 </div>
               </div>
               <div style={{fontSize:12,color:"#888",marginTop:6}}>
-                Jornadas: <strong>{p.jornadas_stock}/{p.jornadas_totales}</strong> disponibles · Vigencia: {p.fecha_inicio} → {p.fecha_vencimiento}
+                {p.es_especial
+                  ? <>Jornadas reservadas: <strong>{p.jornadas_totales}</strong> · Vigencia: {p.fecha_inicio} → {p.fecha_vencimiento}</>
+                  : <>Jornadas: <strong>{p.jornadas_stock}/{p.jornadas_totales}</strong> disponibles · Vigencia: {p.fecha_inicio} → {p.fecha_vencimiento}</>}
               </div>
-              {p.comprobante_url && (
+              {esAdmin && p.comprobante_url && (
                 <button onClick={()=>abrirComprobante("planes_profesional", p.id)}
                   style={{...S.btn("secondary",true),marginTop:8,fontSize:11}}>
                   📎 Ver comprobante

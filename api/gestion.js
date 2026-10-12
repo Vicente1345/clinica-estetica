@@ -8,6 +8,22 @@
 //   { op: '<operación>', datos: {...} }  → { ok, ... } | { ok:false, error }
 
 const { getSbAdmin, requiereRol, rateLimitOk, ipDeReq } = require('./_lib/seguridad');
+const { boxIdsDelRecurso, tiposDelRecurso, recursoDeBox, minHorasDeBox } = require('./_lib/disponibilidad');
+const PE = require('./_lib/planesEspeciales');
+
+const hoyChile = () => new Date().toLocaleDateString('en-CA', { timeZone: 'America/Santiago' });
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+async function todasLasPaginas(consulta) {
+  const out = [];
+  for (let i = 0; ; i += 1000) {
+    const { data, error } = await consulta().range(i, i + 999);
+    if (error) throw error;
+    out.push(...(data || []));
+    if (!data || data.length < 1000 || out.length >= 20000) break;
+  }
+  return out;
+}
+const duracionHoras = (ini, fin) => { const m = h => +h.slice(0, 2) * 60 + +h.slice(3, 5); return (m(fin) - m(ini)) / 60; };
 
 const normalizeNombre = n => (n || '').toLowerCase().replace(/^(dr\.?|dra\.?)\s+/i, '').trim();
 const esTexto = (v, max = 500) => typeof v === 'string' && v.length <= max;
@@ -23,13 +39,20 @@ const ROLES_OP = {
   profesional_guardar:  ['admin'],
   profesional_activo:   ['admin'],
   profesional_eliminar: ['admin'],
-  solicitud_estado:     ['admin', 'recep'],
+  solicitud_estado:     ['admin'],            // recepción ya no gestiona solicitudes de pacientes
   plan_registrar:       ['admin', 'recep', 'prof'],
-  plan_verificar:       ['admin', 'recep'],
+  plan_verificar:       ['admin'],            // solo admin verifica pagos
   jornada_descuento:    ['admin', 'recep', 'prof'],
   comprobante_vincular: ['admin', 'recep', 'prof'],
-  comprobante_url:      ['admin', 'recep', 'prof'],
-  verificar_pago:       ['admin', 'recep'],
+  comprobante_url:      ['admin', 'prof'],    // ver comprobantes es parte de verificar pagos
+  verificar_pago:       ['admin'],            // solo admin verifica pagos
+  // Planes Especiales (privados, fuera del catálogo): SOLO admin
+  plan_especial_condiciones:   ['admin'],
+  plan_especial_previsualizar: ['admin'],
+  plan_especial_asignar:       ['admin'],
+  plan_especial_modificar:     ['admin'],
+  plan_especial_finalizar:     ['admin'],
+  plan_especial_historial:     ['admin'],
 };
 
 module.exports = async (req, res) => {
@@ -222,6 +245,10 @@ module.exports = async (req, res) => {
 
     // ── PLANES (registro tras crear jornadas, o contratación desde TabPlanes) ──
     if (op === 'plan_registrar') {
+      // Los planes especiales solo se asignan por plan_especial_asignar (admin)
+      if (String(d.plan_id || '').startsWith('esp_') || /especial/i.test(String(d.plan_label || ''))) {
+        return res.status(403).json({ ok: false, error: 'Los planes especiales solo los asigna la administración' });
+      }
       let profesional_id = d.profesional_id, profesional_nombre = d.profesional_nombre || '';
       if (usuario.rol === 'prof') {
         const mio = await miProfesional();
@@ -294,12 +321,23 @@ module.exports = async (req, res) => {
       if (!TABLAS.includes(d.tabla)) return res.status(400).json({ ok: false, error: 'Tabla inválida' });
       if (!esTexto(d.path, 300) || !d.path || d.path.includes('..')) return res.status(400).json({ ok: false, error: 'Ruta inválida' });
       if (!esTexto(d.nombre, 200)) return res.status(400).json({ ok: false, error: 'Nombre de archivo inválido' });
+      // movimientos no tiene profesional_id; solo nombre
+      const cols = d.tabla === 'movimientos' ? 'id,verificado,profesional_nombre' : 'id,verificado,profesional_id,profesional_nombre';
+      const { data: fila } = await sb.from(d.tabla).select(cols).eq('id', d.id).single();
+      if (!fila) return res.status(404).json({ ok: false, error: 'Registro no encontrado' });
+      // Adjuntar un comprobante no puede reabrir un pago ya verificado:
+      // cambiar ese estado es facultad exclusiva de la administración
+      if (fila.verificado === 'aprobado' && usuario.rol !== 'admin') {
+        return res.status(409).json({ ok: false, error: 'Este pago ya fue aprobado por la administración' });
+      }
+      // Recepción carga comprobantes por cuenta de las profesionales, pero no
+      // puede reabrir un pago ya revisado (rechazado) ni reemplazar uno en
+      // revisión: eso cambiaría el estado de verificación
+      if (usuario.rol === 'recep' && fila.verificado !== 'sin_pago') {
+        return res.status(403).json({ ok: false, error: 'Solo la administración puede reabrir un pago ya revisado' });
+      }
       // Una profesional solo puede vincular comprobantes a SUS registros
       if (usuario.rol === 'prof') {
-        // movimientos no tiene profesional_id; solo nombre
-        const cols = d.tabla === 'movimientos' ? 'id,profesional_nombre' : 'id,profesional_id,profesional_nombre';
-        const { data: fila } = await sb.from(d.tabla).select(cols).eq('id', d.id).single();
-        if (!fila) return res.status(404).json({ ok: false, error: 'Registro no encontrado' });
         const mio = await miProfesional();
         const esMia = (mio && fila.profesional_id === mio.id) ||
           normalizeNombre(fila.profesional_nombre) === normalizeNombre(usuario.nombre);
@@ -349,6 +387,315 @@ module.exports = async (req, res) => {
       const { error } = await sb.from(d.tabla).update(upd).eq('id', d.id);
       if (error) throw error;
       return res.status(200).json({ ok: true });
+    }
+
+    // ════════════ PLANES ESPECIALES (solo admin) ════════════
+    if (op.startsWith('plan_especial_')) {
+      const ahora = new Date().toISOString();
+      const registrarHistorial = (fila) => sb.from('planes_especiales_historial').insert({
+        usuario_id: String(usuario.uid || ''), usuario_nombre: usuario.nombre, ...fila,
+      });
+
+      // Historial de una asignación (o de todas, últimas 200)
+      if (op === 'plan_especial_historial') {
+        let q = sb.from('planes_especiales_historial').select('*').order('creado_at', { ascending: false }).limit(200);
+        if (d.plan_profesional_id) q = q.eq('plan_profesional_id', d.plan_profesional_id);
+        const { data, error } = await q;
+        if (error) throw error;
+        return res.status(200).json({ ok: true, historial: data || [] });
+      }
+
+      // Editar las condiciones de un plan especial (no altera asignaciones ya
+      // hechas: cada asignación guarda el precio acordado al asignarla)
+      if (op === 'plan_especial_condiciones') {
+        const { data: def } = await sb.from('planes_especiales').select('*').eq('id', d.id).single();
+        if (!def) return res.status(404).json({ ok: false, error: 'Plan especial no encontrado' });
+        const cambios = {};
+        if (esTexto(d.nombre, 120) && d.nombre.trim()) cambios.nombre = d.nombre.trim();
+        if (Number.isInteger(d.jornadas_semanales) && d.jornadas_semanales >= 1 && d.jornadas_semanales <= 7) cambios.jornadas_semanales = d.jornadas_semanales;
+        if (esNum(d.precio_mensual) && d.precio_mensual >= 0) cambios.precio_mensual = Math.floor(d.precio_mensual);
+        if (Number.isInteger(d.vigencia_meses) && d.vigencia_meses >= 1 && d.vigencia_meses <= 12) cambios.vigencia_meses = d.vigencia_meses;
+        if (esTexto(d.descripcion, 300)) cambios.descripcion = d.descripcion;
+        if (typeof d.activo === 'boolean') cambios.activo = d.activo;
+        if (!Object.keys(cambios).length) return res.status(400).json({ ok: false, error: 'Sin cambios válidos' });
+        const { error } = await sb.from('planes_especiales')
+          .update({ ...cambios, actualizado_por: usuario.nombre, actualizado_at: ahora }).eq('id', def.id);
+        if (error) throw error;
+        const antes = {}; Object.keys(cambios).forEach(k => { antes[k] = def[k]; });
+        await registrarHistorial({ plan_especial_id: def.id, accion: 'editar_condiciones', detalle: { antes, despues: cambios } });
+        return res.status(200).json({ ok: true });
+      }
+
+      // ── Preparación común: plan, profesional, box, horario y jornadas ──
+      const preparar = async ({ planEspecialId, profesionalId, horario, fechaInicio, fechaFin, excluir, ignorarPlanId, hoyMinimo, jornadasSemanales, vigenciaMeses }) => {
+        const { data: def } = await sb.from('planes_especiales').select('*').eq('id', planEspecialId).single();
+        if (!def) return { error: 'Plan especial no encontrado', status: 404 };
+        if (!UUID_RE.test(String(profesionalId || ''))) return { error: 'Selecciona la profesional beneficiaria', status: 400 };
+        const { data: prof } = await sb.from('profesionales').select('id,nombre,activo').eq('id', profesionalId).single();
+        if (!prof) return { error: 'Profesional no encontrada', status: 404 };
+        const { data: boxes } = await sb.from('boxes').select('id,nombre,tipo,activo').order('nombre');
+        const box = (boxes || []).find(b => b.activo && b.tipo === def.box_tipo);
+        if (!box) return { error: `No hay un box activo de tipo ${def.box_tipo}`, status: 409 };
+        // Al modificar una asignación existente se respeta SU frecuencia y
+        // vigencia, aunque luego se hayan editado las condiciones del plan
+        const vh = PE.validarHorario(horario, jornadasSemanales || def.jornadas_semanales, minHorasDeBox(box));
+        if (!vh.ok) return { error: vh.error, status: 400 };
+        const vv = PE.validarVigencia(fechaInicio, fechaFin, vigenciaMeses || def.vigencia_meses, hoyMinimo);
+        if (!vv.ok) return { error: vv.error, status: 400 };
+        const excl = Array.isArray(excluir) ? excluir.filter(f => typeof f === 'string') : [];
+        const jornadas = PE.generarJornadas(vh.horario, fechaInicio, fechaFin, excl);
+        if (!jornadas.length) return { error: 'El período no genera ninguna jornada', status: 400 };
+        // Ocupación real del recurso físico compartido (Dental+Pabellón o
+        // Médico+Estético) en el rango, incluidas citas de pacientes
+        const ids = boxIdsDelRecurso(boxes, box);
+        const tipos = tiposDelRecurso(recursoDeBox(box));
+        const desde = jornadas[0].fecha, hasta = jornadas[jornadas.length - 1].fecha;
+        // Un año de ocupación puede superar las 1000 filas de PostgREST: paginado
+        const [ocupados, citas] = await Promise.all([
+          todasLasPaginas(() => sb.from('arriendos').select('id,box_id,box_nombre,fecha,hora_inicio,hora_fin,estado,profesional_nombre,plan_profesional_id')
+            .in('box_id', ids).gte('fecha', desde).lte('fecha', hasta).in('estado', ['pendiente', 'confirmado'])
+            .order('fecha').order('id')),
+          todasLasPaginas(() => sb.from('solicitudes_paciente').select('id,box_tipo,fecha_solicitada,hora_inicio,hora_fin,estado')
+            .in('box_tipo', tipos).gte('fecha_solicitada', desde).lte('fecha_solicitada', hasta)
+            .order('fecha_solicitada').order('id')),
+        ]);
+        const conflictos = PE.detectarConflictos(jornadas, ocupados, citas, ignorarPlanId);
+        return { def, prof, box, horario: vh.horario, jornadas, conflictos };
+      };
+
+      const filasArriendo = (prep, planId) => prep.jornadas.map(j => ({
+        fecha: j.fecha, hora_inicio: j.hora_inicio, hora_fin: j.hora_fin,
+        horas: duracionHoras(j.hora_inicio, j.hora_fin),
+        box_id: prep.box.id, box_nombre: prep.box.nombre,
+        profesional_id: prep.prof.id, profesional_nombre: prep.prof.nombre,
+        monto: 0,                 // el valor se cobra mensualmente en el plan
+        metodo: 'Plan especial',
+        pagado: false,
+        estado: 'confirmado',     // decisión 12-10-2026: quedan confirmadas
+        verificado: 'sin_pago',
+        obs: prep.def.nombre,
+        plan_profesional_id: planId,
+      }));
+
+      // Contexto de una modificación: la asignación, su frecuencia original,
+      // desde cuándo se reprograma y qué jornadas canceló la admin a mano
+      // (esas NO se recrean al reprogramar)
+      const contextoModificacion = async (planProfesionalId, hoy) => {
+        const { data: asig } = await sb.from('planes_profesional').select('*').eq('id', planProfesionalId).single();
+        if (!asig || !asig.es_especial) return { error: 'Asignación especial no encontrada', status: 404 };
+        if (asig.finalizado_at) return { error: 'Esta asignación ya fue finalizada', status: 409 };
+        const manana = PE.sumarDias(hoy, 1);
+        const desde = asig.fecha_inicio > manana ? asig.fecha_inicio : manana;
+        const canceladas = await todasLasPaginas(() => sb.from('arriendos').select('id,fecha,obs_modificacion')
+          .eq('plan_profesional_id', asig.id).gte('fecha', desde).eq('estado', 'cancelado').order('fecha').order('id'));
+        const AUTOMATICAS = ['Reprogramada por modificación del plan especial', 'Plan especial finalizado'];
+        const excluidasPrevias = [...new Set(canceladas
+          .filter(c => !AUTOMATICAS.some(t => String(c.obs_modificacion || '').startsWith(t)))
+          .map(c => c.fecha))];
+        // Término nuevo: hasta la vigencia original del plan (o su vencimiento
+        // actual, si fuera posterior), nunca más de un año desde el inicio
+        const tope = [asig.fecha_vencimiento, PE.finDeVigencia(asig.fecha_inicio, 12)].sort().pop();
+        const validarFin = fin => {
+          if (!/^\d{4}-\d{2}-\d{2}$/.test(String(fin || ''))) return { ok: false, error: 'Fecha de término inválida' };
+          if (fin < desde) return { ok: false, error: 'Para terminar antes, usa "Finalizar"' };
+          if (fin > tope) return { ok: false, error: `La vigencia no puede superar ${tope}` };
+          return { ok: true };
+        };
+        return { asig, desde, excluidasPrevias, validarFin, jornadasSemanales: (asig.horario || []).length || null };
+      };
+
+      // Vista previa: jornadas y conflictos, SIN escribir nada
+      if (op === 'plan_especial_previsualizar') {
+        const hoy = hoyChile();
+        let prep, excluidasPrevias = [];
+        if (d.plan_profesional_id) { // vista previa de una MODIFICACIÓN
+          const ctx = await contextoModificacion(d.plan_profesional_id, hoy);
+          if (ctx.error) return res.status(ctx.status).json({ ok: false, error: ctx.error });
+          excluidasPrevias = ctx.excluidasPrevias;
+          prep = await preparar({
+            planEspecialId: ctx.asig.plan_especial_id, profesionalId: ctx.asig.profesional_id, horario: d.horario,
+            fechaInicio: ctx.desde, fechaFin: d.fecha_fin, excluir: [...excluidasPrevias, ...(d.excluir || [])],
+            ignorarPlanId: ctx.asig.id, jornadasSemanales: ctx.jornadasSemanales, vigenciaMeses: 12,
+          });
+          if (!prep.error) {
+            const vv = ctx.validarFin(d.fecha_fin);
+            if (!vv.ok) return res.status(400).json({ ok: false, error: vv.error });
+          }
+        } else {
+          prep = await preparar({
+            planEspecialId: d.plan_especial_id, profesionalId: d.profesional_id, horario: d.horario,
+            fechaInicio: d.fecha_inicio, fechaFin: d.fecha_fin, excluir: d.excluir, hoyMinimo: hoy,
+          });
+        }
+        if (prep.error) return res.status(prep.status).json({ ok: false, error: prep.error });
+        return res.status(200).json({
+          ok: true, jornadas: prep.jornadas.length, desde: prep.jornadas[0].fecha,
+          hasta: prep.jornadas[prep.jornadas.length - 1].fecha,
+          box: prep.box.nombre, conflictos: prep.conflictos,
+          precio_mensual: prep.def.precio_mensual, horario: PE.describirHorario(prep.horario),
+          excluidas_previas: excluidasPrevias,
+        });
+      }
+
+      // Asignación individual: plan + jornadas del año, o nada
+      if (op === 'plan_especial_asignar') {
+        const hoy = hoyChile();
+        const prep = await preparar({
+          planEspecialId: d.plan_especial_id, profesionalId: d.profesional_id, horario: d.horario,
+          fechaInicio: d.fecha_inicio, fechaFin: d.fecha_fin, excluir: d.excluir, hoyMinimo: hoy,
+        });
+        if (prep.error) return res.status(prep.status).json({ ok: false, error: prep.error });
+        if (!prep.def.activo) return res.status(409).json({ ok: false, error: 'Este plan especial está desactivado' });
+        if (prep.conflictos.length) {
+          return res.status(409).json({ ok: false, error: `Hay ${prep.conflictos.length} conflicto(s) con reservas existentes. Ajusta días u horarios, o excluye esas fechas.`, conflictos: prep.conflictos });
+        }
+        // Sin duplicar: la profesional no puede tener dos asignaciones vigentes del mismo plan
+        const { data: vigentes } = await sb.from('planes_profesional').select('id,fecha_inicio,fecha_vencimiento')
+          .eq('profesional_id', prep.prof.id).eq('plan_especial_id', prep.def.id).is('finalizado_at', null);
+        if ((vigentes || []).some(v => !(v.fecha_vencimiento < d.fecha_inicio || v.fecha_inicio > d.fecha_fin))) {
+          return res.status(409).json({ ok: false, error: `${prep.prof.nombre} ya tiene este plan asignado en ese período: modifícalo en vez de asignarlo de nuevo` });
+        }
+        const { data: plan, error: ePlan } = await sb.from('planes_profesional').insert({
+          profesional_id: prep.prof.id, profesional_nombre: prep.prof.nombre,
+          box_tipo: prep.def.box_tipo, plan_id: prep.def.id, plan_label: prep.def.nombre,
+          plan_precio: prep.def.precio_mensual, con_asistente: false,
+          jornadas_totales: prep.jornadas.length, jornadas_stock: 0, // jornadas ya reservadas
+          fecha_inicio: d.fecha_inicio, fecha_vencimiento: d.fecha_fin,
+          estado: 'pendiente', verificado: 'sin_pago',
+          dias_semana: PE.diasCortos(prep.horario),
+          hora_inicio: prep.horario[0].hora_inicio, hora_fin: prep.horario[0].hora_fin,
+          es_especial: true, plan_especial_id: prep.def.id, horario: prep.horario,
+          asignado_por: usuario.nombre, asignado_at: ahora,
+        }).select('id').single();
+        if (ePlan) throw ePlan;
+        // Todas las jornadas en UN insert: el candado de la BD (EXCLUDE) hace
+        // que entren todas o ninguna
+        const { error: eArr } = await sb.from('arriendos').insert(filasArriendo(prep, plan.id));
+        if (eArr) {
+          await sb.from('planes_profesional').delete().eq('id', plan.id); // compensación
+          if (eArr.code === '23P01') return res.status(409).json({ ok: false, error: 'Otra reserva tomó uno de esos horarios en este momento. Vuelve a previsualizar.' });
+          throw eArr;
+        }
+        await registrarHistorial({
+          plan_profesional_id: plan.id, plan_especial_id: prep.def.id, accion: 'asignar',
+          detalle: {
+            profesional: prep.prof.nombre, box: prep.box.nombre, horario: prep.horario,
+            fecha_inicio: d.fecha_inicio, fecha_fin: d.fecha_fin, jornadas: prep.jornadas.length,
+            excluidas: Array.isArray(d.excluir) ? d.excluir : [], precio_mensual: prep.def.precio_mensual,
+          },
+        });
+        return res.status(200).json({ ok: true, id: plan.id, jornadas: prep.jornadas.length });
+      }
+
+      // ── Asignación existente (modificar / finalizar) ──
+      const { data: asig } = await sb.from('planes_profesional').select('*').eq('id', d.plan_profesional_id).single();
+      if (!asig || !asig.es_especial) return res.status(404).json({ ok: false, error: 'Asignación especial no encontrada' });
+      if (asig.finalizado_at) return res.status(409).json({ ok: false, error: 'Esta asignación ya fue finalizada' });
+
+      if (op === 'plan_especial_modificar') {
+        const hoy = hoyChile();
+        const manana = PE.sumarDias(hoy, 1);
+        const horarioNuevo = d.horario || asig.horario;
+        const finNuevo = d.fecha_fin || asig.fecha_vencimiento;
+        const cambiaAgenda = !!d.horario || (d.fecha_fin && d.fecha_fin !== asig.fecha_vencimiento);
+        const upd = { modificado_por: usuario.nombre, modificado_at: ahora };
+        const antes = {}, despues = {};
+        if (esNum(d.precio_mensual) && d.precio_mensual >= 0 && Math.floor(d.precio_mensual) !== asig.plan_precio) {
+          upd.plan_precio = Math.floor(d.precio_mensual);
+          antes.precio_mensual = asig.plan_precio; despues.precio_mensual = upd.plan_precio;
+        }
+        if (cambiaAgenda) {
+          // Solo se reprograman las jornadas PROPIAS del plan desde mañana;
+          // las pasadas y las de hoy quedan intactas (historial real), y las
+          // que la admin canceló a mano siguen fuera
+          const ctx = await contextoModificacion(asig.id, hoy);
+          if (ctx.error) return res.status(ctx.status).json({ ok: false, error: ctx.error });
+          const desde = ctx.desde;
+          const vf = ctx.validarFin(finNuevo);
+          if (!vf.ok) return res.status(400).json({ ok: false, error: vf.error });
+          const prep = await preparar({
+            planEspecialId: asig.plan_especial_id, profesionalId: asig.profesional_id, horario: horarioNuevo,
+            fechaInicio: desde, fechaFin: finNuevo, excluir: [...ctx.excluidasPrevias, ...(d.excluir || [])],
+            ignorarPlanId: asig.id, jornadasSemanales: ctx.jornadasSemanales, vigenciaMeses: 12,
+          });
+          if (prep.error) return res.status(prep.status).json({ ok: false, error: prep.error });
+          if (prep.conflictos.length) {
+            return res.status(409).json({ ok: false, error: `Hay ${prep.conflictos.length} conflicto(s) con reservas existentes.`, conflictos: prep.conflictos });
+          }
+          // 1) Liberar las jornadas futuras propias (se guardan los ids para revertir)
+          const { data: futuras, error: eFut } = await sb.from('arriendos')
+            .update({ estado: 'cancelado', obs_modificacion: 'Reprogramada por modificación del plan especial' })
+            .eq('plan_profesional_id', asig.id).gte('fecha', desde).in('estado', ['pendiente', 'confirmado'])
+            .select('id,estado');
+          if (eFut) throw eFut;
+          // (las canceladas a mano ya tenían estado 'cancelado': no se tocan)
+          // 2) Crear las nuevas jornadas en un solo insert
+          const { error: eNew } = await sb.from('arriendos').insert(filasArriendo(prep, asig.id));
+          if (eNew) {
+            // Revertir: las jornadas liberadas vuelven a quedar confirmadas
+            const idsFut = (futuras || []).map(f => f.id);
+            if (idsFut.length) {
+              const { error: eRev } = await sb.from('arriendos').update({ estado: 'confirmado', obs_modificacion: null }).in('id', idsFut);
+              if (eRev) {
+                console.error('plan_especial_modificar: NO se pudo revertir', asig.id, eRev.message);
+                return res.status(500).json({ ok: false, error: `No se pudo reprogramar y tampoco restaurar ${idsFut.length} jornada(s) del plan. Revisa la Agenda de esta profesional antes de reintentar.` });
+              }
+            }
+            if (eNew.code === '23P01') return res.status(409).json({ ok: false, error: 'Otra reserva tomó uno de esos horarios en este momento. Vuelve a intentarlo.' });
+            throw eNew;
+          }
+          upd.horario = prep.horario;
+          upd.dias_semana = PE.diasCortos(prep.horario);
+          upd.hora_inicio = prep.horario[0].hora_inicio;
+          upd.hora_fin = prep.horario[0].hora_fin;
+          upd.fecha_vencimiento = finNuevo;
+          antes.horario = asig.horario; despues.horario = prep.horario;
+          antes.fecha_fin = asig.fecha_vencimiento; despues.fecha_fin = finNuevo;
+          despues.jornadas_reprogramadas = prep.jornadas.length;
+          if (Array.isArray(d.excluir) && d.excluir.length) despues.excluidas = d.excluir;
+        }
+        if (!Object.keys(despues).length) return res.status(400).json({ ok: false, error: 'No hay cambios que aplicar' });
+        // Total de jornadas vigentes del plan
+        const { count } = await sb.from('arriendos').select('id', { count: 'exact', head: true })
+          .eq('plan_profesional_id', asig.id).in('estado', ['pendiente', 'confirmado']);
+        upd.jornadas_totales = count || 0;
+        const { error: eUpd } = await sb.from('planes_profesional').update(upd).eq('id', asig.id);
+        if (eUpd) throw eUpd;
+        await registrarHistorial({ plan_profesional_id: asig.id, plan_especial_id: asig.plan_especial_id, accion: 'modificar', detalle: { antes, despues } });
+        return res.status(200).json({ ok: true });
+      }
+
+      if (op === 'plan_especial_finalizar') {
+        const hoy = hoyChile();
+        // Fecha estricta: un valor mal escrito NUNCA cae por defecto a "hoy"
+        // (liberaría todas las jornadas futuras sin vuelta atrás)
+        const raw = String(d.fecha_termino == null ? '' : d.fecha_termino).trim();
+        if (!/^\d{4}-\d{2}-\d{2}$/.test(raw)) return res.status(400).json({ ok: false, error: 'Fecha de término inválida (AAAA-MM-DD)' });
+        const termino = raw;
+        if (termino < hoy) return res.status(400).json({ ok: false, error: 'La fecha de término no puede ser anterior a hoy' });
+        if (termino > asig.fecha_vencimiento) return res.status(400).json({ ok: false, error: `La fecha de término no puede superar el vencimiento (${asig.fecha_vencimiento})` });
+        // Se liberan SOLO las jornadas propias del plan posteriores al término
+        const { data: liberadas, error: eLib } = await sb.from('arriendos')
+          .update({ estado: 'cancelado', obs_modificacion: 'Plan especial finalizado' })
+          .eq('plan_profesional_id', asig.id).gt('fecha', termino).in('estado', ['pendiente', 'confirmado'])
+          .select('id');
+        if (eLib) throw eLib;
+        const { count } = await sb.from('arriendos').select('id', { count: 'exact', head: true })
+          .eq('plan_profesional_id', asig.id).in('estado', ['pendiente', 'confirmado']);
+        // estado 'cancelado' + finalizado_at = finalizado (el CHECK de estado
+        // de la tabla no admite 'finalizado'; no se toca esa regla)
+        const { error: eUpd } = await sb.from('planes_profesional').update({
+          estado: 'cancelado', fecha_vencimiento: termino, jornadas_totales: count || 0,
+          finalizado_por: usuario.nombre, finalizado_at: ahora,
+          modificado_por: usuario.nombre, modificado_at: ahora,
+        }).eq('id', asig.id);
+        if (eUpd) throw eUpd;
+        await registrarHistorial({
+          plan_profesional_id: asig.id, plan_especial_id: asig.plan_especial_id, accion: 'finalizar',
+          detalle: { fecha_termino: termino, jornadas_liberadas: (liberadas || []).length, vencimiento_anterior: asig.fecha_vencimiento },
+        });
+        return res.status(200).json({ ok: true, liberadas: (liberadas || []).length });
+      }
     }
 
     return res.status(400).json({ ok: false, error: 'Operación desconocida' });

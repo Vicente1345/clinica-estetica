@@ -13,6 +13,19 @@
 const { createClient } = require('@supabase/supabase-js');
 const { getSbAdmin, requiereRol } = require('./_lib/seguridad');
 
+// PostgREST entrega como máximo 1000 filas por consulta: se lee por páginas
+// con un orden estable (fecha + id) para no perder ni duplicar filas
+async function todasLasPaginas(consulta) {
+  const out = [];
+  for (let i = 0; ; i += 1000) {
+    const { data, error } = await consulta().range(i, i + 999);
+    if (error) throw error;
+    out.push(...(data || []));
+    if (!data || data.length < 1000 || out.length >= 20000) break;
+  }
+  return out;
+}
+
 // ── Diagnóstico de configuración (GET /api/datos?diag=1, solo admin) ──
 // Vive aquí y no en su propio archivo por el límite de 12 funciones
 // serverless del plan Hobby de Vercel. No devuelve secretos, solo estados.
@@ -87,6 +100,24 @@ module.exports = async (req, res) => {
     }
 
     const esProf = usuario.rol === 'prof';
+    const esRecep = usuario.rol === 'recep';
+    const esAdmin = usuario.rol === 'admin';
+
+    // Ventana de arriendos: desde 6 meses atrás y TODO lo futuro (los planes
+    // anuales crean cientos de jornadas futuras; con un "limit 200" por fecha
+    // descendente la semana en curso quedaba fuera de Agenda y listados)
+    const hoy = new Date().toLocaleDateString('en-CA', { timeZone: 'America/Santiago' });
+    const d0 = new Date(hoy + 'T12:00:00'); d0.setDate(d0.getDate() - 180);
+    const desdeArr = d0.toISOString().slice(0, 10);
+
+    // Citas de pacientes por rol: la profesional nunca recibe datos del
+    // paciente; recepción solo lo necesario para la Agenda (sin teléfono,
+    // correo ni RUT: ya no gestiona solicitudes de pacientes)
+    const colsCitas = esProf
+      ? 'id,box_tipo,fecha_solicitada,hora_inicio,hora_fin,estado,created_at'
+      : esRecep
+        ? 'id,box_tipo,fecha_solicitada,hora_inicio,hora_fin,estado,created_at,nombre,tratamiento,motivo_consulta'
+        : '*';
 
     const [ins, mov, arr, prof, bx, sol, pl] = await Promise.all([
       sb.from('insumos').select('*').eq('activo', true).order('nombre'),
@@ -95,19 +126,31 @@ module.exports = async (req, res) => {
         ? sb.from('movimientos').select('*').eq('profesional_nombre', usuario.nombre).order('created_at', { ascending: false }).limit(200)
         : sb.from('movimientos').select('*').order('created_at', { ascending: false }).limit(200),
       // Arriendos: la profesional solo recibe columnas de ocupación (sin nombres/montos)
-      sb.from('arriendos')
+      todasLasPaginas(() => sb.from('arriendos')
         .select(esProf ? 'id,box_id,box_nombre,fecha,hora_inicio,hora_fin,horas,estado' : '*')
-        .order('fecha', { ascending: false }).limit(200),
+        .gte('fecha', desdeArr)
+        .order('fecha', { ascending: false }).order('id'))
+        .then(data => ({ data }), error => ({ error })),
       sb.from('profesionales').select(esProf ? 'id,nombre,activo' : '*').order('nombre'),
       sb.from('boxes').select('*').order('nombre'),
       // Citas de pacientes: la profesional nunca recibe PII de pacientes
       sb.from('solicitudes_paciente')
-        .select(esProf ? 'id,box_tipo,fecha_solicitada,hora_inicio,hora_fin,estado,created_at' : '*')
+        .select(colsCitas)
         .order('created_at', { ascending: false }).limit(200),
       sb.from('planes_profesional').select('*').order('created_at', { ascending: false }),
     ]);
     const conError = [ins, mov, arr, prof, bx, sol, pl].find(r => r.error);
     if (conError) throw conError.error;
+
+    // Fuera de la ventana: pagos por verificar y deudas abiertas (sin pago o
+    // rechazados) siguen visibles para la admin, que es quien los gestiona
+    let arriendosData = arr.data || [];
+    if (esAdmin) {
+      const antiguos = await todasLasPaginas(() => sb.from('arriendos').select('*')
+        .in('verificado', ['pendiente', 'sin_pago', 'rechazado']).neq('estado', 'cancelado')
+        .lt('fecha', desdeArr).order('fecha', { ascending: false }).order('id'));
+      if (antiguos.length) arriendosData = [...arriendosData, ...antiguos];
+    }
 
     let misArriendos = [];
     let planes = pl.data || [];
@@ -116,25 +159,40 @@ module.exports = async (req, res) => {
       const yo = normalizeNombre(usuario.nombre);
       miProfId = (prof.data || []).find(p => normalizeNombre(p.nombre) === yo)?.id || null;
       if (miProfId) {
-        const { data: mios, error: e2 } = await sb.from('arriendos').select('*')
-          .eq('profesional_id', miProfId).order('fecha', { ascending: false }).limit(200);
-        if (e2) throw e2;
-        misArriendos = mios || [];
+        // Todas las suyas (sin piso de fecha: sus deudas antiguas siguen visibles)
+        misArriendos = await todasLasPaginas(() => sb.from('arriendos').select('*')
+          .eq('profesional_id', miProfId)
+          .order('fecha', { ascending: false }).order('id'));
       }
       planes = planes.filter(p => p.profesional_id === miProfId || normalizeNombre(p.profesional_nombre) === yo);
+    }
+
+    // Recepción: los planes llegan SIN valores monetarios (instrucción
+    // 12-10-2026); solo nombre, box, jornadas y estado operativo
+    if (esRecep) {
+      planes = planes.map(({ plan_precio, comprobante_url, comprobante_nombre, ...resto }) => resto);
+    }
+
+    // Planes Especiales: definiciones y condiciones económicas SOLO para admin.
+    // Tolerante a que la migración aún no se haya ejecutado.
+    let planesEspeciales = null;
+    if (esAdmin) {
+      const { data: defs, error: eDefs } = await sb.from('planes_especiales').select('*').order('id');
+      planesEspeciales = eDefs ? null : (defs || []);
     }
 
     return res.status(200).json({
       ok: true,
       insumos: ins.data || [],
       movimientos: mov.data || [],
-      arriendos: arr.data || [],
+      arriendos: arriendosData,
       misArriendos,
       profesionales: prof.data || [],
       boxes: bx.data || [],
       solicitudes: sol.data || [],
       planes,
       miProfId,
+      ...(esAdmin ? { planesEspeciales } : {}),
     });
   } catch (e) {
     console.error('datos:', e && (e.message || e));
