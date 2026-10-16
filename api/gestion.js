@@ -53,6 +53,7 @@ const ROLES_OP = {
   plan_especial_modificar:     ['admin'],
   plan_especial_finalizar:     ['admin'],
   plan_especial_historial:     ['admin'],
+  arriendo_historial:          ['admin'],
 };
 
 module.exports = async (req, res) => {
@@ -387,6 +388,18 @@ module.exports = async (req, res) => {
       const { error } = await sb.from(d.tabla).update(upd).eq('id', d.id);
       if (error) throw error;
       return res.status(200).json({ ok: true });
+    }
+
+    // Historial de cambios de una reserva (quién, cuándo, qué y por qué)
+    if (op === 'arriendo_historial') {
+      const { data, error } = await sb.from('arriendos_historial').select('*')
+        .eq('arriendo_id', d.arriendo_id).order('creado_at', { ascending: false }).limit(100);
+      if (error) {
+        // Tabla aún no creada (falta la migración): se informa sin romper la pantalla
+        if (error.code === '42P01' || error.code === 'PGRST205') return res.status(200).json({ ok: true, historial: [], sinTabla: true });
+        throw error;
+      }
+      return res.status(200).json({ ok: true, historial: data || [] });
     }
 
     // ════════════ PLANES ESPECIALES (solo admin) ════════════

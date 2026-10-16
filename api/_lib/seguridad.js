@@ -175,7 +175,48 @@ function horasHastaChile(fecha, hora) {
   return (naive(`${fecha} ${hora}`) - naive(ahoraCl)) / 3600000;
 }
 
+// ─── Política de modificación/cancelación de reservas ─────────────
+// Regla general: solo con más de 48 h de anticipación. Excepción GLOBAL de la
+// administración (instrucción 16-10-2026): la admin puede modificar o
+// cancelar cualquier reserva hasta que termine, incluso el mismo día; cada
+// uso queda registrado. Ningún otro rol tiene esta excepción.
+const HORAS_ANTICIPACION = 48;
+function ventanaModificacion(rol, fecha, horaInicio, horaFin) {
+  const hIni = horasHastaChile(fecha, horaInicio);
+  const hFin = horasHastaChile(fecha, horaFin || horaInicio);
+  if (!Number.isFinite(hIni)) return { ok: false, error: 'Fecha u hora de la reserva inválida' };
+  const dentro48h = hIni <= HORAS_ANTICIPACION;
+  if (rol === 'admin') {
+    if (!(hFin > 0)) return { ok: false, error: 'Esta reserva ya terminó: no se puede modificar ni cancelar' };
+    return { ok: true, dentro48h, excepcionAdmin: dentro48h };
+  }
+  if (dentro48h) {
+    return { ok: false, error: `Solo se puede modificar o cancelar con más de ${HORAS_ANTICIPACION} horas de anticipación (quedan ${Math.max(0, Math.round(hIni))})` };
+  }
+  return { ok: true, dentro48h: false, excepcionAdmin: false };
+}
+
+// "16-10-2026 14:32" en hora de Chile (trazas legibles)
+function ahoraChileTexto() {
+  return new Intl.DateTimeFormat('es-CL', {
+    timeZone: 'America/Santiago', day: '2-digit', month: '2-digit', year: 'numeric',
+    hour: '2-digit', minute: '2-digit', hour12: false,
+  }).format(new Date()).replace(',', '');
+}
+
+// Registro de auditoría de una reserva. Si la tabla aún no existe (falta la
+// migración), NO bloquea la operación: la traza legible igual queda en
+// arriendos.obs_modificacion. Devuelve true si quedó en la tabla.
+async function registrarHistorialArriendo(sb, fila) {
+  try {
+    const { error } = await sb.from('arriendos_historial').insert(fila);
+    if (error) { console.error('historial arriendos:', error.message); return false; }
+    return true;
+  } catch (e) { console.error('historial arriendos:', e.message); return false; }
+}
+
 module.exports = {
+  ventanaModificacion, ahoraChileTexto, registrarHistorialArriendo, HORAS_ANTICIPACION,
   getSbAdmin, hashPassword, verificarPassword, esHashScrypt,
   crearToken, verificarToken, usuarioDesdeReq, requiereRol,
   rateLimitOk, ipDeReq, horasHastaChile,

@@ -27,7 +27,7 @@ const {
 } = require('./_lib/disponibilidad');
 
 const normalizarNombre = n => (n || '').toLowerCase().replace(/^(dr\.?|dra\.?)\s+/i, '').trim();
-const { getSbAdmin, requiereRol } = require('./_lib/seguridad');
+const { getSbAdmin, requiereRol, ventanaModificacion, ahoraChileTexto, registrarHistorialArriendo, horasHastaChile, HORAS_ANTICIPACION } = require('./_lib/seguridad');
 
 // service_role (con fallback a anon mientras RLS siga abierta)
 function getSb() { return getSbAdmin(); }
@@ -108,8 +108,9 @@ module.exports = async (req, res) => {
         box_id: m.box_id, box_nombre: m.box_nombre,
         horas: Number(m.horas) || 0,
         monto: Math.max(0, Math.floor(Number(m.monto) || 0)),
-        obs_modificacion: typeof m.obs_modificacion === 'string' ? m.obs_modificacion.slice(0, 500) : null,
+        motivo: String(m.motivo || m.obs_modificacion || '').replace(/^Modificado por admin:\s*/i, '').trim().slice(0, 300),
       }];
+      if (!rows[0].motivo) return res.status(400).json({ ok: false, error: 'Indica el motivo del cambio' });
     } else {
       const VERIF_INICIAL = ['sin_pago', 'pendiente'];
       rows = rows.map(r => ({
@@ -211,12 +212,30 @@ module.exports = async (req, res) => {
     // ── Escritura ──
     let escritos;
     let original = null; // para restaurar si una modificación pierde la carrera
+    let ventana = null;
     if (esModificacion) {
-      const { id, ...campos } = rows[0];
+      const { id, motivo, ...campos } = rows[0];
       const rOrig = await sb.from('arriendos').select('*').eq('id', id).maybeSingle();
       if (rOrig.error || !rOrig.data)
         return res.status(404).json({ ok: false, error: 'Arriendo no encontrado' });
       original = rOrig.data;
+      if (original.estado === 'cancelado')
+        return res.status(409).json({ ok: false, error: 'La reserva está cancelada: no se puede modificar' });
+      // Ventana de 48 h: la admin la omite (hasta que la reserva termine);
+      // cualquier otro rol queda sujeto a ella
+      ventana = ventanaModificacion(auth.usuario.rol, original.fecha, normHora(original.hora_inicio), normHora(original.hora_fin));
+      if (!ventana.ok) return res.status(409).json({ ok: false, error: ventana.error });
+      // El nuevo horario debe seguir vigente (se permite extender una reserva en curso)
+      if (!(horasHastaChile(campos.fecha, normHora(campos.hora_fin)) > 0))
+        return res.status(400).json({ ok: false, error: 'El nuevo horario ya pasó: elige una fecha y hora futuras' });
+      // ¿Se usa la excepción de 48 h? (reserva original o nuevo horario dentro de la ventana)
+      const nuevoDentro = horasHastaChile(campos.fecha, normHora(campos.hora_inicio)) <= HORAS_ANTICIPACION;
+      ventana = { ...ventana, dentro48h: ventana.dentro48h || nuevoDentro, excepcionAdmin: auth.usuario.rol === 'admin' && (ventana.dentro48h || nuevoDentro) };
+      // Las jornadas de un plan especial no se cobran por separado: su monto no cambia
+      if (original.plan_profesional_id || original.metodo === 'Plan especial') campos.monto = original.monto;
+      // Traza legible en la propia reserva (además del historial)
+      campos.obs_modificacion = `Modificado por ${auth.usuario.nombre} (${auth.usuario.rol}) el ${ahoraChileTexto()}${ventana.excepcionAdmin ? ' [con menos de 48 h]' : ''}: ${motivo} · ${original.fecha} ${normHora(original.hora_inicio)}–${normHora(original.hora_fin)} ${original.box_nombre || ''} → ${campos.fecha} ${normHora(campos.hora_inicio)}–${normHora(campos.hora_fin)} ${campos.box_nombre || ''}`.slice(0, 1000);
+      rows[0].motivo = motivo;
       const { data, error } = await sb.from('arriendos').update(campos).eq('id', id).select();
       if (error) {
         if (error.code === '23P01')
@@ -290,6 +309,20 @@ module.exports = async (req, res) => {
       });
     }
 
+    // Registro de la modificación (quién, cuándo, qué cambió y por qué)
+    if (esModificacion && original && escritos && escritos[0]) {
+      const campo = a => ({
+        fecha: a.fecha, hora_inicio: normHora(a.hora_inicio), hora_fin: normHora(a.hora_fin),
+        box_id: a.box_id, box_nombre: a.box_nombre, horas: a.horas, monto: a.monto, estado: a.estado,
+      });
+      await registrarHistorialArriendo(sb, {
+        arriendo_id: original.id, accion: 'modificar',
+        antes: campo(original), despues: campo(escritos[0]),
+        motivo: rows[0].motivo || null,
+        dentro_48h: !!(ventana && ventana.dentro48h),
+        usuario_id: String(auth.usuario.uid || ''), usuario_nombre: auth.usuario.nombre, usuario_rol: auth.usuario.rol,
+      });
+    }
     return res.status(200).json({ ok: true, arriendos: escritos });
   } catch (e) {
     console.error('reservar throw:', e);

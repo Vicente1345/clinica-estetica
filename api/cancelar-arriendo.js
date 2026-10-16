@@ -8,10 +8,8 @@
 //   { id, motivo }
 // → { ok:true, arriendo } | { ok:false, error }
 
-const { getSbAdmin, requiereRol, rateLimitOk, ipDeReq, horasHastaChile } = require('./_lib/seguridad');
+const { getSbAdmin, requiereRol, rateLimitOk, ipDeReq, ventanaModificacion, ahoraChileTexto, registrarHistorialArriendo } = require('./_lib/seguridad');
 const { normHora } = require('./_lib/disponibilidad');
-
-const HORAS_MINIMAS_CANCELACION = 48; // política vigente de arriendos
 
 module.exports = async (req, res) => {
   if (req.method !== 'POST') return res.status(405).json({ ok: false, error: 'Método no permitido' });
@@ -33,30 +31,36 @@ module.exports = async (req, res) => {
   if (!sb) return res.status(500).json({ ok: false, error: 'Sin conexión a la base de datos' });
 
   const { data: arr, error } = await sb.from('arriendos')
-    .select('id,fecha,hora_inicio,hora_fin,estado,box_nombre,profesional_nombre')
+    .select('id,fecha,hora_inicio,hora_fin,estado,box_id,box_nombre,profesional_nombre,horas,monto')
     .eq('id', id).maybeSingle();
   if (error) return res.status(500).json({ ok: false, error: 'No se pudo leer el arriendo: ' + error.message });
   if (!arr) return res.status(404).json({ ok: false, error: 'Arriendo no encontrado' });
   if (arr.estado === 'cancelado') return res.status(400).json({ ok: false, error: 'El arriendo ya está cancelado' });
 
-  const horas = horasHastaChile(arr.fecha, normHora(arr.hora_inicio));
-  if (!Number.isFinite(horas) || horas <= HORAS_MINIMAS_CANCELACION) {
-    return res.status(400).json({
-      ok: false,
-      error: `No se puede cancelar: se requieren más de ${HORAS_MINIMAS_CANCELACION} horas de anticipación (quedan ${Math.max(0, Math.round(horas))}).`,
-    });
-  }
+  // Ventana de 48 h: la admin la omite (hasta que la reserva termine)
+  const ventana = ventanaModificacion(auth.usuario.rol, arr.fecha, normHora(arr.hora_inicio), normHora(arr.hora_fin));
+  if (!ventana.ok) return res.status(400).json({ ok: false, error: 'No se puede cancelar: ' + ventana.error });
 
+  const traza = `Cancelado por ${auth.usuario.nombre} (${auth.usuario.rol}) el ${ahoraChileTexto()}${ventana.excepcionAdmin ? ' [con menos de 48 h]' : ''}: ${motivo}`;
   const { data, error: eUpd } = await sb.from('arriendos')
-    .update({ estado: 'cancelado', obs_modificacion: `Cancelado por ${auth.usuario.nombre} (admin): ${motivo}` })
+    .update({ estado: 'cancelado', obs_modificacion: traza.slice(0, 1000) })
     .eq('id', id).select().single();
   if (eUpd) return res.status(500).json({ ok: false, error: 'No se pudo cancelar: ' + eUpd.message });
+
+  await registrarHistorialArriendo(sb, {
+    arriendo_id: arr.id, accion: 'cancelar',
+    antes: { fecha: arr.fecha, hora_inicio: normHora(arr.hora_inicio), hora_fin: normHora(arr.hora_fin), box_id: arr.box_id, box_nombre: arr.box_nombre, estado: arr.estado },
+    despues: { estado: 'cancelado' },
+    motivo, dentro_48h: ventana.dentro48h,
+    usuario_id: String(auth.usuario.uid || ''), usuario_nombre: auth.usuario.nombre, usuario_rol: auth.usuario.rol,
+  });
 
   // Si la jornada pertenece a un plan especial, su total se mantiene al día
   if (data && data.plan_profesional_id) {
     const { count } = await sb.from('arriendos').select('id', { count: 'exact', head: true })
       .eq('plan_profesional_id', data.plan_profesional_id).in('estado', ['pendiente', 'confirmado']);
-    await sb.from('planes_profesional').update({ jornadas_totales: count || 0 }).eq('id', data.plan_profesional_id);
+    await sb.from('planes_profesional').update({ jornadas_totales: count || 0 })
+      .eq('id', data.plan_profesional_id).eq('es_especial', true);
   }
 
   console.log(`[cancelar-arriendo] ${id} por ${auth.usuario.nombre}: ${motivo}`);

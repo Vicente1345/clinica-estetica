@@ -52,8 +52,19 @@ alter table planes_profesional add column if not exists finalizado_at    timesta
 
 -- 3. Vínculo de cada jornada reservada con su plan (para modificar o
 --    finalizar SOLO las reservas propias del plan, nunca las de terceros)
-alter table arriendos add column if not exists plan_profesional_id uuid
-  references planes_profesional(id) on delete set null;
+--    (la columna ya existía de un modelo anterior, sin uso: 0 filas con valor
+--    al 16-10-2026; solo se agrega la FK si el tipo es uuid y aún no la tiene,
+--    para que la migración no falle si el tipo heredado fuera otro)
+alter table arriendos add column if not exists plan_profesional_id uuid;
+do $$
+begin
+  if (select data_type from information_schema.columns
+       where table_schema = 'public' and table_name = 'arriendos' and column_name = 'plan_profesional_id') = 'uuid'
+     and not exists (select 1 from pg_constraint where conname = 'arriendos_plan_profesional_fk') then
+    alter table arriendos add constraint arriendos_plan_profesional_fk
+      foreign key (plan_profesional_id) references planes_profesional(id) on delete set null;
+  end if;
+end $$;
 create index if not exists idx_arriendos_plan_profesional on arriendos(plan_profesional_id);
 
 -- 4. Historial: quién asignó / modificó / finalizó y cuándo

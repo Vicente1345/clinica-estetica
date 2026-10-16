@@ -1,14 +1,21 @@
 import { useState } from "react";
 import { conflictosArriendo, conflictosCita, minHorasDeBox, normHora, calcularPrecio, normTipoBox } from "./logic/disponibilidad";
+import { apiGestion } from "./api";
 
 const HORAS = ["08:00","09:00","10:00","11:00","12:00","13:00","14:00","15:00","16:00","17:00","18:00","19:00","20:00"];
 const fmt = n => (n||0).toLocaleString("es-CL",{style:"currency",currency:"CLP",maximumFractionDigits:0});
 
-function puedeModificar(fecha, horaInicio) {
+// Permiso exclusivo de la administración (16-10-2026): puede modificar o
+// cancelar cualquier reserva hasta que termine, aunque falten menos de 48 h.
+// El servidor aplica la misma regla (api/_lib/seguridad.js) y registra cada
+// cambio; esta pantalla solo existe para el rol admin.
+function terminada(fecha, horaFin) {
+  if (!fecha || !horaFin) return true;
+  return new Date(`${fecha}T${normHora(horaFin)}:00`) <= new Date();
+}
+function dentro48h(fecha, horaInicio) {
   if (!fecha || !horaInicio) return false;
-  const reserva = new Date(`${fecha}T${horaInicio}:00`);
-  const ahora   = new Date();
-  return (reserva - ahora) / (1000 * 60 * 60) > 48;
+  return (new Date(`${fecha}T${normHora(horaInicio)}:00`) - new Date()) / 3600000 <= 48;
 }
 
 function horasRestantes(fecha, horaInicio) {
@@ -32,6 +39,13 @@ export default function ModificarReserva({ arriendos, boxes, profesionales, soli
   const [guardando, setGuardando]     = useState(false);
   const [toast, setToast]             = useState(null);
   const [confirmarCancelar, setConfirmarCancelar] = useState(false);
+  const [historial, setHistorial] = useState(null); // { id, items, sinTabla }
+  const verHistorial = async (id) => {
+    if (historial?.id === id) { setHistorial(null); return; }
+    setHistorial({ id, items: null });
+    const r = await apiGestion("arriendo_historial", { arriendo_id: id });
+    setHistorial({ id, items: r.ok ? (r.historial || []) : [], error: r.ok ? null : (r.error || "No se pudo cargar el historial"), sinTabla: !!r.sinTabla });
+  };
 
   // ── Filtros combinables (solo afectan la lista; la edición no cambia) ──
   const hoy = new Date().toLocaleDateString("en-CA", { timeZone: "America/Santiago" });
@@ -90,8 +104,11 @@ export default function ModificarReserva({ arriendos, boxes, profesionales, soli
   const guardar = async () => {
     const arr = arriendos.find(a => a.id === selId);
     if (!arr) return;
-    if (!puedeModificar(form.fecha, form.horaInicio)) {
-      showToast("No se puede modificar: faltan menos de 48 horas.", "err"); return;
+    if (terminada(arr.fecha, arr.hora_fin)) {
+      showToast("Esta reserva ya terminó: no se puede modificar.", "err"); return;
+    }
+    if (terminada(form.fecha, form.horaFin)) {
+      showToast("El nuevo horario ya pasó: elige una fecha y hora futuras.", "err"); return;
     }
     if (!form.motivo.trim()) {
       showToast("Debes ingresar el motivo del cambio.", "err"); return;
@@ -142,7 +159,7 @@ export default function ModificarReserva({ arriendos, boxes, profesionales, soli
           fecha: form.fecha, hora_inicio: form.horaInicio, hora_fin: form.horaFin,
           box_id: form.boxId, box_nombre: box?.nombre || arr.box_nombre,
           horas, monto,
-          obs_modificacion: `Modificado por admin: ${form.motivo}`,
+          motivo: form.motivo.trim(),
         }}),
       });
       const data = await r.json();
@@ -166,8 +183,8 @@ export default function ModificarReserva({ arriendos, boxes, profesionales, soli
   const cancelar = async () => {
     const arr = arriendos.find(a => a.id === selId);
     if (!arr) return;
-    if (!puedeModificar(arr.fecha, arr.hora_inicio)) {
-      showToast("No se puede cancelar: faltan menos de 48 horas.", "err");
+    if (terminada(arr.fecha, arr.hora_fin)) {
+      showToast("Esta reserva ya terminó: no se puede cancelar.", "err");
       setConfirmarCancelar(false); return;
     }
     if (!form.motivo.trim()) {
@@ -213,7 +230,8 @@ export default function ModificarReserva({ arriendos, boxes, profesionales, soli
 
       <h3 style={{fontSize:15,fontWeight:500,margin:"0 0 4px"}}>Modificar reservas</h3>
       <p style={{fontSize:13,color:"#666",margin:"0 0 16px"}}>
-        Solo puedes modificar o cancelar reservas con <strong>más de 48 horas de anticipación</strong>.
+        Como administradora puedes modificar o cancelar <strong>cualquier reserva hasta que termine</strong>, incluso con menos de 48 horas
+        de anticipación o el mismo día. Los demás perfiles siguen sujetos a la regla de 48 horas. <strong>Cada cambio queda registrado</strong> (quién, cuándo, qué y por qué).
       </p>
 
       {/* ── Barra de filtros combinables ── */}
@@ -274,7 +292,9 @@ export default function ModificarReserva({ arriendos, boxes, profesionales, soli
       )}
 
       {proximos.map((arr, i) => {
-        const puede   = puedeModificar(arr.fecha, arr.hora_inicio);
+        const fin     = terminada(arr.fecha, arr.hora_fin);
+        const corto   = !fin && dentro48h(arr.fecha, arr.hora_inicio);
+        const puede   = !fin && arr.estado !== "cancelado";
         const hrsRest = horasRestantes(arr.fecha, arr.hora_inicio);
         const esSelec = selId === arr.id;
         const mesKey   = (arr.fecha||"").slice(0,7);
@@ -290,8 +310,8 @@ export default function ModificarReserva({ arriendos, boxes, profesionales, soli
             </div>
           )}
           <div style={{...S.card,
-            border:`1px solid ${esSelec?"#111":puede?"#ddd":"#F5C2C7"}`,
-            background: esSelec?"#f0f0f0": puede?"#f8f8f8":"#FFF5F5"}}>
+            border:`1px solid ${esSelec?"#111":corto?"#F4D58D":puede?"#ddd":"#e5e5e5"}`,
+            background: esSelec?"#f0f0f0": corto?"#FFFBEB":puede?"#f8f8f8":"#fafafa"}}>
 
             <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",flexWrap:"wrap",gap:8}}>
               <div>
@@ -303,25 +323,51 @@ export default function ModificarReserva({ arriendos, boxes, profesionales, soli
               </div>
               <div style={{display:"flex",gap:8,alignItems:"center",flexWrap:"wrap"}}>
                 <span style={{fontSize:11,padding:"3px 10px",borderRadius:10,fontWeight:600,
-                  background:puede?"#EAF3DE":"#FCEBEB",
-                  color:puede?"#3B6D11":"#A32D2D"}}>
-                  {hrsRest<=0?"Ya pasó":puede?`${hrsRest}h ✓`:`${hrsRest}h 🔒`}
+                  background: fin?"#f0f0f0":corto?"#FDE8B6":"#EAF3DE",
+                  color: fin?"#666":corto?"#8A5A00":"#3B6D11"}}>
+                  {fin ? "Terminada" : hrsRest<=0 ? "En curso" : corto ? `${hrsRest}h · permiso admin` : `${hrsRest}h ✓`}
                 </span>
                 {puede && !esSelec && (
                   <button style={S.btn("secondary",true)} onClick={()=>seleccionar(arr)}>Editar</button>
                 )}
-                {!puede && hrsRest>0 && (
-                  <span style={{fontSize:11,color:"#A32D2D"}}>🔒 Menos de 48h</span>
-                )}
+                <button style={{...S.btn("secondary",true),background:"transparent",border:"1px solid #ddd"}} onClick={()=>verHistorial(arr.id)}>
+                  {historial?.id===arr.id ? "Ocultar historial" : "Historial"}
+                </button>
               </div>
             </div>
+
+            {historial?.id===arr.id && (
+              <div style={{marginTop:12,paddingTop:10,borderTop:"1px solid #eee",fontSize:12}}>
+                {historial.items === null && <div style={{color:"#888"}}>Cargando historial…</div>}
+                {historial.error && <div style={{color:"#A32D2D"}}>{historial.error}</div>}
+                {!historial.error && historial.items && historial.items.length === 0 && (
+                  <div style={{color:"#888"}}>
+                    {historial.sinTabla ? "El historial detallado se activa al ejecutar docs/migracion-historial-arriendos.sql." : "Sin cambios registrados."}
+                    {arr.obs_modificacion && <div style={{marginTop:4,color:"#555"}}>Última nota: {arr.obs_modificacion}</div>}
+                  </div>
+                )}
+                {(historial.items || []).map(h => (
+                  <div key={h.id} style={{padding:"5px 0",borderBottom:"1px solid #f3f3f3"}}>
+                    <strong>{new Date(h.creado_at).toLocaleString("es-CL",{timeZone:"America/Santiago",dateStyle:"short",timeStyle:"short"})}</strong>
+                    {" · "}{h.accion === "cancelar" ? "Canceló" : "Modificó"} · {h.usuario_nombre}
+                    {h.dentro_48h && <span style={{marginLeft:6,fontSize:10,fontWeight:700,color:"#8A5A00",background:"#FDE8B6",padding:"1px 6px",borderRadius:6}}>MENOS DE 48 H</span>}
+                    <div style={{color:"#555"}}>
+                      {h.accion === "modificar"
+                        ? <>{h.antes?.fecha} {h.antes?.hora_inicio}–{h.antes?.hora_fin} {h.antes?.box_nombre} → {h.despues?.fecha} {h.despues?.hora_inicio}–{h.despues?.hora_fin} {h.despues?.box_nombre}</>
+                        : <>{h.antes?.fecha} {h.antes?.hora_inicio}–{h.antes?.hora_fin} {h.antes?.box_nombre} → cancelada</>}
+                    </div>
+                    {h.motivo && <div style={{color:"#888"}}>Motivo: {h.motivo}</div>}
+                  </div>
+                ))}
+              </div>
+            )}
 
             {esSelec && (
               <div style={{marginTop:14,paddingTop:14,borderTop:"1px solid #ddd"}}>
                 <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12}}>
                   <div>
                     <label style={S.label}>Nueva fecha</label>
-                    <input type="date" style={S.input} value={form.fecha}
+                    <input type="date" style={S.input} min={hoy} value={form.fecha}
                       onChange={e=>setForm(f=>({...f,fecha:e.target.value}))}/>
                   </div>
                   <div>
@@ -348,9 +394,9 @@ export default function ModificarReserva({ arriendos, boxes, profesionales, soli
                 <input style={S.input} placeholder="Ej: Solicitud de la profesional, mantención del box…"
                   value={form.motivo} onChange={e=>setForm(f=>({...f,motivo:e.target.value}))}/>
 
-                {form.fecha && form.horaInicio && !puedeModificar(form.fecha, form.horaInicio) && (
-                  <div style={{background:"#FCEBEB",border:"1px solid #F5C2C7",borderRadius:8,padding:"8px 12px",fontSize:12,color:"#A32D2D",marginTop:10}}>
-                    ⚠ La nueva fecha tampoco cumple las 48 horas mínimas.
+                {(corto || (form.fecha && form.horaInicio && dentro48h(form.fecha, form.horaInicio))) && (
+                  <div style={{background:"#FFFBEB",border:"1px solid #F4D58D",borderRadius:8,padding:"8px 12px",fontSize:12,color:"#8A5A00",marginTop:10}}>
+                    ⚠ Cambio con menos de 48 horas de anticipación: se aplica con el <strong>permiso de administración</strong> y queda registrado.
                   </div>
                 )}
 
